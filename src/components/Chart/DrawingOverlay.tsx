@@ -256,31 +256,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.setLineDash([]);
     }
 
-    // Crosshair "+" alert button (only in cursor mode, when not drawing/dragging)
-    if (activeTool === 'cursor' && crosshairMouseY.current !== null && !dragRef.current && !isInteracting) {
-      const btnX = w - 28;
-      const btnY = crosshairMouseY.current;
-      const btnR = 10;
-      const isHover = hoveredCrosshairBtn;
-
-      ctx.beginPath();
-      ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
-      ctx.fillStyle = isHover ? '#2563eb' : 'rgba(37, 99, 235, 0.75)';
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Plus icon
-      ctx.beginPath();
-      ctx.moveTo(btnX - 5, btnY);
-      ctx.lineTo(btnX + 5, btnY);
-      ctx.moveTo(btnX, btnY - 5);
-      ctx.lineTo(btnX, btnY + 5);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    // (Crosshair "+" button is rendered as HTML element, not on canvas)
 
     const ds = drawRef.current;
     if (ds.phase === 'drawing') {
