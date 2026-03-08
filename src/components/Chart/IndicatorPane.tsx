@@ -175,8 +175,17 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     });
     ro.observe(containerRef.current);
 
+    // Register with sync context
+    if (chartSync) {
+      chartSync.registerChart(chartId, chart);
+      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        if (range) chartSync.syncRange(chartId, range);
+      });
+    }
+
     return () => {
       ro.disconnect();
+      if (chartSync) chartSync.unregisterChart(chartId);
       chart.remove();
       chartRef.current = null;
     };

@@ -164,8 +164,17 @@ export const CandlestickChart: React.FC = () => {
     });
     ro.observe(containerRef.current);
 
+    // Register with sync context
+    if (chartSync) {
+      chartSync.registerChart('main', chart);
+      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        if (range) chartSync.syncRange('main', range);
+      });
+    }
+
     return () => {
       ro.disconnect();
+      if (chartSync) chartSync.unregisterChart('main');
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
