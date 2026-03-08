@@ -56,6 +56,21 @@ export interface Alert {
   telegramEnabled?: boolean;
 }
 
+export interface IndicatorCrossAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  indicatorId1: string;
+  indicatorId2: string;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
 export interface AlertLog {
   id: string;
   alertId: string;
