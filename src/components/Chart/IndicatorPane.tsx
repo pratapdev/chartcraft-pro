@@ -23,11 +23,16 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const { candles, removeIndicator } = useChartStore();
   const chartSync = useChartSync();
   const chartId = `indicator-${indicator.id}`;
+  const savedRangeRef = useRef<{ from: number; to: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || candles.length === 0) return;
 
+    // Save visible range before destroying
     if (chartRef.current) {
+      const range = chartRef.current.timeScale().getVisibleLogicalRange();
+      if (range) savedRangeRef.current = range;
+      if (chartSync) chartSync.unregisterChart(chartId);
       chartRef.current.remove();
       chartRef.current = null;
     }
