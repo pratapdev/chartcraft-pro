@@ -1033,6 +1033,14 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'settings' && (
           <SettingsPanel />
         )}
+
+        {rightPanelTab === 'watchlist' && (
+          <WatchlistPanel />
+        )}
+
+        {rightPanelTab === 'heatmap' && (
+          <HeatmapView />
+        )}
       </div>
     </div>
   );
