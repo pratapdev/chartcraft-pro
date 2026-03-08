@@ -389,6 +389,109 @@ export const CandlestickChart: React.FC = () => {
           text: `L ${p.price.toFixed(2)}`,
         })));
       }
+
+      if (ind.type === 'MSB_OB') {
+        const msbResult = computeMsbOb(candles, ind.zigzagLength ?? 9, ind.fibFactor ?? 0.33);
+
+        // ZigZag line
+        if (msbResult.zigzag.length > 1) {
+          const zigzagSeries = chartRef.current.addLineSeries({
+            color: '#6b7280',
+            lineWidth: 1 as 1 | 2 | 3 | 4,
+            lineStyle: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          zigzagSeries.setData(msbResult.zigzag.map(p => ({ time: p.time as Time, value: p.price })) as LineData[]);
+          lineSeriesRefs.current.set(ind.id + '-zigzag', zigzagSeries);
+        }
+
+        // MSB horizontal lines
+        for (let mi = 0; mi < msbResult.msbLines.length; mi++) {
+          const msb = msbResult.msbLines[mi];
+          const color = msb.direction === 'bull' ? '#22c55e' : '#ef4444';
+          const msbSeries = chartRef.current.addLineSeries({
+            color,
+            lineWidth: 2 as 1 | 2 | 3 | 4,
+            lineStyle: 0,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          msbSeries.setData([
+            { time: msb.time1 as Time, value: msb.price },
+            { time: msb.time2 as Time, value: msb.price },
+          ] as LineData[]);
+          lineSeriesRefs.current.set(ind.id + `-msb-${mi}`, msbSeries);
+        }
+
+        // MSB markers
+        allMarkers.push(...msbResult.msbMarkers.map(m => ({
+          time: m.time as Time,
+          position: (m.direction === 'bull' ? 'aboveBar' : 'belowBar') as 'aboveBar' | 'belowBar',
+          color: m.direction === 'bull' ? '#22c55e' : '#ef4444',
+          shape: (m.direction === 'bull' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+          text: m.label,
+        })));
+
+        // Order Block & Breaker Block zones (top + bottom lines)
+        const lastTime = candles[candles.length - 1].time;
+        for (let zi = 0; zi < msbResult.zones.length; zi++) {
+          const zone = msbResult.zones[zi];
+          const isBull = zone.type.startsWith('Bu');
+          const zoneColor = isBull ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)';
+          const zoneBorderColor = isBull ? '#22c55e' : '#ef4444';
+
+          // Top line
+          const topSeries = chartRef.current.addLineSeries({
+            color: zoneBorderColor,
+            lineWidth: 1 as 1 | 2 | 3 | 4,
+            lineStyle: 0,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          topSeries.setData([
+            { time: zone.startTime as Time, value: zone.top },
+            { time: lastTime as Time, value: zone.top },
+          ] as LineData[]);
+          lineSeriesRefs.current.set(ind.id + `-zone-top-${zi}`, topSeries);
+
+          // Bottom line
+          const bottomSeries = chartRef.current.addLineSeries({
+            color: zoneBorderColor,
+            lineWidth: 1 as 1 | 2 | 3 | 4,
+            lineStyle: 0,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          bottomSeries.setData([
+            { time: zone.startTime as Time, value: zone.bottom },
+            { time: lastTime as Time, value: zone.bottom },
+          ] as LineData[]);
+          lineSeriesRefs.current.set(ind.id + `-zone-bot-${zi}`, bottomSeries);
+
+          // Mid label line (faint, for zone fill effect)
+          const midSeries = chartRef.current.addLineSeries({
+            color: zoneColor,
+            lineWidth: 1 as 1 | 2 | 3 | 4,
+            lineStyle: 1,
+            priceLineVisible: false,
+            lastValueVisible: true,
+            crosshairMarkerVisible: false,
+          });
+          const midPrice = (zone.top + zone.bottom) / 2;
+          midSeries.setData([
+            { time: zone.startTime as Time, value: midPrice },
+            { time: lastTime as Time, value: midPrice },
+          ] as LineData[]);
+          // Set the last value label to show zone type
+          midSeries.applyOptions({ title: zone.type });
+          lineSeriesRefs.current.set(ind.id + `-zone-mid-${zi}`, midSeries);
+        }
+      }
     }
 
     // Sort markers by time (required by lightweight-charts) and set on candle series
