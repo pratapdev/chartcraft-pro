@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell } from 'lucide-react';
+import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send } from 'lucide-react';
 import { IndicatorType, IndicatorConfig, AlertCondition } from '@/types/trading';
+import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 
 const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial<IndicatorConfig> }[] = [
   { type: 'EMA', label: 'EMA', defaults: { period: 20, color: '#2962FF' } },
