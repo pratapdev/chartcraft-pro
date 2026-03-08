@@ -195,8 +195,9 @@ export const CandlestickChart: React.FC = () => {
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || !chartRef.current || candles.length === 0) return;
 
-    // Preserve scroll position
-    const range = chartRef.current.timeScale().getVisibleLogicalRange();
+    const timeScale = chartRef.current.timeScale();
+    const prevRange = timeScale.getVisibleLogicalRange();
+    const wasNearRealtime = Math.abs(timeScale.scrollPosition()) <= 1;
 
     const candleData: CandlestickData[] = candles.map((c) => ({
       time: c.time as Time,
@@ -215,9 +216,11 @@ export const CandlestickChart: React.FC = () => {
     candleSeriesRef.current.setData(candleData);
     volumeSeriesRef.current.setData(volumeData);
 
-    // Restore scroll position if user had scrolled
-    if (range) {
-      chartRef.current.timeScale().setVisibleLogicalRange(range);
+    // Keep user position if they are reviewing history, otherwise stay at latest candle
+    if (wasNearRealtime) {
+      timeScale.scrollToRealTime();
+    } else if (prevRange) {
+      timeScale.setVisibleLogicalRange(prevRange);
     }
   }, [candles]);
 
