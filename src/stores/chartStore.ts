@@ -335,6 +335,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   multiTfMode: false,
   setMultiTfMode: (multiTfMode) => set({ multiTfMode }),
 
+  chartFontSize: 11,
+  setChartFontSize: (chartFontSize) => set({ chartFontSize }),
+
   alertCandles: {},
   setAlertCandles: (key, candles) => set((s) => ({ alertCandles: { ...s.alertCandles, [key]: candles } })),
   updateAlertCandle: (key, candle) => set((s) => {
