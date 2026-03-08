@@ -58,6 +58,16 @@ export const CrosshairLegend: React.FC = () => {
         });
       }
     }
+
+    if (ind.type === 'BBANDS') {
+      const { upper, middle, lower } = computeBollingerBands(candles, ind.period, ind.stdDev ?? 2);
+      const uPt = upper.find((pt) => pt.time === crosshairData.time);
+      const mPt = middle.find((pt) => pt.time === crosshairData.time);
+      const lPt = lower.find((pt) => pt.time === crosshairData.time);
+      if (mPt) {
+        indicatorValues.push({ label: `BB(${ind.period})`, value: `${uPt?.value.toFixed(2)} / ${mPt.value.toFixed(2)} / ${lPt?.value.toFixed(2)}`, color: ind.color });
+      }
+    }
   }
 
   return (
