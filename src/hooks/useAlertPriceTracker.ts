@@ -34,9 +34,13 @@ export function useAlertPriceTracker() {
     for (const key of activeKeysRef.current) {
       if (key === currentKey) continue;
       const [symbol, timeframe] = key.split(':') as [string, Timeframe];
-      fetchCandles(symbol, timeframe, 200).then((candles) => {
-        useChartStore.getState().setAlertCandles(key, candles);
-      });
+      fetchCandles(symbol, timeframe, 200)
+        .then((candles) => {
+          useChartStore.getState().setAlertCandles(key, candles);
+        })
+        .catch((err) => {
+          console.error(`[AlertTracker] Refetch failed for ${key}:`, err);
+        });
     }
   }, []);
 

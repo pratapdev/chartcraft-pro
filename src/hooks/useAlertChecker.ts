@@ -84,13 +84,18 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
 }
 
 function getIndicatorValues(ind: IndicatorConfig, candles: Candle[]): { time: number; value: number }[] {
-  if (ind.type === 'EMA') return computeEMA(candles, ind.period);
-  if (ind.type === 'SMA') return computeSMA(candles, ind.period);
-  if (ind.type === 'RSI') return computeRSI(candles, ind.period);
-  if (ind.type === 'ATR') return computeATR(candles, ind.period);
-  if (ind.type === 'OBV') return computeOBV(candles);
-  if (ind.type === 'ADX') return computeADX(candles, ind.period).adx;
-  return [];
+  try {
+    if (ind.type === 'EMA') return computeEMA(candles, ind.period);
+    if (ind.type === 'SMA') return computeSMA(candles, ind.period);
+    if (ind.type === 'RSI') return computeRSI(candles, ind.period);
+    if (ind.type === 'ATR') return computeATR(candles, ind.period);
+    if (ind.type === 'OBV') return computeOBV(candles);
+    if (ind.type === 'ADX') return computeADX(candles, ind.period).adx;
+    return [];
+  } catch (err) {
+    console.error(`[AlertChecker] Failed to compute ${ind.type}(${ind.period}):`, err);
+    return [];
+  }
 }
 
 function getIndicatorLabel(ind: IndicatorConfig): string {
