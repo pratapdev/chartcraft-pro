@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { toast } from 'sonner';
 import { sendTelegramMessage } from '@/lib/telegram';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV } from '@/lib/marketData';
-import { Candle, IndicatorConfig } from '@/types/trading';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
+import { Candle, IndicatorConfig, PctDiffDonLine } from '@/types/trading';
 
 // Shared AudioContext, unlocked on first user gesture
 let sharedCtx: AudioContext | null = null;
@@ -144,11 +144,13 @@ export function useAlertChecker() {
   const indicatorCrossAlerts = useChartStore((s) => s.indicatorCrossAlerts);
   const indicatorThresholdAlerts = useChartStore((s) => s.indicatorThresholdAlerts);
   const stochRSICrossAlerts = useChartStore((s) => s.stochRSICrossAlerts);
+  const pctDiffDonCrossAlerts = useChartStore((s) => s.pctDiffDonCrossAlerts);
 
   const triggeredSetRef = useRef<Set<string>>(new Set());
   const crossTriggeredRef = useRef<Set<string>>(new Set());
   const thresholdTriggeredRef = useRef<Set<string>>(new Set());
   const stochTriggeredRef = useRef<Set<string>>(new Set());
+  const pctDiffTriggeredRef = useRef<Set<string>>(new Set());
 
   // Trendline alerts — check per-symbol candles
   useEffect(() => {
@@ -329,6 +331,82 @@ export function useAlertChecker() {
       useChartStore.getState().addStochRSICrossAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
     }
   }, [alertCandles, stochRSICrossAlerts, indicators]);
+
+  // PctDiffDon line crossover alerts
+  useEffect(() => {
+    const active = (pctDiffDonCrossAlerts ?? []).filter((a) => a.active && !a.triggered);
+    if (active.length === 0) return;
+
+    for (const alert of active) {
+      if (pctDiffTriggeredRef.current.has(alert.id)) continue;
+      const candles = getCandlesForAlert(alert.symbol, alert.timeframe);
+      if (candles.length < 30) continue;
+
+      const ind = indicators.find((i) => i.id === alert.indicatorId && i.type === 'PCT_DIFF_DON');
+      if (!ind) continue;
+
+      const result = computePctDiffDonchian(
+        candles, ind.period, ind.lookbackWindow ?? 10,
+        ind.emaSmoothing ?? 5, ind.donchianLength ?? 20, ind.donLineDiff ?? 0.2,
+      );
+
+      const getLineValues = (line: PctDiffDonLine) => {
+        switch (line) {
+          case 'main': return result.pctDiff.map(d => ({ time: d.time, value: d.value }));
+          case 'ema': return result.emaLine;
+          case 'basis': return result.basis;
+          case 'upper': return result.upper;
+          case 'lower': return result.lower;
+          case 'upperNew': return result.upperNew;
+          case 'lowerNew': return result.lowerNew;
+        }
+      };
+
+      const vals1 = getLineValues(alert.line1);
+      const vals2 = getLineValues(alert.line2);
+      if (vals1.length < 2 || vals2.length < 2) continue;
+
+      // Align by time — use last two common timestamps
+      const time1 = vals1[vals1.length - 1].time;
+      const time2 = vals2[vals2.length - 1].time;
+      if (time1 !== time2) continue;
+
+      const v1Curr = vals1[vals1.length - 1].value;
+      const v1Prev = vals1[vals1.length - 2].value;
+      const v2Curr = vals2[vals2.length - 1].value;
+      const v2Prev = vals2[vals2.length - 2].value;
+
+      const prevDiff = v1Prev - v2Prev;
+      const currDiff = v1Curr - v2Curr;
+
+      let dir: 'above' | 'below' | null = null;
+      if (prevDiff <= 0 && currDiff > 0) dir = 'above';
+      if (prevDiff >= 0 && currDiff < 0) dir = 'below';
+      if (!dir) continue;
+
+      const matches = alert.condition === 'cross_any' ||
+        (alert.condition === 'cross_above' && dir === 'above') ||
+        (alert.condition === 'cross_below' && dir === 'below');
+      if (!matches) continue;
+
+      pctDiffTriggeredRef.current.add(alert.id);
+      const curr = candles[candles.length - 1];
+      const LINE_LABELS: Record<PctDiffDonLine, string> = {
+        main: 'Main', ema: 'EMA', basis: 'Basis', upper: 'Upper', lower: 'Lower', upperNew: 'Upper-Adj', lowerNew: 'Lower-Adj',
+      };
+      fireAlert({
+        message: `${alert.symbol} %Diff ${LINE_LABELS[alert.line1]} ${dir === 'above' ? '↑ crossed above' : '↓ crossed below'} ${LINE_LABELS[alert.line2]}`,
+        symbol: alert.symbol,
+        alertId: alert.id,
+        price: curr.close,
+        direction: alert.condition === 'cross_any' ? 'any' : dir,
+        telegramEnabled: alert.telegramEnabled,
+        time: curr.time,
+      });
+      useChartStore.getState().removePctDiffDonCrossAlert(alert.id);
+      useChartStore.getState().addPctDiffDonCrossAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
+    }
+  }, [alertCandles, pctDiffDonCrossAlerts, indicators]);
 }
 
 function detectCrossingDynamic(

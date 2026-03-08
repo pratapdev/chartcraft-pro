@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft, RefreshCw, CloudOff, Cloud, List, Grid3X3 } from 'lucide-react';
-import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition } from '@/types/trading';
+import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition, PctDiffDonLine } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 import { pushState, pullState, checkSyncHealth, extractSyncPayload, getSyncServerUrl, setSyncServerUrl } from '@/lib/syncService';
 import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/components/Alerts/CompoundAlerts';
@@ -462,6 +462,81 @@ const IndicatorThresholdAlertForm: React.FC = () => {
   );
 };
 
+const PCT_DIFF_DON_LINES: { value: PctDiffDonLine; label: string }[] = [
+  { value: 'main', label: 'Main Line' },
+  { value: 'ema', label: 'EMA Smooth' },
+  { value: 'basis', label: 'Don Basis' },
+  { value: 'upper', label: 'Don Upper' },
+  { value: 'lower', label: 'Don Lower' },
+  { value: 'upperNew', label: 'Don Upper-Adj' },
+  { value: 'lowerNew', label: 'Don Lower-Adj' },
+];
+
+const PctDiffDonCrossAlertForm: React.FC = () => {
+  const { symbol, timeframe, indicators, addPctDiffDonCrossAlert } = useChartStore();
+  const pctDiffIndicators = indicators.filter((i) => i.visible && i.type === 'PCT_DIFF_DON');
+  const [selectedInd, setSelectedInd] = useState('');
+  const [line1, setLine1] = useState<PctDiffDonLine>('main');
+  const [line2, setLine2] = useState<PctDiffDonLine>('ema');
+  const [condition, setCondition] = useState<AlertCondition>('cross_any');
+
+  if (pctDiffIndicators.length === 0) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (line1 === line2) return;
+    const indId = selectedInd || pctDiffIndicators[0]?.id;
+    if (!indId) return;
+    const l1Label = PCT_DIFF_DON_LINES.find(l => l.value === line1)?.label ?? line1;
+    const l2Label = PCT_DIFF_DON_LINES.find(l => l.value === line2)?.label ?? line2;
+    addPctDiffDonCrossAlert({
+      id: crypto.randomUUID(),
+      symbol, timeframe, indicatorId: indId,
+      line1, line2, condition,
+      active: true, triggered: false,
+      message: `%Diff ${l1Label} ${condition.replace('_', ' ')} ${l2Label}`,
+      createdAt: Date.now(),
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="panel-section rounded p-2 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <ArrowRightLeft size={12} className="text-accent-foreground" />
+        %Diff Donchian Crossover
+      </div>
+      {pctDiffIndicators.length > 1 && (
+        <select value={selectedInd || pctDiffIndicators[0]?.id} onChange={(e) => setSelectedInd(e.target.value)}
+          className="w-full bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+          {pctDiffIndicators.map((ind) => (
+            <option key={ind.id} value={ind.id}>%Diff Don({ind.period})</option>
+          ))}
+        </select>
+      )}
+      <div className="flex gap-1.5">
+        <select value={line1} onChange={(e) => setLine1(e.target.value as PctDiffDonLine)}
+          className="flex-1 bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+          {PCT_DIFF_DON_LINES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+        </select>
+        <span className="text-xs text-muted-foreground self-center">×</span>
+        <select value={line2} onChange={(e) => setLine2(e.target.value as PctDiffDonLine)}
+          className="flex-1 bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+          {PCT_DIFF_DON_LINES.filter(l => l.value !== line1).map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+        </select>
+      </div>
+      <select value={condition} onChange={(e) => setCondition(e.target.value as AlertCondition)}
+        className="w-full bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+        <option value="cross_above">Line 1 Cross Above Line 2</option>
+        <option value="cross_below">Line 1 Cross Below Line 2</option>
+        <option value="cross_any">Any Crossing</option>
+      </select>
+      <button type="submit" className="w-full text-xs py-1.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors font-medium">
+        Set %Diff Crossover Alert
+      </button>
+    </form>
+  );
+};
+
 const LINE_STYLE_OPTIONS: { value: LineStyleType; label: string }[] = [
   { value: 'solid', label: '━━━' },
   { value: 'dashed', label: '╌╌╌' },
@@ -847,6 +922,8 @@ export const RightSidebar: React.FC = () => {
     removeIndicatorThresholdAlert,
     stochRSICrossAlerts,
     removeStochRSICrossAlert,
+    pctDiffDonCrossAlerts,
+    removePctDiffDonCrossAlert,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -893,6 +970,7 @@ export const RightSidebar: React.FC = () => {
             <IndicatorCrossAlertForm />
             <StochRSICrossAlertForm />
             <IndicatorThresholdAlertForm />
+            <PctDiffDonCrossAlertForm />
             <CompoundAlertsList />
             <AlertTemplatesSection />
             <div className="flex items-center justify-between px-1">
@@ -965,6 +1043,18 @@ export const RightSidebar: React.FC = () => {
                     <span className="text-foreground">{alert.condition} {alert.threshold}</span>
                   </div>
                   <button onClick={() => removeIndicatorThresholdAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(pctDiffDonCrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">%Diff {alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <button onClick={() => removePctDiffDonCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                 </div>
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
               </div>

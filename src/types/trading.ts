@@ -105,6 +105,24 @@ export interface StochRSICrossAlert {
   telegramEnabled?: boolean;
 }
 
+export type PctDiffDonLine = 'main' | 'ema' | 'basis' | 'upper' | 'lower' | 'upperNew' | 'lowerNew';
+
+export interface PctDiffDonCrossAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  indicatorId: string;
+  line1: PctDiffDonLine;
+  line2: PctDiffDonLine;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
 export interface AlertLog {
   id: string;
   alertId: string;

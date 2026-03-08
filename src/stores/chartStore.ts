@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, LineStyleType } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, PctDiffDonCrossAlert, LineStyleType } from '@/types/trading';
 import { CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
@@ -80,6 +80,11 @@ interface ChartStore {
   stochRSICrossAlerts: StochRSICrossAlert[];
   addStochRSICrossAlert: (alert: StochRSICrossAlert) => void;
   removeStochRSICrossAlert: (id: string) => void;
+
+  // PctDiffDon cross alerts
+  pctDiffDonCrossAlerts: PctDiffDonCrossAlert[];
+  addPctDiffDonCrossAlert: (alert: PctDiffDonCrossAlert) => void;
+  removePctDiffDonCrossAlert: (id: string) => void;
 
   // Indicators
   selectedIndicatorId: string | null;
@@ -287,6 +292,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       indicatorCrossAlerts: [],
       indicatorThresholdAlerts: [],
       stochRSICrossAlerts: [],
+      pctDiffDonCrossAlerts: [],
       trendlines: s.trendlines.filter((t) => !alertTrendlineIds.has(t.id)),
       selectedTrendlineId: alertTrendlineIds.has(s.selectedTrendlineId ?? '') ? null : s.selectedTrendlineId,
     });
@@ -306,6 +312,10 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   stochRSICrossAlerts: [],
   addStochRSICrossAlert: (alert) => set((s) => ({ stochRSICrossAlerts: [...s.stochRSICrossAlerts, alert] })),
   removeStochRSICrossAlert: (id) => set((s) => ({ stochRSICrossAlerts: s.stochRSICrossAlerts.filter((a) => a.id !== id) })),
+
+  pctDiffDonCrossAlerts: [],
+  addPctDiffDonCrossAlert: (alert) => set((s) => ({ pctDiffDonCrossAlerts: [...s.pctDiffDonCrossAlerts, alert] })),
+  removePctDiffDonCrossAlert: (id) => set((s) => ({ pctDiffDonCrossAlerts: s.pctDiffDonCrossAlerts.filter((a) => a.id !== id) })),
 
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
@@ -427,6 +437,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     indicatorCrossAlerts: state.indicatorCrossAlerts,
     indicatorThresholdAlerts: state.indicatorThresholdAlerts,
     stochRSICrossAlerts: state.stochRSICrossAlerts,
+    pctDiffDonCrossAlerts: state.pctDiffDonCrossAlerts,
     fibonacciDrawings: state.fibonacciDrawings,
     symbol: state.symbol,
     timeframe: state.timeframe,
