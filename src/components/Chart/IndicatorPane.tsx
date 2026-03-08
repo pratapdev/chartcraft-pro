@@ -247,6 +247,11 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         seriesRefs.current[7]?.setData(pctDiff.map((d) => ({ time: d.time as Time, value: 0 })) as LineData[]);
       }
     }
+
+    // Restore the visible range after data update to stay in sync with main chart
+    if (prevRange) {
+      try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
+    }
   }, [candles, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
