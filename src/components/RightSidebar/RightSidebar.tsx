@@ -112,6 +112,20 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               />
             </div>
           )}
+          {ind.type === 'SUPERTREND' && (
+            <div className="flex items-center justify-between">
+              <label className="text-muted-foreground">Multiplier</label>
+              <input
+                type="number"
+                min={0.5}
+                max={10}
+                step={0.5}
+                value={ind.multiplier ?? 3}
+                onChange={(e) => updateIndicator(ind.id, { multiplier: Math.max(0.5, parseFloat(e.target.value) || 3) })}
+                className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+              />
+            </div>
+          )
         </div>
       )}
     </div>
