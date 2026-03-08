@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
+import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 
 interface ChartStore {
-  // Symbol & timeframe
+  // Market type & Symbol & timeframe
+  marketType: MarketType;
+  setMarketType: (mt: MarketType) => void;
   symbol: string;
   timeframe: Timeframe;
   setSymbol: (s: string) => void;
@@ -51,17 +54,30 @@ interface ChartStore {
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
+  marketType: 'crypto',
+  setMarketType: (marketType) => {
+    const defaultSymbol = marketType === 'crypto' ? 'BTC/USD' : 'RELIANCE';
+    set({ marketType, symbol: defaultSymbol });
+    get().stopLiveUpdates();
+    get().loadCandles().then(() => {
+      if (marketType === 'crypto') get().startLiveUpdates();
+    });
+  },
   symbol: 'BTC/USD',
   timeframe: '1h',
   setSymbol: (symbol) => {
     set({ symbol });
     get().stopLiveUpdates();
-    get().loadCandles().then(() => get().startLiveUpdates());
+    get().loadCandles().then(() => {
+      if (get().marketType === 'crypto') get().startLiveUpdates();
+    });
   },
   setTimeframe: (timeframe) => {
     set({ timeframe });
     get().stopLiveUpdates();
-    get().loadCandles().then(() => get().startLiveUpdates());
+    get().loadCandles().then(() => {
+      if (get().marketType === 'crypto') get().startLiveUpdates();
+    });
   },
 
   candles: [],
@@ -70,9 +86,19 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   unsubscribe: null,
 
   loadCandles: async () => {
-    const { symbol, timeframe } = get();
+    const { symbol, timeframe, marketType } = get();
     set({ loading: true });
-    const candles = await fetchCandles(symbol, timeframe, 500);
+    let candles: Candle[];
+    if (marketType === 'indian') {
+      const key = getInstrumentKey(symbol);
+      if (key) {
+        candles = await fetchUpstoxCandles(key, timeframe);
+      } else {
+        candles = [];
+      }
+    } else {
+      candles = await fetchCandles(symbol, timeframe, 500);
+    }
     set({ candles, loading: false });
   },
 
@@ -152,5 +178,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     indicators: state.indicators,
     symbol: state.symbol,
     timeframe: state.timeframe,
+    marketType: state.marketType,
   }),
 }));
