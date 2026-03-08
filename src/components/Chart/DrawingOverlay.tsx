@@ -185,11 +185,16 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.lineTo(px.x2, px.y2);
       ctx.strokeStyle = line.color;
       ctx.lineWidth = sel ? line.thickness + 1.5 : line.thickness;
+      const style = line.lineStyle ?? 'solid';
+      if (style === 'dashed') ctx.setLineDash([8, 5]);
+      else if (style === 'dotted') ctx.setLineDash([2, 3]);
+      else ctx.setLineDash([]);
       if (sel) {
         ctx.shadowColor = line.color;
         ctx.shadowBlur = 8;
       }
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.restore();
 
       if (sel) {

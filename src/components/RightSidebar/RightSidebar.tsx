@@ -81,6 +81,25 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               ))}
             </div>
           </div>
+          <div className="flex items-center justify-between">
+            <label className="text-muted-foreground">Style</label>
+            <div className="flex items-center gap-1">
+              {([
+                { value: 'solid' as LineStyleType, dash: 'none' },
+                { value: 'dashed' as LineStyleType, dash: '6 3' },
+                { value: 'dotted' as LineStyleType, dash: '2 2' },
+              ]).map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => updateIndicator(ind.id, { lineStyle: s.value })}
+                  className={`w-8 h-6 rounded flex items-center justify-center transition-colors ${(ind.lineStyle ?? 'solid') === s.value ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                >
+                  <svg width="20" height="4" viewBox="0 0 20 4">
+                    <line x1="0" y1="2" x2="20" y2="2" stroke={ind.color} strokeWidth={ind.lineWidth ?? 1} strokeDasharray={s.dash} />
+                  </svg>
+                </button>
+              ))}
+            </div>
           {ind.type === 'STOCH_RSI' && (
             <>
               <div className="flex items-center justify-between">
