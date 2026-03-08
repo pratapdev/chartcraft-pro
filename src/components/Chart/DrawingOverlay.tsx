@@ -814,8 +814,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         style={{ right: 65, bottom: 28, pointerEvents: shouldCapture ? 'auto' : 'none' }}
         onMouseDown={(e) => {
           const { mx, my } = getPos(e.nativeEvent);
-          // In cursor mode, check trendline and fib hits
-          if (activeTool === 'cursor' && !hitTest(mx, my)) {
+          // In cursor mode, check crosshair btn, trendline and fib hits
+          if (activeTool === 'cursor' && !hitTest(mx, my) && !hitCrosshairAlertBtn(mx, my)) {
             // Check if clicking on a fib level
             const series = seriesRef.current;
             let fibHit = false;
