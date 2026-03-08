@@ -188,6 +188,10 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     })),
 
+  fibonacciDrawings: [],
+  addFibonacci: (fib) => set((s) => ({ fibonacciDrawings: [...s.fibonacciDrawings, fib] })),
+  removeFibonacci: (id) => set((s) => ({ fibonacciDrawings: s.fibonacciDrawings.filter((f) => f.id !== id) })),
+
   crosshairData: null,
   setCrosshairData: (crosshairData) => set({ crosshairData }),
 
