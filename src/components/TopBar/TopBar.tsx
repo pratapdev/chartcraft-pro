@@ -118,7 +118,7 @@ export const TopBar: React.FC = () => {
         </button>
 
         {showMarketDropdown && (
-          <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-xl z-50 min-w-[160px] overflow-hidden">
+          <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-xl z-50 min-w-[240px] overflow-hidden">
             {MARKET_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -134,6 +134,8 @@ export const TopBar: React.FC = () => {
                 <span className="font-medium">{opt.label}</span>
               </button>
             ))}
+
+            <UpstoxCredentialsForm />
           </div>
         )}
       </div>
