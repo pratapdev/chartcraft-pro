@@ -4,6 +4,15 @@ import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorCo
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 
+interface CrosshairData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 interface ChartStore {
   // Market type & Symbol & timeframe
   marketType: MarketType;
