@@ -226,6 +226,23 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
+    if (indicator.type === 'OBV') {
+      const data = computeOBV(candles);
+      if (data.length > 0) {
+        const series = chart.addLineSeries({
+          color: indicator.color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+
+        const zeroLine = chart.addLineSeries({ color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        zeroLine.setData(data.map((d) => ({ time: d.time as Time, value: 0 })) as LineData[]);
+      }
+    }
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
