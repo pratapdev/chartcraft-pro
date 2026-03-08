@@ -54,17 +54,30 @@ interface ChartStore {
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
+  marketType: 'crypto',
+  setMarketType: (marketType) => {
+    const defaultSymbol = marketType === 'crypto' ? 'BTC/USD' : 'RELIANCE';
+    set({ marketType, symbol: defaultSymbol });
+    get().stopLiveUpdates();
+    get().loadCandles().then(() => {
+      if (marketType === 'crypto') get().startLiveUpdates();
+    });
+  },
   symbol: 'BTC/USD',
   timeframe: '1h',
   setSymbol: (symbol) => {
     set({ symbol });
     get().stopLiveUpdates();
-    get().loadCandles().then(() => get().startLiveUpdates());
+    get().loadCandles().then(() => {
+      if (get().marketType === 'crypto') get().startLiveUpdates();
+    });
   },
   setTimeframe: (timeframe) => {
     set({ timeframe });
     get().stopLiveUpdates();
-    get().loadCandles().then(() => get().startLiveUpdates());
+    get().loadCandles().then(() => {
+      if (get().marketType === 'crypto') get().startLiveUpdates();
+    });
   },
 
   candles: [],
