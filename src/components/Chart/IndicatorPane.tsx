@@ -75,7 +75,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (data.length > 0) {
         const series = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 1,
+          lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -110,7 +110,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (k.length > 0) {
         const kSeries = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 1,
+          lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -120,7 +120,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         if (d.length > 0) {
           const dSeries = chart.addLineSeries({
             color: indicator.color2 ?? '#FF5722',
-            lineWidth: 1,
+            lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
             priceLineVisible: false,
             lastValueVisible: true,
             crosshairMarkerVisible: false,
@@ -141,7 +141,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (macdLine.length > 0) {
         const macdSeries = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 1,
+          lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -150,7 +150,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
         const sigSeries = chart.addLineSeries({
           color: indicator.color2 ?? '#FF5722',
-          lineWidth: 1,
+          lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: false,
@@ -179,7 +179,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (adx.length > 0) {
         const adxSeries = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 2,
+          lineWidth: (indicator.lineWidth ?? 2) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,

@@ -67,6 +67,20 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               className="w-6 h-5 rounded cursor-pointer border-0 bg-transparent"
             />
           </div>
+          <div className="flex items-center justify-between">
+            <label className="text-muted-foreground">Line Width</label>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4].map((w) => (
+                <button
+                  key={w}
+                  onClick={() => updateIndicator(ind.id, { lineWidth: w })}
+                  className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${(ind.lineWidth ?? 1) === w ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                >
+                  <div className="rounded-full" style={{ width: 14, height: w, background: ind.color }} />
+                </button>
+              ))}
+            </div>
+          </div>
           {ind.type === 'STOCH_RSI' && (
             <>
               <div className="flex items-center justify-between">

@@ -229,7 +229,7 @@ export const CandlestickChart: React.FC = () => {
         if (data.length === 0) continue;
         const series = chartRef.current.addLineSeries({
           color: ind.color,
-          lineWidth: 1,
+          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -246,7 +246,7 @@ export const CandlestickChart: React.FC = () => {
 
         const middleSeries = chartRef.current.addLineSeries({
           color: ind.color,
-          lineWidth: 1,
+          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -256,7 +256,7 @@ export const CandlestickChart: React.FC = () => {
 
         const upperSeries = chartRef.current.addLineSeries({
           color: ind.color,
-          lineWidth: 1,
+          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           lineStyle: 2,
           priceLineVisible: false,
           lastValueVisible: false,
@@ -267,7 +267,7 @@ export const CandlestickChart: React.FC = () => {
 
         const lowerSeries = chartRef.current.addLineSeries({
           color: ind.color,
-          lineWidth: 1,
+          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           lineStyle: 2,
           priceLineVisible: false,
           lastValueVisible: false,
@@ -282,7 +282,7 @@ export const CandlestickChart: React.FC = () => {
         if (data.length === 0) continue;
         const series = chartRef.current.addLineSeries({
           color: ind.color,
-          lineWidth: 2,
+          lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: false,
@@ -318,7 +318,7 @@ export const CandlestickChart: React.FC = () => {
         if (greenData.length > 0) {
           const greenSeries = chartRef.current.addLineSeries({
             color: ind.color || '#22c55e',
-            lineWidth: 2,
+            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerVisible: false,
@@ -330,7 +330,7 @@ export const CandlestickChart: React.FC = () => {
         if (redData.length > 0) {
           const redSeries = chartRef.current.addLineSeries({
             color: ind.color2 || '#ef4444',
-            lineWidth: 2,
+            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerVisible: false,
