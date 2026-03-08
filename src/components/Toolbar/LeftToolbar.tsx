@@ -92,7 +92,11 @@ export const LeftToolbar: React.FC = () => {
         <button
           key={action.id}
           onClick={action.action}
-          className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+            action.id === 'bbands' && hasBBands
+              ? 'bg-primary/15 text-primary'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+          }`}
           title={action.label}
         >
           {action.icon}
