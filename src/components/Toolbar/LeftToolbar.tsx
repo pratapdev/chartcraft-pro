@@ -9,6 +9,7 @@ import {
   BarChart3,
   Settings,
   Trash2,
+  Ruler,
 } from 'lucide-react';
 
 interface ToolButton {
