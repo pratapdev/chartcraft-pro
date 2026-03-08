@@ -55,6 +55,9 @@ export const ChartHeader: React.FC = () => {
         ))}
       </div>
 
+      <div className="w-px h-5 bg-border" />
+      <ReplayBar />
+
       {/* OHLCV */}
       {last && (
         <>
