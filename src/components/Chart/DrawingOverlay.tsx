@@ -322,7 +322,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings]);
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId]);
 
   useEffect(() => {
     let raf: number;
