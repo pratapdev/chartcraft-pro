@@ -671,6 +671,7 @@ const SettingsPanel: React.FC = () => {
           </p>
         </div>
       </div>
+      <SyncSection />
     </div>
   );
 };
