@@ -1,6 +1,7 @@
 import React from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
+import { ReplayBar } from './ReplayBar';
 
 const TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
