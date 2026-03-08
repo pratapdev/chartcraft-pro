@@ -28,6 +28,8 @@ export const CandlestickChart: React.FC = () => {
 
   const { candles, indicators, chartFontSize, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
+  const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, indicators);
+
   useEffect(() => {
     loadCandles().then(() => startLiveUpdates());
     return () => stopLiveUpdates();
