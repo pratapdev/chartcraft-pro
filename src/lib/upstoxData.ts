@@ -37,10 +37,11 @@ export const INDIAN_STOCKS: IndianStock[] = [
 // Map timeframes to Upstox intervals
 const UPSTOX_INTERVAL_MAP: Record<string, string> = {
   '1m': '1minute',
+  '3m': '1minute', // Upstox doesn't have 3m, use 1min
   '5m': '5minute',
   '15m': '15minute',
-  '1h': '30minute', // Upstox doesn't have 1h, use 30min
-  '4h': '30minute', // Closest available
+  '1h': '30minute',
+  '4h': '30minute',
   '1D': 'day',
   '1W': 'week',
 };

@@ -12,7 +12,7 @@ import { Candle, Timeframe } from '@/types/trading';
 import { fetchCandles } from '@/lib/marketData';
 import { computeEMA } from '@/lib/marketData';
 
-const ALL_TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1D', '1W'];
+const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
 interface MiniChartProps {
   symbol: string;
