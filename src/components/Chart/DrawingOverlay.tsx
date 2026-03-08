@@ -798,8 +798,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           setHoverY(null);
           crosshairMouseY.current = null;
           crosshairPrice.current = null;
-          setCrosshairBtnY(null);
-          setCrosshairBtnPrice(null);
+          // Delay clearing so button stays clickable when mouse moves to it
+          if (crosshairHideTimer.current) clearTimeout(crosshairHideTimer.current);
+          crosshairHideTimer.current = setTimeout(() => {
+            if (!crosshairBtnHovered.current) {
+              setCrosshairBtnY(null);
+              setCrosshairBtnPrice(null);
+            }
+          }, 300);
         }}
       />
 
