@@ -337,6 +337,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (activeTool === 'measure') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          measureRef.current = {
+            phase: 'measuring', startX: mx, startY: my, currentX: mx, currentY: my,
+            startPrice: coords.price, currentPrice: coords.price,
+            startTime: coords.time, currentTime: coords.time,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       // Cursor: check hit
       const hitId = hitTest(mx, my);
       if (hitId) {
