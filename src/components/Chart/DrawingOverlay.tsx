@@ -708,8 +708,8 @@ function drawFibLines(
     ctx.moveTo(0, y as number);
     ctx.lineTo(w, y as number);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = selected ? 2.5 : 1;
+    ctx.globalAlpha = selected ? 1 : 0.7;
     ctx.stroke();
     ctx.globalAlpha = 1;
 
