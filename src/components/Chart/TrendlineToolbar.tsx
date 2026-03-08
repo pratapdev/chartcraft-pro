@@ -239,6 +239,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
           onClick={() => {
             setShowColors(!showColors);
             setShowThickness(false);
+            setShowLineStyle(false);
             setShowAlertMenu(false);
           }}
         />
