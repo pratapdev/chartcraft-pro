@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { Timeframe } from '@/types/trading';
@@ -7,6 +7,8 @@ import { Timeframe } from '@/types/trading';
  * Background price tracker that maintains WebSocket connections
  * for all symbols/timeframes that have active alerts,
  * independent of the currently viewed chart.
+ * 
+ * Handles offline→online recovery by re-fetching candles to fill gaps.
  */
 export function useAlertPriceTracker() {
   const alerts = useChartStore((s) => s.alerts);
@@ -18,6 +20,61 @@ export function useAlertPriceTracker() {
   const marketType = useChartStore((s) => s.marketType);
 
   const subsRef = useRef<Map<string, () => void>>(new Map());
+  const activeKeysRef = useRef<Set<string>>(new Set());
+
+  /** Re-fetch candles for all tracked keys to fill gaps after reconnect */
+  const refetchAll = useCallback(() => {
+    const store = useChartStore.getState();
+    const currentKey = `${store.symbol}:${store.timeframe}`;
+
+    // Refetch for current chart
+    store.loadCandles();
+
+    // Refetch for all background-tracked keys
+    for (const key of activeKeysRef.current) {
+      if (key === currentKey) continue;
+      const [symbol, timeframe] = key.split(':') as [string, Timeframe];
+      fetchCandles(symbol, timeframe, 200).then((candles) => {
+        useChartStore.getState().setAlertCandles(key, candles);
+      });
+    }
+  }, []);
+
+  // Listen for online/offline events
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[AlertTracker] Browser came online — refetching candles to fill gaps');
+      // Small delay to let network stabilize
+      setTimeout(refetchAll, 1500);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab became visible again — check for gaps
+        const store = useChartStore.getState();
+        const currentKey = `${store.symbol}:${store.timeframe}`;
+        const candles = store.alertCandles[currentKey];
+        if (candles && candles.length > 0) {
+          const lastTime = candles[candles.length - 1].time;
+          const now = Math.floor(Date.now() / 1000);
+          const gapSeconds = now - lastTime;
+          // If gap > 2 minutes, refetch to fill
+          if (gapSeconds > 120) {
+            console.log(`[AlertTracker] Tab visible, ${Math.round(gapSeconds / 60)}min gap detected — refetching`);
+            refetchAll();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refetchAll]);
 
   useEffect(() => {
     // Collect all unique symbol+timeframe pairs from active alerts
@@ -35,22 +92,24 @@ export function useAlertPriceTracker() {
       pairs.add(key);
     }
 
-    // Current chart's symbol:timeframe is already tracked by the main chart
     const currentKey = `${currentSymbol}:${currentTimeframe}`;
 
-    // Sync current chart candles into alertCandles for the current key
+    // Sync current chart candles into alertCandles
     const store = useChartStore.getState();
     if (store.candles.length > 0) {
       store.setAlertCandles(currentKey, store.candles);
     }
 
-    // Determine which keys need new subscriptions and which to remove
+    // Determine which keys need background subscriptions
     const neededKeys = new Set<string>();
     for (const key of pairs) {
       if (key !== currentKey) {
         neededKeys.add(key);
       }
     }
+
+    // Track all active keys (including current) for refetch
+    activeKeysRef.current = new Set([...pairs, currentKey]);
 
     // Remove subscriptions no longer needed
     for (const [key, unsub] of subsRef.current.entries()) {
@@ -66,7 +125,6 @@ export function useAlertPriceTracker() {
 
       const [symbol, timeframe] = key.split(':') as [string, Timeframe];
 
-      // Only crypto supports WebSocket background tracking
       if (marketType !== 'crypto') continue;
 
       // Fetch initial candles then subscribe
@@ -77,9 +135,10 @@ export function useAlertPriceTracker() {
           useChartStore.getState().updateAlertCandle(key, candle);
         });
 
-        // Store unsubscribe (check if still needed)
-        if (subsRef.current.has(key)) {
-          // Already replaced, clean up
+        // Check if key was removed while fetching
+        const currentUnsub = subsRef.current.get(key);
+        if (currentUnsub && currentUnsub !== placeholderUnsub) {
+          // Already replaced, clean up new one
           unsub();
         } else {
           subsRef.current.set(key, unsub);
@@ -87,12 +146,9 @@ export function useAlertPriceTracker() {
       });
 
       // Placeholder to mark as "pending"
-      subsRef.current.set(key, () => {});
+      const placeholderUnsub = () => {};
+      subsRef.current.set(key, placeholderUnsub);
     }
-
-    return () => {
-      // Don't cleanup on every re-render, only on unmount
-    };
   }, [alerts, indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts, currentSymbol, currentTimeframe, marketType]);
 
   // Keep current chart candles synced to alertCandles
