@@ -467,6 +467,13 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (measureRef.current.phase === 'measuring') {
+        measureRef.current = EMPTY_MEASURE;
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
+
       if (dragRef.current) {
         dragRef.current = null;
         setIsInteracting(false);
