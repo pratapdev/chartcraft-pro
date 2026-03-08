@@ -687,6 +687,31 @@ const SyncControls: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
   const [syncing, setSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [autoSync, setAutoSync] = useState(() => localStorage.getItem('auto-sync') === 'true');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('auto-sync', String(autoSync));
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    if (autoSync) {
+      const doSync = async () => {
+        const ok = await checkSyncHealth();
+        if (ok) {
+          const payload = extractSyncPayload(useChartStore.getState());
+          const pushed = await pushState(payload);
+          setStatus('online');
+          setLastResult(pushed ? `Auto-synced ✓ ${new Date().toLocaleTimeString()}` : 'Auto-sync failed ✗');
+        } else {
+          setStatus('offline');
+        }
+      };
+      doSync();
+      intervalRef.current = setInterval(doSync, 30_000);
+    }
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [autoSync]);
 
   const handleCheckHealth = async () => {
     setStatus('checking');
