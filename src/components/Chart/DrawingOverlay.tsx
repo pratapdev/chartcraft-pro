@@ -448,6 +448,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (fibRef.current.phase === 'drawing') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          fibRef.current = { ...fibRef.current, currentX: mx, currentY: my, currentPrice: coords.price, currentTime: coords.time };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
       if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
