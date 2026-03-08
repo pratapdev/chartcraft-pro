@@ -339,19 +339,7 @@ export const RightSidebar: React.FC = () => {
         )}
 
         {rightPanelTab === 'settings' && (
-          <div className="space-y-3 text-xs text-muted-foreground p-1">
-            <div>
-              <p className="font-semibold text-foreground mb-1">Trendlines</p>
-              <p>{trendlines.length} line(s) drawn</p>
-            </div>
-            <div>
-              <p className="font-semibold text-foreground mb-1">Shortcuts</p>
-              <div className="space-y-1">
-                <p><kbd className="bg-accent px-1 rounded text-foreground">Delete</kbd> Remove selected line</p>
-                <p><kbd className="bg-accent px-1 rounded text-foreground">Esc</kbd> Cancel drawing</p>
-              </div>
-            </div>
-          </div>
+          <SettingsPanel />
         )}
       </div>
     </div>
