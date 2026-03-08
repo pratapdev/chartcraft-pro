@@ -251,8 +251,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.beginPath();
       ctx.moveTo(0, hoverY);
       ctx.lineTo(w, hoverY);
-      ctx.strokeStyle = '#eab308';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = useChartStore.getState().drawingDefaults.horizontal.color;
+      ctx.lineWidth = useChartStore.getState().drawingDefaults.horizontal.thickness;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
