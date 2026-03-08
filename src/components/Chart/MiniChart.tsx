@@ -31,6 +31,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<Candle[]>([]);
+  const chartFontSize = useChartStore((s) => s.chartFontSize);
 
   useEffect(() => {
     if (!containerRef.current) return;
