@@ -236,16 +236,17 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
         />
         {showColors && (
           <div
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 grid grid-cols-4 gap-1 p-2 rounded-md border shadow-xl"
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 grid grid-cols-4 gap-2 p-3 rounded-md border shadow-xl"
             style={{
               background: 'hsl(var(--popover))',
               borderColor: 'hsl(var(--border))',
+              minWidth: '120px',
             }}
           >
             {COLORS.map((c) => (
               <button
                 key={c}
-                className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-125"
+                className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110"
                 style={{
                   background: c,
                   borderColor: selectedLine.color === c ? 'hsl(var(--foreground))' : 'transparent',
