@@ -330,6 +330,22 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
 
   multiTfMode: false,
   setMultiTfMode: (multiTfMode) => set({ multiTfMode }),
+
+  alertCandles: {},
+  setAlertCandles: (key, candles) => set((s) => ({ alertCandles: { ...s.alertCandles, [key]: candles } })),
+  updateAlertCandle: (key, candle) => set((s) => {
+    const existing = s.alertCandles[key] ?? [];
+    const copy = [...existing];
+    const lastIdx = copy.length - 1;
+    if (lastIdx >= 0 && copy[lastIdx].time === candle.time) {
+      copy[lastIdx] = candle;
+    } else {
+      copy.push(candle);
+      // Keep max 500 candles
+      if (copy.length > 500) copy.shift();
+    }
+    return { alertCandles: { ...s.alertCandles, [key]: copy } };
+  }),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
