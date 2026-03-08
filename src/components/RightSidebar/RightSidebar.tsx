@@ -922,6 +922,8 @@ export const RightSidebar: React.FC = () => {
     removeIndicatorThresholdAlert,
     stochRSICrossAlerts,
     removeStochRSICrossAlert,
+    pctDiffDonCrossAlerts,
+    removePctDiffDonCrossAlert,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
