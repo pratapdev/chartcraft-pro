@@ -505,11 +505,14 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
+            <IndicatorCrossAlertForm />
             <div className="flex items-center justify-between px-1">
               <p className="text-xs text-muted-foreground">
-                {alerts.length === 0 ? 'No alerts set.' : `${alerts.length} active alert(s)`}
+                {alerts.length + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length === 0
+                  ? 'No alerts set.'
+                  : `${alerts.length + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length} active alert(s)`}
               </p>
-              {alerts.length > 0 && (
+              {(alerts.length > 0 || indicatorCrossAlerts.length > 0) && (
                 <button
                   onClick={clearAllAlerts}
                   className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
@@ -539,7 +542,34 @@ export const RightSidebar: React.FC = () => {
                     </button>
                   </div>
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · ${alert.message ?? ''}</div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {indicatorCrossAlerts.filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-primary" />
+                    <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) };
+                        removeIndicatorCrossAlert(alert.id);
+                        useChartStore.getState().addIndicatorCrossAlert(updated);
+                      }}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    >
+                      <Send size={10} />
+                    </button>
+                    <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
               </div>
             ))}
             {alertLogs.length > 0 && (
