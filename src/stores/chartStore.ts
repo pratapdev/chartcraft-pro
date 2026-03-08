@@ -287,6 +287,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       indicatorCrossAlerts: [],
       indicatorThresholdAlerts: [],
       stochRSICrossAlerts: [],
+      pctDiffDonCrossAlerts: [],
       trendlines: s.trendlines.filter((t) => !alertTrendlineIds.has(t.id)),
       selectedTrendlineId: alertTrendlineIds.has(s.selectedTrendlineId ?? '') ? null : s.selectedTrendlineId,
     });
