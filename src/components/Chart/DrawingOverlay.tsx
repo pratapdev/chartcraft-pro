@@ -61,6 +61,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [hoveredAlertBtn, setHoveredAlertBtn] = useState<string | null>(null);
   const [crosshairBtnY, setCrosshairBtnY] = useState<number | null>(null);
   const [crosshairBtnPrice, setCrosshairBtnPrice] = useState<number | null>(null);
+  const crosshairHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crosshairBtnHovered = useRef(false);
   const crosshairMouseY = useRef<number | null>(null);
   const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
