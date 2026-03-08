@@ -79,6 +79,14 @@ export const KeyboardShortcuts: React.FC = () => {
         return;
       }
 
+      // Delete selected
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (store.selectedTrendlineId) {
+          store.removeTrendline(store.selectedTrendlineId);
+          return;
+        }
+      }
+
       // Escape
       if (e.key === 'Escape') {
         store.setActiveTool('cursor');
