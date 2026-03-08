@@ -281,6 +281,15 @@ export const TopBar: React.FC = () => {
       </div>
 
       <button
+        onClick={() => setMultiTfMode(!multiTfMode)}
+        className={`trading-btn flex items-center gap-1 ${multiTfMode ? 'text-primary' : ''}`}
+        title="Multi-timeframe view"
+      >
+        <LayoutGrid size={14} />
+        <span className="hidden sm:inline">Multi-TF</span>
+      </button>
+
+      <button
         onClick={() => setRightPanelTab('indicators')}
         className="trading-btn flex items-center gap-1"
       >
