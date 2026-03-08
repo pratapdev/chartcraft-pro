@@ -4,6 +4,7 @@ import { LeftToolbar } from '@/components/Toolbar/LeftToolbar';
 import { ChartContainer } from '@/components/Chart/ChartContainer';
 import { RightSidebar } from '@/components/RightSidebar/RightSidebar';
 import { BottomPanel } from '@/components/BottomPanel/BottomPanel';
+import { KeyboardShortcuts } from '@/components/KeyboardShortcuts';
 import { useAlertChecker } from '@/hooks/useAlertChecker';
 
 const Index: React.FC = () => {
@@ -21,6 +22,7 @@ const Index: React.FC = () => {
         </div>
         <RightSidebar />
       </div>
+      <KeyboardShortcuts />
     </div>
   );
 };
