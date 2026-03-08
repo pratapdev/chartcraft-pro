@@ -384,6 +384,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (measureRef.current.phase === 'measuring') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          measureRef.current = { ...measureRef.current, currentX: mx, currentY: my, currentPrice: coords.price, currentTime: coords.time };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
       if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
