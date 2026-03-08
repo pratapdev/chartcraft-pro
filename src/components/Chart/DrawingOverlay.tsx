@@ -8,7 +8,9 @@ interface Props {
   seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>;
 }
 
-const EMPTY_DRAW = { phase: 'idle' as const, startX: 0, startY: 0, currentX: 0, currentY: 0 };
+type DrawPhase = 'idle' | 'drawing';
+interface DrawState { phase: DrawPhase; startX: number; startY: number; currentX: number; currentY: number; }
+const EMPTY_DRAW: DrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
 export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
