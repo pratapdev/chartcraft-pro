@@ -70,6 +70,8 @@ export interface IndicatorConfig {
   period: number;
   color: string;
   visible: boolean;
+  /** Line width for the indicator */
+  lineWidth?: number;
   /** For StochRSI: smoothing K period */
   kPeriod?: number;
   /** For StochRSI: smoothing D period */
