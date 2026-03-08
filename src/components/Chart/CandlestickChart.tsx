@@ -49,7 +49,7 @@ export const CandlestickChart: React.FC = () => {
       layout: {
         background: { color: '#0d1117' },
         textColor: '#6b7280',
-        fontSize: 11,
+        fontSize: chartFontSize,
         fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {

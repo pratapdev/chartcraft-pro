@@ -45,7 +45,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       layout: {
         background: { color: '#0d1117' },
         textColor: '#6b7280',
-        fontSize: 10,
+        fontSize: chartFontSize - 1,
         fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {
