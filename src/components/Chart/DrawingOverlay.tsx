@@ -886,9 +886,20 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
             cursor: 'pointer',
             pointerEvents: 'auto',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(37, 99, 235, 0.8)'; }}
-          title={`Add alert at ${crosshairBtnPrice.toFixed(2)}`}
+          onMouseEnter={(e) => {
+            crosshairBtnHovered.current = true;
+            if (crosshairHideTimer.current) clearTimeout(crosshairHideTimer.current);
+            e.currentTarget.style.background = '#2563eb';
+          }}
+          onMouseLeave={(e) => {
+            crosshairBtnHovered.current = false;
+            e.currentTarget.style.background = 'rgba(37, 99, 235, 0.8)';
+            crosshairHideTimer.current = setTimeout(() => {
+              setCrosshairBtnY(null);
+              setCrosshairBtnPrice(null);
+            }, 200);
+          }}
+          title={`Add alert at ${crosshairBtnPrice.toFixed(2)} (or press +)`}
           onClick={() => {
             const price = crosshairBtnPrice;
             const { candles: c } = useChartStore.getState();
@@ -918,6 +929,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
               message: `Price crosses ${price.toFixed(2)}`,
               createdAt: Date.now(),
             });
+            setCrosshairBtnY(null);
+            setCrosshairBtnPrice(null);
           }}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
