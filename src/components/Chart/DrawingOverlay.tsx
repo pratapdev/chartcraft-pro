@@ -651,3 +651,83 @@ function ptLineDist(px: number, py: number, x1: number, y1: number, x2: number, 
   else { xx = x1 + param * C; yy = y1 + param * D; }
   return Math.hypot(px - xx, py - yy);
 }
+
+function drawFibLines(
+  ctx: CanvasRenderingContext2D,
+  startPrice: number,
+  endPrice: number,
+  w: number,
+  series: ISeriesApi<'Candlestick'>,
+) {
+  const diff = endPrice - startPrice;
+
+  for (const level of FIB_LEVELS) {
+    const price = endPrice - diff * level;
+    const y = series.priceToCoordinate(price);
+    if (y === null) continue;
+
+    const color = FIB_COLORS[level] ?? '#787b86';
+
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(0, y as number);
+    ctx.lineTo(w, y as number);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.7;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Fill between levels
+    const nextIdx = FIB_LEVELS.indexOf(level) + 1;
+    if (nextIdx < FIB_LEVELS.length) {
+      const nextPrice = endPrice - diff * FIB_LEVELS[nextIdx];
+      const nextY = series.priceToCoordinate(nextPrice);
+      if (nextY !== null) {
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.04;
+        ctx.fillRect(0, Math.min(y as number, nextY as number), w, Math.abs((y as number) - (nextY as number)));
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Label
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(`${(level * 100).toFixed(1)}%  ${price.toFixed(2)}`, 8, (y as number) - 4);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function renderFibLevels(
+  ctx: CanvasRenderingContext2D,
+  fib: FibonacciDrawing,
+  w: number,
+  series: ISeriesApi<'Candlestick'>,
+) {
+  drawFibLines(ctx, fib.startPrice, fib.endPrice, w, series);
+}
+
+function renderFibPreview(
+  ctx: CanvasRenderingContext2D,
+  fs: FibDrawState,
+  w: number,
+  series: ISeriesApi<'Candlestick'>,
+) {
+  drawFibLines(ctx, fs.startPrice, fs.currentPrice, w, series);
+
+  // Draw the diagonal reference line
+  const y1 = series.priceToCoordinate(fs.startPrice);
+  const y2 = series.priceToCoordinate(fs.currentPrice);
+  if (y1 !== null && y2 !== null) {
+    ctx.beginPath();
+    ctx.moveTo(fs.startX, y1 as number);
+    ctx.lineTo(fs.currentX, y2 as number);
+    ctx.strokeStyle = '#787b86';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
