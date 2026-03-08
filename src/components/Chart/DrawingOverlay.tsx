@@ -8,27 +8,22 @@ interface Props {
   seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>;
 }
 
-interface DrawState {
-  phase: 'idle' | 'drawing';
-  startX: number;
-  startY: number;
-  currentX: number;
-  currentY: number;
-}
-
-const INITIAL_DRAW: DrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0 };
+const EMPTY_DRAW = { phase: 'idle' as const, startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
 export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawStateRef = useRef<DrawState>(INITIAL_DRAW);
-  const draggingRef = useRef<{
+  const eventLayerRef = useRef<HTMLDivElement>(null);
+  const drawRef = useRef(EMPTY_DRAW);
+  const dragRef = useRef<{
     lineId: string;
     point: 'start' | 'end' | 'body';
     startMX: number;
     startMY: number;
     origLine: Trendline;
   } | null>(null);
-  const [, forceRender] = useState(0);
+
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [, bump] = useState(0);
 
   const {
     activeTool,
@@ -43,23 +38,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     timeframe,
   } = useChartStore();
 
-  // Helper: pixel → price/time using the ACTUAL series API
+  // ---- Coordinate helpers ----
   const pixelToCoords = useCallback(
-    (x: number, y: number): { time: number; price: number } | null => {
+    (x: number, y: number) => {
       const chart = chartRef.current;
       const series = seriesRef.current;
       if (!chart || !series) return null;
       const time = chart.timeScale().coordinateToTime(x);
       const price = series.coordinateToPrice(y);
       if (time === null || price === null) return null;
-      return { time: time as unknown as number, price };
+      return { time: time as unknown as number, price: price as number };
     },
     [chartRef, seriesRef]
   );
 
-  // Helper: trendline → pixel positions
   const lineToPixels = useCallback(
-    (line: Trendline): { x1: number; y1: number; x2: number; y2: number } | null => {
+    (line: Trendline) => {
       const chart = chartRef.current;
       const series = seriesRef.current;
       if (!chart || !series) return null;
@@ -68,26 +62,24 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const y1 = series.priceToCoordinate(line.startPrice);
       const y2 = series.priceToCoordinate(line.endPrice);
       if (x1 === null || x2 === null || y1 === null || y2 === null) return null;
-      return { x1, y1, x2, y2 };
+      return { x1, y1: y1 as number, x2, y2: y2 as number };
     },
     [chartRef, seriesRef]
   );
 
-  // Hit test
   const hitTest = useCallback(
-    (mx: number, my: number): string | null => {
+    (mx: number, my: number) => {
       for (let i = trendlines.length - 1; i >= 0; i--) {
-        const line = trendlines[i];
-        const px = lineToPixels(line);
+        const px = lineToPixels(trendlines[i]);
         if (!px) continue;
-        if (ptLineDist(mx, my, px.x1, px.y1, px.x2, px.y2) < 8) return line.id;
+        if (ptLineDist(mx, my, px.x1, px.y1, px.x2, px.y2) < 8) return trendlines[i].id;
       }
       return null;
     },
     [trendlines, lineToPixels]
   );
 
-  // ---- Render loop ----
+  // ---- Canvas render ----
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -104,13 +96,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     }
     ctx.clearRect(0, 0, w, h);
 
-    // Draw trendlines
     for (const line of trendlines) {
       const px = lineToPixels(line);
       if (!px) continue;
       const sel = selectedTrendlineId === line.id;
 
-      // Extend line beyond endpoints (ray-style)
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(px.x1, px.y1);
@@ -119,23 +109,17 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.lineWidth = sel ? line.thickness + 1.5 : line.thickness;
       if (sel) {
         ctx.shadowColor = line.color;
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 8;
       }
       ctx.stroke();
       ctx.restore();
 
-      // Endpoints
       if (sel) {
-        for (const [ex, ey] of [
-          [px.x1, px.y1],
-          [px.x2, px.y2],
-        ]) {
+        for (const [ex, ey] of [[px.x1, px.y1], [px.x2, px.y2]]) {
           ctx.beginPath();
           ctx.arc(ex, ey, 5, 0, Math.PI * 2);
           ctx.fillStyle = line.color;
           ctx.fill();
-          ctx.beginPath();
-          ctx.arc(ex, ey, 5, 0, Math.PI * 2);
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1.5;
           ctx.stroke();
@@ -143,8 +127,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
     }
 
-    // In-progress drawing
-    const ds = drawStateRef.current;
+    const ds = drawRef.current;
     if (ds.phase === 'drawing') {
       ctx.beginPath();
       ctx.moveTo(ds.startX, ds.startY);
@@ -154,8 +137,6 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Start point dot
       ctx.beginPath();
       ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
       ctx.fillStyle = '#2563eb';
@@ -165,48 +146,48 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   useEffect(() => {
     let raf: number;
-    const loop = () => {
-      render();
-      raf = requestAnimationFrame(loop);
-    };
+    const loop = () => { render(); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [render]);
 
-  // ---- Mouse handlers ----
-  const getMousePos = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
+  // ---- Event handlers ----
+  const getPos = (e: MouseEvent | React.MouseEvent) => {
+    const rect = eventLayerRef.current?.getBoundingClientRect();
     if (!rect) return { mx: 0, my: 0 };
     return { mx: e.clientX - rect.left, my: e.clientY - rect.top };
   };
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      const { mx, my } = getMousePos(e);
+      const { mx, my } = getPos(e);
 
       if (activeTool === 'trendline') {
-        // Start drawing
-        drawStateRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
-        forceRender((n) => n + 1);
+        drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
+        setIsInteracting(true);
+        bump((n) => n + 1);
+        e.preventDefault();
         e.stopPropagation();
         return;
       }
 
-      // Cursor mode
+      // Cursor: check hit
       const hitId = hitTest(mx, my);
-      setSelectedTrendlineId(hitId);
-
       if (hitId) {
+        setSelectedTrendlineId(hitId);
         const line = trendlines.find((t) => t.id === hitId)!;
         const px = lineToPixels(line);
         if (px) {
           const d1 = Math.hypot(mx - px.x1, my - px.y1);
           const d2 = Math.hypot(mx - px.x2, my - px.y2);
           const point = d1 < 12 ? 'start' : d2 < 12 ? 'end' : 'body';
-          draggingRef.current = { lineId: hitId, point, startMX: mx, startMY: my, origLine: { ...line } };
+          dragRef.current = { lineId: hitId, point, startMX: mx, startMY: my, origLine: { ...line } };
         }
-        e.stopPropagation();
+        setIsInteracting(true);
         e.preventDefault();
+        e.stopPropagation();
+      } else {
+        setSelectedTrendlineId(null);
       }
     },
     [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId]
@@ -214,50 +195,43 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      const { mx, my } = getMousePos(e);
-      const ds = drawStateRef.current;
+      const { mx, my } = getPos(e);
 
-      // Drawing in progress
-      if (ds.phase === 'drawing') {
-        drawStateRef.current = { ...ds, currentX: mx, currentY: my };
+      if (drawRef.current.phase === 'drawing') {
+        drawRef.current = { ...drawRef.current, currentX: mx, currentY: my };
         return;
       }
 
-      // Dragging a trendline
-      const drag = draggingRef.current;
-      if (drag) {
+      if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
+        const drag = dragRef.current;
 
         if (drag.point === 'start') {
           updateTrendline(drag.lineId, { startTime: coords.time, startPrice: coords.price });
         } else if (drag.point === 'end') {
           updateTrendline(drag.lineId, { endTime: coords.time, endPrice: coords.price });
         } else {
-          // Body drag: move both endpoints by delta
           const startCoords = pixelToCoords(drag.startMX, drag.startMY);
           if (!startCoords) return;
-          const dt = coords.time - startCoords.time;
-          const dp = coords.price - startCoords.price;
           updateTrendline(drag.lineId, {
-            startTime: drag.origLine.startTime + dt,
-            startPrice: drag.origLine.startPrice + dp,
-            endTime: drag.origLine.endTime + dt,
-            endPrice: drag.origLine.endPrice + dp,
+            startTime: drag.origLine.startTime + (coords.time - startCoords.time),
+            startPrice: drag.origLine.startPrice + (coords.price - startCoords.price),
+            endTime: drag.origLine.endTime + (coords.time - startCoords.time),
+            endPrice: drag.origLine.endPrice + (coords.price - startCoords.price),
           });
         }
-        e.stopPropagation();
         e.preventDefault();
+        e.stopPropagation();
         return;
       }
 
-      // Cursor style
-      if (canvasRef.current) {
+      // Update cursor
+      if (eventLayerRef.current) {
         if (activeTool === 'trendline') {
-          canvasRef.current.style.cursor = 'crosshair';
+          eventLayerRef.current.style.cursor = 'crosshair';
         } else {
-          const hit = hitTest(mx, my);
-          canvasRef.current.style.cursor = hit ? 'pointer' : '';
+          eventLayerRef.current.style.cursor = hitTest(mx, my) ? 'pointer' : '';
         }
       }
     },
@@ -266,45 +240,45 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   const handleMouseUp = useCallback(
     (e: React.MouseEvent) => {
-      const { mx, my } = getMousePos(e);
-      const ds = drawStateRef.current;
+      const { mx, my } = getPos(e);
 
-      // Finish drawing trendline
-      if (ds.phase === 'drawing') {
+      if (drawRef.current.phase === 'drawing') {
+        const ds = drawRef.current;
         const dist = Math.hypot(mx - ds.startX, my - ds.startY);
         if (dist > 10) {
-          const startCoords = pixelToCoords(ds.startX, ds.startY);
-          const endCoords = pixelToCoords(mx, my);
-          if (startCoords && endCoords) {
+          const start = pixelToCoords(ds.startX, ds.startY);
+          const end = pixelToCoords(mx, my);
+          if (start && end) {
             addTrendline({
               id: crypto.randomUUID(),
               symbol,
               timeframe,
-              startTime: startCoords.time,
-              startPrice: startCoords.price,
-              endTime: endCoords.time,
-              endPrice: endCoords.price,
+              startTime: start.time,
+              startPrice: start.price,
+              endTime: end.time,
+              endPrice: end.price,
               color: '#2563eb',
               thickness: 2,
               createdAt: Date.now(),
             });
           }
         }
-        drawStateRef.current = INITIAL_DRAW;
+        drawRef.current = EMPTY_DRAW;
         setActiveTool('cursor');
-        forceRender((n) => n + 1);
+        setIsInteracting(false);
+        bump((n) => n + 1);
         return;
       }
 
-      // Finish dragging
-      if (draggingRef.current) {
-        draggingRef.current = null;
+      if (dragRef.current) {
+        dragRef.current = null;
+        setIsInteracting(false);
       }
     },
     [pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
   );
 
-  // Keyboard shortcuts
+  // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTrendlineId) {
@@ -312,55 +286,48 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
       if (e.key === 'Escape') {
         setSelectedTrendlineId(null);
-        drawStateRef.current = INITIAL_DRAW;
+        drawRef.current = EMPTY_DRAW;
         setActiveTool('cursor');
-        forceRender((n) => n + 1);
+        setIsInteracting(false);
+        bump((n) => n + 1);
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
-  // Determine pointer-events: let chart handle events in cursor mode when not near lines
-  const shouldCapture =
-    activeTool === 'trendline' ||
-    drawStateRef.current.phase === 'drawing' ||
-    draggingRef.current !== null;
+  // Event layer should capture when: drawing tool active, or actively interacting
+  const shouldCapture = activeTool === 'trendline' || isInteracting;
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 z-10"
-      style={{ pointerEvents: shouldCapture ? 'auto' : 'auto' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => {
-        if (draggingRef.current) draggingRef.current = null;
-      }}
-    />
+    <>
+      {/* Render-only canvas - never captures events */}
+      <canvas ref={canvasRef} className="absolute inset-0 z-10 pointer-events-none" />
+
+      {/* Event capture layer - only active during drawing/dragging */}
+      <div
+        ref={eventLayerRef}
+        className="absolute inset-0 z-20"
+        style={{ pointerEvents: shouldCapture ? 'auto' : 'none' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          if (dragRef.current) { dragRef.current = null; setIsInteracting(false); }
+        }}
+      />
+    </>
   );
 };
 
-// Distance from point to line segment
 function ptLineDist(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
-  const A = px - x1,
-    B = py - y1,
-    C = x2 - x1,
-    D = y2 - y1;
+  const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1;
   const dot = A * C + B * D;
   const lenSq = C * C + D * D;
-  const param = lenSq !== 0 ? dot / lenSq : -1;
+  const param = lenSq ? dot / lenSq : -1;
   let xx: number, yy: number;
-  if (param < 0) {
-    xx = x1;
-    yy = y1;
-  } else if (param > 1) {
-    xx = x2;
-    yy = y2;
-  } else {
-    xx = x1 + param * C;
-    yy = y1 + param * D;
-  }
+  if (param < 0) { xx = x1; yy = y1; }
+  else if (param > 1) { xx = x2; yy = y2; }
+  else { xx = x1 + param * C; yy = y1 + param * D; }
   return Math.hypot(px - xx, py - yy);
 }
