@@ -68,6 +68,14 @@ export const CrosshairLegend: React.FC = () => {
         indicatorValues.push({ label: `BB(${ind.period})`, value: `${uPt?.value.toFixed(2)} / ${mPt.value.toFixed(2)} / ${lPt?.value.toFixed(2)}`, color: ind.color });
       }
     }
+
+    if (ind.type === 'VWAP') {
+      const data = computeVWAP(candles);
+      const point = data.find((d) => d.time === crosshairData.time);
+      if (point) {
+        indicatorValues.push({ label: 'VWAP', value: point.value.toFixed(2), color: ind.color });
+      }
+    }
   }
 
   return (
