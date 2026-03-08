@@ -46,9 +46,27 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const chart = chartRef.current;
       const series = seriesRef.current;
       if (!chart || !series) return null;
-      const time = chart.timeScale().coordinateToTime(x);
       const price = series.coordinateToPrice(y);
-      if (time === null || price === null) return null;
+      if (price === null) return null;
+
+      let time = chart.timeScale().coordinateToTime(x);
+      if (time === null) {
+        // Extrapolate into the future using the last two candles' spacing
+        const { candles: c } = useChartStore.getState();
+        if (c.length < 2) return null;
+        const lastTime = c[c.length - 1].time;
+        const interval = c[c.length - 1].time - c[c.length - 2].time;
+        const lastX = chart.timeScale().timeToCoordinate(lastTime as unknown as Time);
+        if (lastX === null) return null;
+        const pxPerBar = (() => {
+          const prevX = chart.timeScale().timeToCoordinate(c[c.length - 2].time as unknown as Time);
+          if (prevX === null) return 10;
+          return lastX - prevX;
+        })();
+        if (pxPerBar <= 0) return null;
+        const barsAhead = (x - lastX) / pxPerBar;
+        time = (lastTime + Math.round(barsAhead) * interval) as unknown as Time;
+      }
       return { time: time as unknown as number, price: price as number };
     },
     [chartRef, seriesRef]
