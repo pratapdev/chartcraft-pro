@@ -61,6 +61,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [hoveredAlertBtn, setHoveredAlertBtn] = useState<string | null>(null);
   const [crosshairBtnY, setCrosshairBtnY] = useState<number | null>(null);
   const [crosshairBtnPrice, setCrosshairBtnPrice] = useState<number | null>(null);
+  const crosshairHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crosshairBtnHovered = useRef(false);
   const crosshairMouseY = useRef<number | null>(null);
   const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
@@ -702,6 +704,38 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   // Keyboard
   useEffect(() => {
+    const addAlertAtCrosshair = () => {
+      const price = crosshairPrice.current;
+      if (price === null) return;
+      const { candles: c } = useChartStore.getState();
+      const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
+      const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
+      const lineId = crypto.randomUUID();
+      addTrendline({
+        id: lineId,
+        symbol,
+        timeframe,
+        startTime,
+        startPrice: price,
+        endTime,
+        endPrice: price,
+        color: '#eab308',
+        thickness: 2,
+        createdAt: Date.now(),
+      });
+      addAlert({
+        id: crypto.randomUUID(),
+        symbol,
+        timeframe,
+        trendlineId: lineId,
+        condition: 'cross_any' as AlertCondition,
+        active: true,
+        triggered: false,
+        message: `Price crosses ${price.toFixed(2)}`,
+        createdAt: Date.now(),
+      });
+    };
+
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedTrendlineId) removeTrendline(selectedTrendlineId);
@@ -722,10 +756,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setIsInteracting(false);
         bump((n) => n + 1);
       }
+      // '+' or '=' key to add alert at crosshair
+      if ((e.key === '+' || e.key === '=') && activeTool === 'cursor') {
+        addAlertAtCrosshair();
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool]);
+  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
   const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
@@ -796,8 +834,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           setHoverY(null);
           crosshairMouseY.current = null;
           crosshairPrice.current = null;
-          setCrosshairBtnY(null);
-          setCrosshairBtnPrice(null);
+          // Delay clearing so button stays clickable when mouse moves to it
+          if (crosshairHideTimer.current) clearTimeout(crosshairHideTimer.current);
+          crosshairHideTimer.current = setTimeout(() => {
+            if (!crosshairBtnHovered.current) {
+              setCrosshairBtnY(null);
+              setCrosshairBtnPrice(null);
+            }
+          }, 300);
         }}
       />
 
@@ -842,9 +886,20 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
             cursor: 'pointer',
             pointerEvents: 'auto',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(37, 99, 235, 0.8)'; }}
-          title={`Add alert at ${crosshairBtnPrice.toFixed(2)}`}
+          onMouseEnter={(e) => {
+            crosshairBtnHovered.current = true;
+            if (crosshairHideTimer.current) clearTimeout(crosshairHideTimer.current);
+            e.currentTarget.style.background = '#2563eb';
+          }}
+          onMouseLeave={(e) => {
+            crosshairBtnHovered.current = false;
+            e.currentTarget.style.background = 'rgba(37, 99, 235, 0.8)';
+            crosshairHideTimer.current = setTimeout(() => {
+              setCrosshairBtnY(null);
+              setCrosshairBtnPrice(null);
+            }, 200);
+          }}
+          title={`Add alert at ${crosshairBtnPrice.toFixed(2)} (or press +)`}
           onClick={() => {
             const price = crosshairBtnPrice;
             const { candles: c } = useChartStore.getState();
@@ -874,6 +929,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
               message: `Price crosses ${price.toFixed(2)}`,
               createdAt: Date.now(),
             });
+            setCrosshairBtnY(null);
+            setCrosshairBtnPrice(null);
           }}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
