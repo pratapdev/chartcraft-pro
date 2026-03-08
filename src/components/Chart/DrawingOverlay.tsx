@@ -542,14 +542,18 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         const fs = fibRef.current;
         const dist = Math.hypot(mx - fs.startX, my - fs.startY);
         if (dist > 10) {
+          // Ensure left-to-right ordering
+          const [sTime, sPrice, eTime, ePrice] = fs.startTime <= fs.currentTime
+            ? [fs.startTime, fs.startPrice, fs.currentTime, fs.currentPrice]
+            : [fs.currentTime, fs.currentPrice, fs.startTime, fs.startPrice];
           addFibonacci({
             id: crypto.randomUUID(),
             symbol,
             timeframe,
-            startTime: fs.startTime,
-            startPrice: fs.startPrice,
-            endTime: fs.currentTime,
-            endPrice: fs.currentPrice,
+            startTime: sTime,
+            startPrice: sPrice,
+            endTime: eTime,
+            endPrice: ePrice,
             createdAt: Date.now(),
           });
         }
