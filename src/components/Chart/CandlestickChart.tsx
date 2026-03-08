@@ -318,7 +318,7 @@ export const CandlestickChart: React.FC = () => {
         if (greenData.length > 0) {
           const greenSeries = chartRef.current.addLineSeries({
             color: ind.color || '#22c55e',
-            lineWidth: 2,
+            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerVisible: false,
