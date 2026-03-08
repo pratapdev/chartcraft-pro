@@ -64,6 +64,8 @@ interface ChartStore {
   addAlertLog: (log: AlertLog) => void;
 
   // Indicators
+  selectedIndicatorId: string | null;
+  setSelectedIndicatorId: (id: string | null) => void;
   indicators: IndicatorConfig[];
   addIndicator: (ind: IndicatorConfig) => void;
   removeIndicator: (id: string) => void;
