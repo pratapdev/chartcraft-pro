@@ -437,6 +437,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     indicatorCrossAlerts: state.indicatorCrossAlerts,
     indicatorThresholdAlerts: state.indicatorThresholdAlerts,
     stochRSICrossAlerts: state.stochRSICrossAlerts,
+    pctDiffDonCrossAlerts: state.pctDiffDonCrossAlerts,
     fibonacciDrawings: state.fibonacciDrawings,
     symbol: state.symbol,
     timeframe: state.timeframe,
