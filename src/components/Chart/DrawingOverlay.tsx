@@ -402,19 +402,6 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     [trendlines, lineToPixels]
   );
 
-  // Check if mouse hits the crosshair "+" alert button
-  const hitCrosshairAlertBtn = useCallback(
-    (mx: number, my: number): boolean => {
-      const canvas = canvasRef.current;
-      if (!canvas || activeTool !== 'cursor' || crosshairMouseY.current === null) return false;
-      const w = canvas.parentElement?.clientWidth ?? canvas.width;
-      const btnX = w - 28;
-      const btnY = crosshairMouseY.current;
-      return Math.hypot(mx - btnX, my - btnY) <= 12;
-    },
-    [activeTool]
-  );
-
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
