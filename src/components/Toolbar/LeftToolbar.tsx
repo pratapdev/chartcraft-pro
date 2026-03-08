@@ -13,6 +13,7 @@ import {
   GitFork,
   Activity,
   Eraser,
+  Diamond,
 } from 'lucide-react';
 
 interface ToolButton {
