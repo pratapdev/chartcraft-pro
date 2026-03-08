@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import {
+import { useChartSync } from './ChartSyncContext';
   createChart,
   IChartApi,
   ISeriesApi,
