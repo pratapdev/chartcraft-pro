@@ -212,6 +212,20 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
+    if (indicator.type === 'ATR') {
+      const data = computeATR(candles, indicator.period);
+      if (data.length > 0) {
+        const series = chart.addLineSeries({
+          color: indicator.color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+      }
+    }
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
