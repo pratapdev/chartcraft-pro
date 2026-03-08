@@ -143,4 +143,14 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   rightPanelTab: 'alerts',
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
   setRightPanelTab: (rightPanelTab) => set({ rightPanelTab, rightPanelOpen: true }),
+}), {
+  name: 'chart-store',
+  partialize: (state) => ({
+    trendlines: state.trendlines,
+    alerts: state.alerts,
+    alertLogs: state.alertLogs,
+    indicators: state.indicators,
+    symbol: state.symbol,
+    timeframe: state.timeframe,
+  }),
 }));
