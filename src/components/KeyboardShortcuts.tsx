@@ -65,9 +65,16 @@ export const KeyboardShortcuts: React.FC = () => {
       if (key === 's') { store.setRightPanelTab('settings'); return; }
 
       // Undo
-      if (key === 'z' && (e.ctrlKey || e.metaKey)) {
+      if (key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         store.undoLastDeletion();
+        return;
+      }
+
+      // Redo (Ctrl+Y or Ctrl+Shift+Z)
+      if ((key === 'y' && (e.ctrlKey || e.metaKey)) || (key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
+        e.preventDefault();
+        store.redoLastDeletion();
         return;
       }
 
