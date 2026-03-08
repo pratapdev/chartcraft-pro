@@ -12,6 +12,7 @@ const SHORTCUTS: { key: string; label: string; description: string; action?: () 
   { key: 'Delete', label: 'Del', description: 'Delete selected drawing' },
   { key: 'Escape', label: 'Esc', description: 'Cancel drawing / Deselect' },
   { key: 'Ctrl+Z', label: 'Ctrl+Z', description: 'Undo last deletion' },
+  { key: 'Ctrl+Y', label: 'Ctrl+Y', description: 'Redo last deletion' },
   { key: 'A', label: 'A', description: 'Open Alerts panel' },
   { key: 'I', label: 'I', description: 'Open Indicators panel' },
   { key: 'S', label: 'S', description: 'Open Settings panel' },
@@ -65,9 +66,16 @@ export const KeyboardShortcuts: React.FC = () => {
       if (key === 's') { store.setRightPanelTab('settings'); return; }
 
       // Undo
-      if (key === 'z' && (e.ctrlKey || e.metaKey)) {
+      if (key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         store.undoLastDeletion();
+        return;
+      }
+
+      // Redo (Ctrl+Y or Ctrl+Shift+Z)
+      if ((key === 'y' && (e.ctrlKey || e.metaKey)) || (key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
+        e.preventDefault();
+        store.redoLastDeletion();
         return;
       }
 

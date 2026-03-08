@@ -14,6 +14,7 @@ interface UndoEntry {
 }
 
 const undoStack: UndoEntry[] = [];
+const redoStack: UndoEntry[] = [];
 
 interface CrosshairData {
   time: number;
@@ -89,6 +90,7 @@ interface ChartStore {
 
   // Undo
   undoLastDeletion: () => void;
+  redoLastDeletion: () => void;
 
   // Multi-timeframe
   multiTfMode: boolean;
@@ -187,6 +189,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     const relatedAlerts = s.alerts.filter((a) => a.trendlineId === id);
     if (line) {
       undoStack.push({ type: 'trendline+alerts', trendline: line, alerts: relatedAlerts });
+      redoStack.length = 0;
       toast('Deleted', {
         action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
         duration: 5000,
@@ -210,6 +213,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     const alert = get().alerts.find((a) => a.id === id);
     if (alert) {
       undoStack.push({ type: 'alert', alert });
+      redoStack.length = 0;
       toast('Alert deleted', {
         action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
         duration: 5000,
@@ -251,15 +255,38 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   undoLastDeletion: () => {
     const entry = undoStack.pop();
     if (!entry) return;
+    redoStack.push(entry);
     if (entry.type === 'trendline+alerts' && entry.trendline) {
       set((s) => ({
         trendlines: [...s.trendlines, entry.trendline!],
         alerts: [...s.alerts, ...(entry.alerts ?? [])],
       }));
-      toast.success('Restored');
+      toast.success('Restored (Ctrl+Y to redo)');
     } else if (entry.type === 'alert' && entry.alert) {
       set((s) => ({ alerts: [...s.alerts, entry.alert!] }));
-      toast.success('Alert restored');
+      toast.success('Alert restored (Ctrl+Y to redo)');
+    }
+  },
+  redoLastDeletion: () => {
+    const entry = redoStack.pop();
+    if (!entry) return;
+    undoStack.push(entry);
+    if (entry.type === 'trendline+alerts' && entry.trendline) {
+      set((s) => ({
+        trendlines: s.trendlines.filter((t) => t.id !== entry.trendline!.id),
+        alerts: s.alerts.filter((a) => !(entry.alerts ?? []).some((ea) => ea.id === a.id)),
+        selectedTrendlineId: s.selectedTrendlineId === entry.trendline!.id ? null : s.selectedTrendlineId,
+      }));
+      toast('Redone deletion', {
+        action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
+        duration: 5000,
+      });
+    } else if (entry.type === 'alert' && entry.alert) {
+      set((s) => ({ alerts: s.alerts.filter((a) => a.id !== entry.alert!.id) }));
+      toast('Alert re-deleted', {
+        action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
+        duration: 5000,
+      });
     }
   },
 
