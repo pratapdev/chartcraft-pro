@@ -50,6 +50,7 @@ export interface Alert {
   triggeredAt?: number;
   message?: string;
   createdAt: number;
+  telegramEnabled?: boolean;
 }
 
 export interface AlertLog {
