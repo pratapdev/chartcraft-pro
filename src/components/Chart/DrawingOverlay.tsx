@@ -25,6 +25,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   } | null>(null);
 
   const [isInteracting, setIsInteracting] = useState(false);
+  const [hoverY, setHoverY] = useState<number | null>(null);
   const [, bump] = useState(0);
 
   const {
@@ -168,31 +169,34 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
     }
 
-    const ds = drawRef.current;
-    if (ds.phase === 'drawing') {
-      const isHoriz = activeTool === 'horizontal';
+    // Horizontal tool hover preview
+    if (activeTool === 'horizontal' && hoverY !== null) {
       ctx.beginPath();
-      ctx.moveTo(0, ds.startY);
-      if (isHoriz) {
-        ctx.lineTo(w, ds.startY);
-        ctx.strokeStyle = '#eab308';
-      } else {
-        ctx.moveTo(ds.startX, ds.startY);
-        ctx.lineTo(ds.currentX, ds.currentY);
-        ctx.strokeStyle = '#2563eb';
-      }
+      ctx.moveTo(0, hoverY);
+      ctx.lineTo(w, hoverY);
+      ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
-      if (!isHoriz) {
-        ctx.beginPath();
-        ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#2563eb';
-        ctx.fill();
-      }
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels]);
+
+    const ds = drawRef.current;
+    if (ds.phase === 'drawing') {
+      ctx.beginPath();
+      ctx.moveTo(ds.startX, ds.startY);
+      ctx.lineTo(ds.currentX, ds.currentY);
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#2563eb';
+      ctx.fill();
+    }
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY]);
 
   useEffect(() => {
     let raf: number;
@@ -214,7 +218,33 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
 
-      if (activeTool === 'trendline' || activeTool === 'horizontal') {
+      if (activeTool === 'horizontal') {
+        // Single-click placement like TradingView
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          const { candles: c } = useChartStore.getState();
+          const startTime = c.length > 0 ? c[0].time : coords.time - 86400;
+          const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : coords.time + 86400;
+          addTrendline({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            startTime,
+            startPrice: coords.price,
+            endTime,
+            endPrice: coords.price,
+            color: '#eab308',
+            thickness: 2,
+            createdAt: Date.now(),
+          });
+        }
+        setActiveTool('cursor');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (activeTool === 'trendline') {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
         bump((n) => n + 1);
@@ -242,7 +272,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setSelectedTrendlineId(null);
       }
     },
-    [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId]
+    [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
   );
 
   const handleMouseMove = useCallback(
@@ -279,8 +309,12 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       // Update cursor and hover state
-      if (eventLayerRef.current) {
-        if (activeTool === 'trendline' || activeTool === 'horizontal') {
+      if (activeTool === 'horizontal') {
+        setHoverY(my);
+        if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
+      } else if (eventLayerRef.current) {
+        setHoverY(null);
+        if (activeTool === 'trendline') {
           eventLayerRef.current.style.cursor = 'crosshair';
         } else {
           const isHit = !!hitTest(mx, my);
@@ -298,25 +332,20 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
       if (drawRef.current.phase === 'drawing') {
         const ds = drawRef.current;
-        const isHorizontal = activeTool === 'horizontal';
         const dist = Math.hypot(mx - ds.startX, my - ds.startY);
-        if (isHorizontal || dist > 10) {
+        if (dist > 10) {
           const start = pixelToCoords(ds.startX, ds.startY);
-          const end = isHorizontal ? null : pixelToCoords(mx, my);
-          if (start && (isHorizontal || end)) {
-            const { candles: c } = useChartStore.getState();
-            const endTime = isHorizontal
-              ? (c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : start.time + 86400)
-              : end!.time;
+          const end = pixelToCoords(mx, my);
+          if (start && end) {
             addTrendline({
               id: crypto.randomUUID(),
               symbol,
               timeframe,
-              startTime: isHorizontal ? (c.length > 0 ? c[0].time : start.time) : start.time,
+              startTime: start.time,
               startPrice: start.price,
-              endTime,
-              endPrice: isHorizontal ? start.price : end!.price,
-              color: isHorizontal ? '#eab308' : '#2563eb',
+              endTime: end.time,
+              endPrice: end.price,
+              color: '#2563eb',
               thickness: 2,
               createdAt: Date.now(),
             });
@@ -400,6 +429,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         onMouseLeave={() => {
           if (dragRef.current) { dragRef.current = null; setIsInteracting(false); }
           setHoveringLine(false);
+          setHoverY(null);
         }}
       />
     </>
