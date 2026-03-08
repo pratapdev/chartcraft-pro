@@ -530,3 +530,17 @@ export function computeATR(candles: Candle[], period: number = 14): { time: numb
 
   return result;
 }
+
+// Compute OBV (On-Balance Volume)
+export function computeOBV(candles: Candle[]): { time: number; value: number }[] {
+  if (candles.length === 0) return [];
+  const result: { time: number; value: number }[] = [];
+  let obv = 0;
+  result.push({ time: candles[0].time, value: obv });
+  for (let i = 1; i < candles.length; i++) {
+    if (candles[i].close > candles[i - 1].close) obv += candles[i].volume;
+    else if (candles[i].close < candles[i - 1].close) obv -= candles[i].volume;
+    result.push({ time: candles[i].time, value: obv });
+  }
+  return result;
+}
