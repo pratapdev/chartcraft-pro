@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
+import { checkSyncHealth, pushState, extractSyncPayload, getSyncServerUrl } from '@/lib/syncService';
 
 const CRYPTO_SYMBOLS = [
   { name: 'BTC/USD', label: 'Bitcoin' },
