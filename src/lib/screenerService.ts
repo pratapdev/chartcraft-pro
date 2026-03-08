@@ -1,0 +1,264 @@
+import { Candle, Timeframe } from '@/types/trading';
+import { fetchCandles, computeRSI, computeSMA, computeEMA, computeSupertrend } from './marketData';
+
+export interface ScreenerRow {
+  symbol: string;
+  price: number;
+  change24h: number;
+  change7d: number;
+  volume24h: number;
+  volumeChange: number;
+  marketCap?: number;
+  rsi: number | null;
+  macd: { value: number; signal: number; histogram: number } | null;
+  ema20: number | null;
+  ema50: number | null;
+  supertrend: 'bullish' | 'bearish' | null;
+  pattern: string | null;
+  candles: Candle[];
+}
+
+export interface ScreenerFilters {
+  minPrice?: number;
+  maxPrice?: number;
+  minVolume?: number;
+  maxVolume?: number;
+  minChange?: number;
+  maxChange?: number;
+  rsiOversold?: number; // e.g., < 30
+  rsiOverbought?: number; // e.g., > 70
+  trendDirection?: 'bullish' | 'bearish' | 'any';
+  pattern?: string[];
+  customFormula?: string;
+}
+
+const CRYPTO_SYMBOLS = [
+  'BTC/USD',
+  'ETH/USD',
+  'SOL/USD',
+  'BNB/USD',
+  'XRP/USD',
+  'ADA/USD',
+  'DOGE/USD',
+  'AVAX/USD',
+];
+
+// Fetch 24h ticker data from Binance
+async function fetch24hTicker(binanceSymbol: string) {
+  try {
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSymbol}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      priceChange: parseFloat(data.priceChange),
+      priceChangePercent: parseFloat(data.priceChangePercent),
+      lastPrice: parseFloat(data.lastPrice),
+      volume: parseFloat(data.volume),
+      quoteVolume: parseFloat(data.quoteVolume),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Compute MACD (12, 26, 9)
+function computeMACD(candles: Candle[]) {
+  const ema12 = computeEMA(candles, 12);
+  const ema26 = computeEMA(candles, 26);
+  if (ema12.length === 0 || ema26.length === 0) return null;
+
+  const macdLine = ema12.map((e12, i) => ({
+    time: e12.time,
+    value: e12.value - (ema26[i]?.value ?? 0),
+  }));
+
+  const signalLine = computeEMA(
+    macdLine.map((m) => ({ time: m.time, open: m.value, high: m.value, low: m.value, close: m.value, volume: 0 })),
+    9
+  );
+
+  if (macdLine.length === 0 || signalLine.length === 0) return null;
+
+  const latest = macdLine[macdLine.length - 1];
+  const latestSignal = signalLine[signalLine.length - 1];
+
+  return {
+    value: latest.value,
+    signal: latestSignal.value,
+    histogram: latest.value - latestSignal.value,
+  };
+}
+
+// Simple pattern detection (engulfing, doji, hammer, etc.)
+function detectPattern(candles: Candle[]): string | null {
+  if (candles.length < 2) return null;
+  const curr = candles[candles.length - 1];
+  const prev = candles[candles.length - 2];
+
+  const currBody = Math.abs(curr.close - curr.open);
+  const prevBody = Math.abs(prev.close - prev.open);
+  const currRange = curr.high - curr.low;
+
+  // Bullish Engulfing
+  if (prev.close < prev.open && curr.close > curr.open && curr.open <= prev.close && curr.close >= prev.open) {
+    return 'Bullish Engulfing';
+  }
+
+  // Bearish Engulfing
+  if (prev.close > prev.open && curr.close < curr.open && curr.open >= prev.close && curr.close <= prev.open) {
+    return 'Bearish Engulfing';
+  }
+
+  // Doji (small body)
+  if (currBody < currRange * 0.1 && currRange > 0) {
+    return 'Doji';
+  }
+
+  // Hammer (bullish reversal)
+  const lowerWick = Math.min(curr.open, curr.close) - curr.low;
+  const upperWick = curr.high - Math.max(curr.open, curr.close);
+  if (lowerWick > currBody * 2 && upperWick < currBody * 0.5 && currRange > 0) {
+    return 'Hammer';
+  }
+
+  // Shooting Star (bearish reversal)
+  if (upperWick > currBody * 2 && lowerWick < currBody * 0.5 && currRange > 0) {
+    return 'Shooting Star';
+  }
+
+  return null;
+}
+
+export async function fetchScreenerData(timeframe: Timeframe = '1D'): Promise<ScreenerRow[]> {
+  const results: ScreenerRow[] = [];
+
+  for (const symbol of CRYPTO_SYMBOLS) {
+    try {
+      const binanceSymbol = symbol.replace('/', '').replace('USD', 'USDT');
+      
+      // Fetch candles and 24h ticker in parallel
+      const [candles, ticker24h] = await Promise.all([
+        fetchCandles(symbol, timeframe, 100),
+        fetch24hTicker(binanceSymbol),
+      ]);
+
+      if (!candles || candles.length === 0 || !ticker24h) continue;
+
+      // Compute indicators
+      const rsiData = computeRSI(candles, 14);
+      const rsi = rsiData.length > 0 ? rsiData[rsiData.length - 1].value : null;
+
+      const macd = computeMACD(candles);
+
+      const ema20Data = computeEMA(candles, 20);
+      const ema20 = ema20Data.length > 0 ? ema20Data[ema20Data.length - 1].value : null;
+
+      const ema50Data = computeEMA(candles, 50);
+      const ema50 = ema50Data.length > 0 ? ema50Data[ema50Data.length - 1].value : null;
+
+      const supertrendData = computeSupertrend(candles, 10, 3);
+      const lastSupertrend = supertrendData.line[supertrendData.line.length - 1];
+      const supertrend = lastSupertrend?.color === '#22c55e' ? 'bullish' : 'bearish';
+
+      const pattern = detectPattern(candles);
+
+      // Estimate 7d change (compare current price to 7 days ago if available)
+      let change7d = 0;
+      if (timeframe === '1D' && candles.length >= 7) {
+        const weekAgoPrice = candles[candles.length - 7].close;
+        change7d = ((ticker24h.lastPrice - weekAgoPrice) / weekAgoPrice) * 100;
+      }
+
+      results.push({
+        symbol,
+        price: ticker24h.lastPrice,
+        change24h: ticker24h.priceChangePercent,
+        change7d,
+        volume24h: ticker24h.quoteVolume,
+        volumeChange: 0, // Binance doesn't provide this directly
+        rsi,
+        macd,
+        ema20,
+        ema50,
+        supertrend,
+        pattern,
+        candles,
+      });
+    } catch (err) {
+      console.error(`Failed to fetch screener data for ${symbol}:`, err);
+    }
+  }
+
+  return results;
+}
+
+export function applyFilters(data: ScreenerRow[], filters: ScreenerFilters): ScreenerRow[] {
+  return data.filter((row) => {
+    // Price filters
+    if (filters.minPrice !== undefined && row.price < filters.minPrice) return false;
+    if (filters.maxPrice !== undefined && row.price > filters.maxPrice) return false;
+
+    // Volume filters
+    if (filters.minVolume !== undefined && row.volume24h < filters.minVolume) return false;
+    if (filters.maxVolume !== undefined && row.volume24h > filters.maxVolume) return false;
+
+    // Change filters
+    if (filters.minChange !== undefined && row.change24h < filters.minChange) return false;
+    if (filters.maxChange !== undefined && row.change24h > filters.maxChange) return false;
+
+    // RSI filters
+    if (filters.rsiOversold !== undefined && row.rsi !== null && row.rsi >= filters.rsiOversold) return false;
+    if (filters.rsiOverbought !== undefined && row.rsi !== null && row.rsi <= filters.rsiOverbought) return false;
+
+    // Trend direction
+    if (filters.trendDirection && filters.trendDirection !== 'any') {
+      if (row.supertrend !== filters.trendDirection) return false;
+    }
+
+    // Pattern filter
+    if (filters.pattern && filters.pattern.length > 0) {
+      if (!row.pattern || !filters.pattern.includes(row.pattern)) return false;
+    }
+
+    // Custom formula (basic eval - in production, use a safe parser)
+    if (filters.customFormula) {
+      try {
+        const context = {
+          price: row.price,
+          change: row.change24h,
+          volume: row.volume24h,
+          rsi: row.rsi ?? 0,
+          ema20: row.ema20 ?? 0,
+          ema50: row.ema50 ?? 0,
+        };
+        // Simple formula evaluation (e.g., "rsi < 30 && volume > 1000000")
+        const result = new Function(...Object.keys(context), `return ${filters.customFormula}`)(...Object.values(context));
+        if (!result) return false;
+      } catch {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+export function sortScreenerData(data: ScreenerRow[], sortBy: keyof ScreenerRow, order: 'asc' | 'desc'): ScreenerRow[] {
+  return [...data].sort((a, b) => {
+    const aVal = a[sortBy];
+    const bVal = b[sortBy];
+
+    if (aVal === null || aVal === undefined) return 1;
+    if (bVal === null || bVal === undefined) return -1;
+
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return order === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+
+    return 0;
+  });
+}
