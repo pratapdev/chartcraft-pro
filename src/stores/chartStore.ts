@@ -189,6 +189,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     const relatedAlerts = s.alerts.filter((a) => a.trendlineId === id);
     if (line) {
       undoStack.push({ type: 'trendline+alerts', trendline: line, alerts: relatedAlerts });
+      redoStack.length = 0;
       toast('Deleted', {
         action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
         duration: 5000,
