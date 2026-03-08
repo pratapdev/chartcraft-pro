@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { toast } from 'sonner';
 import { sendTelegramMessage } from '@/lib/telegram';
-import { computeEMA, computeSMA } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV } from '@/lib/marketData';
 import { IndicatorConfig } from '@/types/trading';
 
 // Shared AudioContext, unlocked on first user gesture
