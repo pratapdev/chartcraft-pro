@@ -739,8 +739,9 @@ function renderFibLevels(
   fib: FibonacciDrawing,
   w: number,
   series: ISeriesApi<'Candlestick'>,
+  selected?: boolean,
 ) {
-  drawFibLines(ctx, fib.startPrice, fib.endPrice, w, series);
+  drawFibLines(ctx, fib.startPrice, fib.endPrice, w, series, selected);
 }
 
 function renderFibPreview(
