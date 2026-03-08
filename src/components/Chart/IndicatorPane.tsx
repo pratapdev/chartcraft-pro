@@ -170,6 +170,9 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   useEffect(() => {
     if (!chartRef.current || seriesRefs.current.length === 0 || candles.length === 0) return;
 
+    const timeScale = chartRef.current.timeScale();
+    const prevRange = timeScale.getVisibleLogicalRange();
+
     const toLD = (d: { time: number; value: number }) => ({ time: d.time as Time, value: d.value });
 
     if (indicator.type === 'RSI') {
