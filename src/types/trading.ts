@@ -50,7 +50,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'MACD';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD';
 
 export interface IndicatorConfig {
   id: string;
@@ -58,4 +58,10 @@ export interface IndicatorConfig {
   period: number;
   color: string;
   visible: boolean;
+  /** For StochRSI: smoothing K period */
+  kPeriod?: number;
+  /** For StochRSI: smoothing D period */
+  dPeriod?: number;
+  /** Secondary color for D line in StochRSI */
+  color2?: string;
 }

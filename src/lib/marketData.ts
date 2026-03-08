@@ -171,3 +171,75 @@ export function computeSMA(candles: Candle[], period: number): { time: number; v
   }
   return result;
 }
+
+// Compute RSI
+export function computeRSI(candles: Candle[], period: number): { time: number; value: number }[] {
+  if (candles.length < period + 1) return [];
+  const result: { time: number; value: number }[] = [];
+  let avgGain = 0, avgLoss = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const change = candles[i].close - candles[i - 1].close;
+    if (change > 0) avgGain += change;
+    else avgLoss += Math.abs(change);
+  }
+  avgGain /= period;
+  avgLoss /= period;
+
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  result.push({ time: candles[period].time, value: Math.round((100 - 100 / (1 + rs)) * 100) / 100 });
+
+  for (let i = period + 1; i < candles.length; i++) {
+    const change = candles[i].close - candles[i - 1].close;
+    const gain = change > 0 ? change : 0;
+    const loss = change < 0 ? Math.abs(change) : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    const rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    result.push({ time: candles[i].time, value: Math.round(rsi * 100) / 100 });
+  }
+  return result;
+}
+
+// Compute Stochastic RSI
+export function computeStochRSI(
+  candles: Candle[],
+  rsiPeriod: number,
+  stochPeriod: number,
+  kSmooth: number,
+  dSmooth: number
+): { k: { time: number; value: number }[]; d: { time: number; value: number }[] } {
+  const rsiValues = computeRSI(candles, rsiPeriod);
+  if (rsiValues.length < stochPeriod) return { k: [], d: [] };
+
+  // Raw StochRSI
+  const rawStoch: { time: number; value: number }[] = [];
+  for (let i = stochPeriod - 1; i < rsiValues.length; i++) {
+    let minRsi = Infinity, maxRsi = -Infinity;
+    for (let j = i - stochPeriod + 1; j <= i; j++) {
+      minRsi = Math.min(minRsi, rsiValues[j].value);
+      maxRsi = Math.max(maxRsi, rsiValues[j].value);
+    }
+    const range = maxRsi - minRsi;
+    const stochVal = range === 0 ? 50 : ((rsiValues[i].value - minRsi) / range) * 100;
+    rawStoch.push({ time: rsiValues[i].time, value: stochVal });
+  }
+
+  // Smooth K (SMA of rawStoch)
+  const kLine: { time: number; value: number }[] = [];
+  for (let i = kSmooth - 1; i < rawStoch.length; i++) {
+    let sum = 0;
+    for (let j = i - kSmooth + 1; j <= i; j++) sum += rawStoch[j].value;
+    kLine.push({ time: rawStoch[i].time, value: Math.round((sum / kSmooth) * 100) / 100 });
+  }
+
+  // D line (SMA of K)
+  const dLine: { time: number; value: number }[] = [];
+  for (let i = dSmooth - 1; i < kLine.length; i++) {
+    let sum = 0;
+    for (let j = i - dSmooth + 1; j <= i; j++) sum += kLine[j].value;
+    dLine.push({ time: kLine[i].time, value: Math.round((sum / dSmooth) * 100) / 100 });
+  }
+
+  return { k: kLine, d: dLine };
+}

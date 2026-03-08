@@ -165,6 +165,10 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     set((s) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, visible: !i.visible } : i)),
     })),
+  updateIndicator: (id, updates) =>
+    set((s) => ({
+      indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates } : i)),
+    })),
 
   rightPanelOpen: false,
   rightPanelTab: 'alerts',
