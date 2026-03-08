@@ -4,8 +4,8 @@ import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
 import { LayoutGrid, Columns2 } from 'lucide-react';
 
-const TWO_TIMEFRAMES: Timeframe[] = ['1h', '1D'];
-const FOUR_TIMEFRAMES: Timeframe[] = ['15m', '1h', '4h', '1D'];
+const DEFAULT_TWO: Timeframe[] = ['1h', '1D'];
+const DEFAULT_FOUR: Timeframe[] = ['15m', '1h', '4h', '1D'];
 
 type GridMode = 2 | 4;
 
@@ -13,12 +13,30 @@ export const MultiTimeframeView: React.FC = () => {
   const symbol = useChartStore((s) => s.symbol);
   const [syncTime, setSyncTime] = useState<number | null>(null);
   const [gridMode, setGridMode] = useState<GridMode>(4);
+  const [twoTf, setTwoTf] = useState<Timeframe[]>([...DEFAULT_TWO]);
+  const [fourTf, setFourTf] = useState<Timeframe[]>([...DEFAULT_FOUR]);
 
-  const timeframes = gridMode === 2 ? TWO_TIMEFRAMES : FOUR_TIMEFRAMES;
+  const timeframes = gridMode === 2 ? twoTf : fourTf;
 
   const handleCrosshairMove = useCallback((time: number | null) => {
     setSyncTime(time);
   }, []);
+
+  const handleTimeframeChange = useCallback((index: number, newTf: Timeframe) => {
+    if (gridMode === 2) {
+      setTwoTf((prev) => {
+        const next = [...prev];
+        next[index] = newTf;
+        return next;
+      });
+    } else {
+      setFourTf((prev) => {
+        const next = [...prev];
+        next[index] = newTf;
+        return next;
+      });
+    }
+  }, [gridMode]);
 
   const gridStyle = gridMode === 4
     ? { gridTemplateColumns: 'repeat(2, 1fr)', gridTemplateRows: 'repeat(2, 1fr)' }
@@ -26,7 +44,6 @@ export const MultiTimeframeView: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Grid mode selector */}
       <div className="flex items-center gap-1 px-2 py-1 border-b border-border bg-card">
         <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1">Layout</span>
         <button
@@ -45,13 +62,14 @@ export const MultiTimeframeView: React.FC = () => {
         </button>
       </div>
       <div className="grid h-full" style={gridStyle}>
-        {timeframes.map((tf) => (
+        {timeframes.map((tf, idx) => (
           <MiniChart
-            key={tf}
+            key={`${gridMode}-${idx}`}
             symbol={symbol}
             timeframe={tf}
             onCrosshairMove={handleCrosshairMove}
             syncTime={syncTime}
+            onTimeframeChange={(newTf) => handleTimeframeChange(idx, newTf)}
           />
         ))}
       </div>
