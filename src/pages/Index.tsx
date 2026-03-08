@@ -1,11 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import React from 'react';
+import { TopBar } from '@/components/TopBar/TopBar';
+import { LeftToolbar } from '@/components/Toolbar/LeftToolbar';
+import { ChartContainer } from '@/components/Chart/ChartContainer';
+import { RightSidebar } from '@/components/RightSidebar/RightSidebar';
+import { BottomPanel } from '@/components/BottomPanel/BottomPanel';
 
-const Index = () => {
+const Index: React.FC = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
+      <TopBar />
+      <div className="flex flex-1 min-h-0">
+        <LeftToolbar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 min-h-0">
+            <ChartContainer />
+          </div>
+          <BottomPanel />
+        </div>
+        <RightSidebar />
       </div>
     </div>
   );
