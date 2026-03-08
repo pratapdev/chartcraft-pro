@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp } from 'lucide-react';
+import { INDIAN_STOCKS } from '@/lib/upstoxData';
+import { MarketType } from '@/types/trading';
 
-const DEFAULT_SYMBOLS = [
+const CRYPTO_SYMBOLS = [
   { name: 'BTC/USD', label: 'Bitcoin' },
   { name: 'ETH/USD', label: 'Ethereum' },
   { name: 'SOL/USD', label: 'Solana' },
@@ -23,39 +25,48 @@ function saveCustomPairs(pairs: { name: string; label: string }[]) {
   localStorage.setItem('custom-pairs', JSON.stringify(pairs));
 }
 
+const MARKET_OPTIONS: { value: MarketType; label: string; icon: string }[] = [
+  { value: 'crypto', label: 'Crypto', icon: '₿' },
+  { value: 'indian', label: 'Indian Stocks', icon: '🇮🇳' },
+];
+
 export const TopBar: React.FC = () => {
-  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected } = useChartStore();
+  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType } = useChartStore();
   const [showSymbols, setShowSymbols] = useState(false);
+  const [showMarketDropdown, setShowMarketDropdown] = useState(false);
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPair, setNewPair] = useState('');
   const [addError, setAddError] = useState('');
   const [customPairs, setCustomPairs] = useState(loadCustomPairs);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const marketRef = useRef<HTMLDivElement>(null);
 
-  const allSymbols = [...DEFAULT_SYMBOLS, ...customPairs];
+  const symbolList = marketType === 'crypto'
+    ? [...CRYPTO_SYMBOLS, ...customPairs]
+    : INDIAN_STOCKS.map((s) => ({ name: s.name, label: s.label }));
 
-  const filtered = allSymbols.filter(
+  const filtered = symbolList.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.label.toLowerCase().includes(search.toLowerCase())
   );
 
+  const currentMarket = MARKET_OPTIONS.find((m) => m.value === marketType)!;
+
   const handleAddPair = async () => {
     const raw = newPair.trim().toUpperCase();
     if (!raw) return;
 
-    // Normalize: accept "LINK/USD", "LINKUSDT", "LINK"
     let binanceSymbol = raw.replace('/', '').replace('USD', 'USDT');
     if (!binanceSymbol.endsWith('USDT')) binanceSymbol += 'USDT';
     const displayName = binanceSymbol.replace('USDT', '/USD');
 
-    if (allSymbols.some((s) => s.name === displayName)) {
+    if (symbolList.some((s) => s.name === displayName)) {
       setAddError('Pair already exists');
       return;
     }
 
-    // Validate against Binance
     setAddError('');
     try {
       const res = await fetch(
@@ -85,6 +96,9 @@ export const TopBar: React.FC = () => {
         setShowSymbols(false);
         setShowAddForm(false);
       }
+      if (marketRef.current && !marketRef.current.contains(e.target as Node)) {
+        setShowMarketDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -92,6 +106,41 @@ export const TopBar: React.FC = () => {
 
   return (
     <div className="h-10 bg-card border-b border-border flex items-center px-2 gap-2 relative">
+      {/* Market Type Dropdown */}
+      <div className="relative" ref={marketRef}>
+        <button
+          onClick={() => setShowMarketDropdown(!showMarketDropdown)}
+          className="flex items-center gap-1.5 trading-btn font-semibold text-foreground"
+        >
+          <TrendingUp size={13} className="text-primary" />
+          <span className="text-xs">{currentMarket.icon} {currentMarket.label}</span>
+          <ChevronDown size={12} className="text-muted-foreground" />
+        </button>
+
+        {showMarketDropdown && (
+          <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-xl z-50 min-w-[160px] overflow-hidden">
+            {MARKET_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  if (opt.value !== marketType) setMarketType(opt.value);
+                  setShowMarketDropdown(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors flex items-center gap-2 ${
+                  opt.value === marketType ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                <span>{opt.icon}</span>
+                <span className="font-medium">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="w-px h-5 bg-border" />
+
+      {/* Symbol Dropdown */}
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => { setShowSymbols(!showSymbols); setSearch(''); setShowAddForm(false); }}
@@ -107,7 +156,7 @@ export const TopBar: React.FC = () => {
             <div className="p-2 border-b border-border">
               <input
                 type="text"
-                placeholder="Search symbol..."
+                placeholder={`Search ${marketType === 'crypto' ? 'crypto' : 'stock'}...`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
@@ -127,41 +176,46 @@ export const TopBar: React.FC = () => {
                   }`}
                 >
                   <span className="font-medium">{s.name}</span>
-                  <span className="text-muted-foreground">{s.label}</span>
+                  <span className="text-muted-foreground text-[10px]">{s.label}</span>
                 </button>
               ))}
-            </div>
-
-            <div className="border-t border-border">
-              {!showAddForm ? (
-                <button
-                  onClick={() => { setShowAddForm(true); setAddError(''); setNewPair(''); }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors flex items-center gap-1.5 text-primary"
-                >
-                  <Plus size={12} />
-                  Add new pair
-                </button>
-              ) : (
-                <div className="p-2 space-y-1.5">
-                  <input
-                    type="text"
-                    placeholder="e.g. LINK, MATIC/USD"
-                    value={newPair}
-                    onChange={(e) => { setNewPair(e.target.value); setAddError(''); }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddPair()}
-                    className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
-                    autoFocus
-                  />
-                  {addError && <p className="text-[10px] text-destructive">{addError}</p>}
-                  <button
-                    onClick={handleAddPair}
-                    className="w-full text-xs py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                  >
-                    Add & Load
-                  </button>
-                </div>
+              {filtered.length === 0 && (
+                <div className="px-3 py-2 text-xs text-muted-foreground">No results found</div>
               )}
             </div>
+
+            {marketType === 'crypto' && (
+              <div className="border-t border-border">
+                {!showAddForm ? (
+                  <button
+                    onClick={() => { setShowAddForm(true); setAddError(''); setNewPair(''); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors flex items-center gap-1.5 text-primary"
+                  >
+                    <Plus size={12} />
+                    Add new pair
+                  </button>
+                ) : (
+                  <div className="p-2 space-y-1.5">
+                    <input
+                      type="text"
+                      placeholder="e.g. LINK, MATIC/USD"
+                      value={newPair}
+                      onChange={(e) => { setNewPair(e.target.value); setAddError(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddPair()}
+                      className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+                      autoFocus
+                    />
+                    {addError && <p className="text-[10px] text-destructive">{addError}</p>}
+                    <button
+                      onClick={handleAddPair}
+                      className="w-full text-xs py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                    >
+                      Add & Load
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -169,10 +223,14 @@ export const TopBar: React.FC = () => {
       <div className="flex-1" />
 
       <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
-        {connected ? (
-          <Wifi size={13} className="text-bull" />
+        {marketType === 'crypto' ? (
+          connected ? (
+            <Wifi size={13} className="text-bull" />
+          ) : (
+            <WifiOff size={13} className="text-bear" />
+          )
         ) : (
-          <WifiOff size={13} className="text-bear" />
+          <span className="text-[10px] text-muted-foreground">NSE</span>
         )}
       </div>
 
