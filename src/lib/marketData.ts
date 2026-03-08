@@ -65,7 +65,7 @@ export function subscribeToCandles(
   timeframe: Timeframe,
   onUpdate: (candle: Candle) => void
 ): () => void {
-  const binanceSymbol = (SYMBOL_MAP[symbol] || 'BTCUSDT').toLowerCase();
+  const binanceSymbol = toBinanceSymbol(symbol).toLowerCase();
   const interval = INTERVAL_MAP[timeframe];
   const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@kline_${interval}`;
 
