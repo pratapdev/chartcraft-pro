@@ -209,8 +209,38 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
     `${indicator.type}(${indicator.period})`;
 
+  const [height, setHeight] = useState(120);
+  const isDragging = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(120);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    startY.current = e.clientY;
+    startHeight.current = height;
+
+    const handleMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = ev.clientY - startY.current;
+      setHeight(Math.max(60, Math.min(400, startHeight.current + delta)));
+    };
+    const handleUp = () => {
+      isDragging.current = false;
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  }, [height]);
+
   return (
-    <div className="relative border-t border-border" style={{ height: 120 }}>
+    <div className="relative" style={{ height }}>
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        className="absolute top-0 left-0 right-0 h-1 cursor-row-resize z-20 border-t border-border hover:border-primary hover:bg-primary/10 transition-colors"
+      />
       <div className="absolute top-1 left-2 z-10 flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground pointer-events-auto">
         <span style={{ color: indicator.color }}>{label}</span>
         <button
