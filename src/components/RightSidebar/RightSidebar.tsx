@@ -21,6 +21,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'ATR', label: 'ATR', defaults: { period: 14, color: '#26a69a' } },
   { type: 'OBV', label: 'OBV', defaults: { period: 1, color: '#AB47BC' } },
   { type: 'PIVOT_HL', label: 'Pivot Points H/L', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
+  { type: 'PCT_DIFF_DON', label: '% Diff Donchian', defaults: { period: 20, color: '#22c55e', color2: '#ef4444', lookbackWindow: 10, emaSmoothing: 5, donchianLength: 20, donLineDiff: 0.2 } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
