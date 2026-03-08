@@ -829,6 +829,59 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           </button>
         </div>
       )}
+
+      {/* Crosshair "+" alert button - rendered as HTML so it's independently clickable */}
+      {activeTool === 'cursor' && crosshairBtnY !== null && crosshairBtnPrice !== null && !isInteracting && (
+        <button
+          className="absolute z-30 flex items-center justify-center w-5 h-5 rounded-full transition-colors"
+          style={{
+            right: 68,
+            top: crosshairBtnY - 10,
+            background: 'rgba(37, 99, 235, 0.8)',
+            border: '1.5px solid #fff',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(37, 99, 235, 0.8)'; }}
+          title={`Add alert at ${crosshairBtnPrice.toFixed(2)}`}
+          onClick={() => {
+            const price = crosshairBtnPrice;
+            const { candles: c } = useChartStore.getState();
+            const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
+            const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
+            const lineId = crypto.randomUUID();
+            addTrendline({
+              id: lineId,
+              symbol,
+              timeframe,
+              startTime,
+              startPrice: price,
+              endTime,
+              endPrice: price,
+              color: '#eab308',
+              thickness: 2,
+              createdAt: Date.now(),
+            });
+            addAlert({
+              id: crypto.randomUUID(),
+              symbol,
+              timeframe,
+              trendlineId: lineId,
+              condition: 'cross_any' as AlertCondition,
+              active: true,
+              triggered: false,
+              message: `Price crosses ${price.toFixed(2)}`,
+              createdAt: Date.now(),
+            });
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+            <line x1="5" y1="1" x2="5" y2="9" />
+            <line x1="1" y1="5" x2="9" y2="5" />
+          </svg>
+        </button>
+      )}
     </>
   );
 };
