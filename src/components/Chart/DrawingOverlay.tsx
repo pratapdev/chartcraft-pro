@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline, FibonacciDrawing } from '@/types/trading';
+import { Trendline, FibonacciDrawing, AlertCondition } from '@/types/trading';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -58,6 +58,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [, bump] = useState(0);
   const [selectedFibId, setSelectedFibId] = useState<string | null>(null);
   const [fibDeletePos, setFibDeletePos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredAlertBtn, setHoveredAlertBtn] = useState<string | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
 
@@ -75,6 +76,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     fibonacciDrawings,
     addFibonacci,
     removeFibonacci,
+    addAlert,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
@@ -206,8 +208,36 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1.5;
           ctx.stroke();
-        }
       }
+
+      // ⊕ Alert button for horizontal lines (startPrice === endPrice)
+      const isHorizontal = Math.abs(line.startPrice - line.endPrice) < 0.0001;
+      if (isHorizontal) {
+        const btnX = w - 80; // Position near the right price scale
+        const btnY = px.y1;
+        const btnR = 10;
+        const isHovered = hoveredAlertBtn === line.id;
+
+        // Circle background
+        ctx.beginPath();
+        ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
+        ctx.fillStyle = isHovered ? '#2563eb' : 'rgba(37, 99, 235, 0.7)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Plus icon
+        ctx.beginPath();
+        ctx.moveTo(btnX - 5, btnY);
+        ctx.lineTo(btnX + 5, btnY);
+        ctx.moveTo(btnX, btnY - 5);
+        ctx.lineTo(btnX, btnY + 5);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
     }
 
     // Horizontal tool hover preview
@@ -327,7 +357,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId]);
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn]);
 
   useEffect(() => {
     let raf: number;
@@ -345,9 +375,52 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   const [hoveringLine, setHoveringLine] = useState(false);
 
+  // Check if mouse hits the ⊕ alert button on a horizontal line
+  const hitAlertButton = useCallback(
+    (mx: number, my: number): string | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const w = canvas.parentElement?.clientWidth ?? canvas.width;
+      const btnX = w - 80;
+      const btnR = 12; // slightly larger than visual for easier click
+      for (const line of trendlines) {
+        const isHorizontal = Math.abs(line.startPrice - line.endPrice) < 0.0001;
+        if (!isHorizontal) continue;
+        const px = lineToPixels(line);
+        if (!px) continue;
+        const dist = Math.hypot(mx - btnX, my - px.y1);
+        if (dist <= btnR) return line.id;
+      }
+      return null;
+    },
+    [trendlines, lineToPixels]
+  );
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
+
+      // Check ⊕ alert button click on horizontal lines
+      const alertBtnHit = hitAlertButton(mx, my);
+      if (alertBtnHit) {
+        const line = trendlines.find((t) => t.id === alertBtnHit);
+        if (line) {
+          addAlert({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            trendlineId: line.id,
+            condition: 'cross_any' as AlertCondition,
+            active: true,
+            triggered: false,
+            message: `Price crosses ${line.startPrice.toFixed(2)}`,
+            createdAt: Date.now(),
+          });
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
 
       if (activeTool === 'horizontal') {
         // Single-click placement like TradingView
@@ -462,7 +535,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       setSelectedFibId(null);
       setFibDeletePos(null);
     },
-    [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
+    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
   );
 
   const handleMouseMove = useCallback(
@@ -517,6 +590,10 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       // Update cursor and hover state
+      // Check ⊕ button hover
+      const alertHover = hitAlertButton(mx, my);
+      setHoveredAlertBtn(alertHover);
+
       if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
@@ -527,11 +604,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         } else {
           const isHit = !!hitTest(mx, my);
           setHoveringLine(isHit);
-          eventLayerRef.current.style.cursor = isHit ? 'pointer' : '';
+          eventLayerRef.current.style.cursor = alertHover ? 'pointer' : isHit ? 'pointer' : '';
         }
       }
     },
-    [activeTool, hitTest, pixelToCoords, updateTrendline]
+    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton]
   );
 
   const handleMouseUp = useCallback(

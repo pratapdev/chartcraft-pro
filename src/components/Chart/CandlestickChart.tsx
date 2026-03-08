@@ -58,8 +58,8 @@ export const CandlestickChart: React.FC = () => {
       },
       crosshair: {
         mode: 0,
-        vertLine: { color: '#4b5563', width: 1, style: 2, labelBackgroundColor: '#2563eb' },
-        horzLine: { color: '#4b5563', width: 1, style: 2, labelBackgroundColor: '#2563eb' },
+        vertLine: { color: '#ffffff', width: 1, style: 3, labelBackgroundColor: '#2563eb' },
+        horzLine: { color: '#ffffff', width: 1, style: 3, labelBackgroundColor: '#2563eb' },
       },
       rightPriceScale: {
         borderColor: '#1c2333',
