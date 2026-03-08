@@ -324,7 +324,11 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       <div className="absolute top-1 left-2 z-10 flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground pointer-events-auto">
         <span style={{ color: indicator.color }}>{label}</span>
         <button
-          onClick={() => removeIndicator(indicator.id)}
+          onClick={() => {
+            if (window.confirm(`Remove ${label}?`)) {
+              removeIndicator(indicator.id);
+            }
+          }}
           className="hover:text-destructive transition-colors"
           title="Remove"
         >
