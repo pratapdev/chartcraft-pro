@@ -86,9 +86,19 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   unsubscribe: null,
 
   loadCandles: async () => {
-    const { symbol, timeframe } = get();
+    const { symbol, timeframe, marketType } = get();
     set({ loading: true });
-    const candles = await fetchCandles(symbol, timeframe, 500);
+    let candles: Candle[];
+    if (marketType === 'indian') {
+      const key = getInstrumentKey(symbol);
+      if (key) {
+        candles = await fetchUpstoxCandles(key, timeframe);
+      } else {
+        candles = [];
+      }
+    } else {
+      candles = await fetchCandles(symbol, timeframe, 500);
+    }
     set({ candles, loading: false });
   },
 
