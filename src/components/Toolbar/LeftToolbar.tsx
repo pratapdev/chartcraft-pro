@@ -11,6 +11,7 @@ import {
   Trash2,
   Ruler,
   GitFork,
+  Activity,
 } from 'lucide-react';
 
 interface ToolButton {
