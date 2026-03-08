@@ -11,7 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
@@ -275,6 +275,20 @@ export const CandlestickChart: React.FC = () => {
         });
         lowerSeries.setData(lower.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
         lineSeriesRefs.current.set(ind.id + '-lower', lowerSeries);
+      }
+
+      if (ind.type === 'VWAP') {
+        const data = computeVWAP(candles);
+        if (data.length === 0) continue;
+        const series = chartRef.current.addLineSeries({
+          color: ind.color,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: false,
+        });
+        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        lineSeriesRefs.current.set(ind.id, series);
       }
     }
   }, [candles, indicators]);

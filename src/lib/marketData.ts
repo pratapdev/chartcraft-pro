@@ -318,3 +318,20 @@ export function computeMACD(
 
   return { macdLine, signalLine, histogram };
 }
+
+// Compute VWAP
+export function computeVWAP(candles: Candle[]): { time: number; value: number }[] {
+  const result: { time: number; value: number }[] = [];
+  let cumVolPrice = 0;
+  let cumVol = 0;
+
+  for (const c of candles) {
+    const tp = (c.high + c.low + c.close) / 3;
+    cumVolPrice += tp * c.volume;
+    cumVol += c.volume;
+    if (cumVol > 0) {
+      result.push({ time: c.time, value: Math.round((cumVolPrice / cumVol) * 100) / 100 });
+    }
+  }
+  return result;
+}

@@ -10,6 +10,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'STOCH_RSI', label: 'Stoch RSI', defaults: { period: 14, color: '#00BCD4', color2: '#FF5722', kPeriod: 3, dPeriod: 3 } },
   { type: 'MACD', label: 'MACD', defaults: { period: 12, color: '#2196F3', color2: '#FF5722' } },
   { type: 'BBANDS', label: 'Bollinger Bands', defaults: { period: 20, color: '#2196F3', color2: 'rgba(33,150,243,0.08)', stdDev: 2 } },
+  { type: 'VWAP', label: 'VWAP', defaults: { period: 1, color: '#FFEB3B' } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
