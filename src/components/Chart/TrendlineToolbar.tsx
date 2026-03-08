@@ -45,6 +45,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [showColors, setShowColors] = useState(false);
   const [showThickness, setShowThickness] = useState(false);
+  const [showLineStyle, setShowLineStyle] = useState(false);
   const [showAlertMenu, setShowAlertMenu] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
