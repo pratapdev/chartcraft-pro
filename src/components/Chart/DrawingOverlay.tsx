@@ -502,7 +502,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
 
   return (
     <>
