@@ -3,6 +3,17 @@ import { persist } from 'zustand/middleware';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
+import { toast } from 'sonner';
+
+interface UndoEntry {
+  type: 'trendline' | 'alert' | 'trendline+alerts';
+  trendline?: Trendline;
+  alert?: Alert;
+  trendlines?: Trendline[];
+  alerts?: Alert[];
+}
+
+const undoStack: UndoEntry[] = [];
 
 interface CrosshairData {
   time: number;
