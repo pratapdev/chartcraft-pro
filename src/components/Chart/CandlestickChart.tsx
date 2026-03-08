@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { useChartSync } from './ChartSyncContext';
+import {
   createChart,
   IChartApi,
   ISeriesApi,
@@ -10,6 +10,7 @@ import { useChartSync } from './ChartSyncContext';
   MouseEventParams,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
+import { useChartSync } from './ChartSyncContext';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
