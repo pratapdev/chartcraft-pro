@@ -1,6 +1,17 @@
 import { Candle, Timeframe } from '@/types/trading';
 
-export interface IndianStock {
+// Upstox credential helpers (localStorage)
+export function getUpstoxCredentials(): { apiKey: string; accessToken: string } {
+  return {
+    apiKey: localStorage.getItem('upstox-api-key') || '',
+    accessToken: localStorage.getItem('upstox-access-token') || '',
+  };
+}
+
+export function saveUpstoxCredentials(apiKey: string, accessToken: string) {
+  localStorage.setItem('upstox-api-key', apiKey.trim());
+  localStorage.setItem('upstox-access-token', accessToken.trim());
+}
   name: string;
   label: string;
   instrumentKey: string;
