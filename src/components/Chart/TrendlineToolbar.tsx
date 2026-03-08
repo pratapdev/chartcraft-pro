@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline, AlertCondition } from '@/types/trading';
+import { Trendline, AlertCondition, LineStyleType } from '@/types/trading';
 import {
   Bell,
   Trash2,
