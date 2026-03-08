@@ -6,17 +6,21 @@ import { LayoutGrid, Columns2 } from 'lucide-react';
 
 const DEFAULT_TWO: Timeframe[] = ['1h', '1D'];
 const DEFAULT_FOUR: Timeframe[] = ['15m', '1h', '4h', '1D'];
+const CRYPTO_SYMBOLS = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD', 'ADA/USD', 'DOGE/USD', 'AVAX/USD'];
 
 type GridMode = 2 | 4;
 
 export const MultiTimeframeView: React.FC = () => {
-  const symbol = useChartStore((s) => s.symbol);
+  const globalSymbol = useChartStore((s) => s.symbol);
   const [syncTime, setSyncTime] = useState<number | null>(null);
   const [gridMode, setGridMode] = useState<GridMode>(4);
   const [twoTf, setTwoTf] = useState<Timeframe[]>([...DEFAULT_TWO]);
   const [fourTf, setFourTf] = useState<Timeframe[]>([...DEFAULT_FOUR]);
+  const [twoSymbols, setTwoSymbols] = useState<string[]>([globalSymbol, globalSymbol]);
+  const [fourSymbols, setFourSymbols] = useState<string[]>([globalSymbol, globalSymbol, globalSymbol, globalSymbol]);
 
   const timeframes = gridMode === 2 ? twoTf : fourTf;
+  const symbols = gridMode === 2 ? twoSymbols : fourSymbols;
 
   const handleCrosshairMove = useCallback((time: number | null) => {
     setSyncTime(time);
@@ -24,17 +28,17 @@ export const MultiTimeframeView: React.FC = () => {
 
   const handleTimeframeChange = useCallback((index: number, newTf: Timeframe) => {
     if (gridMode === 2) {
-      setTwoTf((prev) => {
-        const next = [...prev];
-        next[index] = newTf;
-        return next;
-      });
+      setTwoTf((prev) => { const next = [...prev]; next[index] = newTf; return next; });
     } else {
-      setFourTf((prev) => {
-        const next = [...prev];
-        next[index] = newTf;
-        return next;
-      });
+      setFourTf((prev) => { const next = [...prev]; next[index] = newTf; return next; });
+    }
+  }, [gridMode]);
+
+  const handleSymbolChange = useCallback((index: number, newSymbol: string) => {
+    if (gridMode === 2) {
+      setTwoSymbols((prev) => { const next = [...prev]; next[index] = newSymbol; return next; });
+    } else {
+      setFourSymbols((prev) => { const next = [...prev]; next[index] = newSymbol; return next; });
     }
   }, [gridMode]);
 
@@ -65,11 +69,13 @@ export const MultiTimeframeView: React.FC = () => {
         {timeframes.map((tf, idx) => (
           <MiniChart
             key={`${gridMode}-${idx}`}
-            symbol={symbol}
+            symbol={symbols[idx]}
             timeframe={tf}
             onCrosshairMove={handleCrosshairMove}
             syncTime={syncTime}
             onTimeframeChange={(newTf) => handleTimeframeChange(idx, newTf)}
+            onSymbolChange={(newSymbol) => handleSymbolChange(idx, newSymbol)}
+            availableSymbols={CRYPTO_SYMBOLS}
           />
         ))}
       </div>
