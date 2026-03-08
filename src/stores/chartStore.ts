@@ -45,6 +45,7 @@ interface ChartStore {
   addIndicator: (ind: IndicatorConfig) => void;
   removeIndicator: (id: string) => void;
   toggleIndicator: (id: string) => void;
+  updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
 
   // Right sidebar
   rightPanelOpen: boolean;
@@ -163,6 +164,10 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   toggleIndicator: (id) =>
     set((s) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, visible: !i.visible } : i)),
+    })),
+  updateIndicator: (id, updates) =>
+    set((s) => ({
+      indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     })),
 
   rightPanelOpen: false,
