@@ -170,18 +170,27 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
     const ds = drawRef.current;
     if (ds.phase === 'drawing') {
+      const isHoriz = activeTool === 'horizontal';
       ctx.beginPath();
-      ctx.moveTo(ds.startX, ds.startY);
-      ctx.lineTo(ds.currentX, ds.currentY);
-      ctx.strokeStyle = '#2563eb';
+      ctx.moveTo(0, ds.startY);
+      if (isHoriz) {
+        ctx.lineTo(w, ds.startY);
+        ctx.strokeStyle = '#eab308';
+      } else {
+        ctx.moveTo(ds.startX, ds.startY);
+        ctx.lineTo(ds.currentX, ds.currentY);
+        ctx.strokeStyle = '#2563eb';
+      }
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#2563eb';
-      ctx.fill();
+      if (!isHoriz) {
+        ctx.beginPath();
+        ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#2563eb';
+        ctx.fill();
+      }
     }
   }, [trendlines, selectedTrendlineId, lineToPixels]);
 
@@ -205,7 +214,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
 
-      if (activeTool === 'trendline') {
+      if (activeTool === 'trendline' || activeTool === 'horizontal') {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
         bump((n) => n + 1);
@@ -271,7 +280,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
       // Update cursor and hover state
       if (eventLayerRef.current) {
-        if (activeTool === 'trendline') {
+        if (activeTool === 'trendline' || activeTool === 'horizontal') {
           eventLayerRef.current.style.cursor = 'crosshair';
         } else {
           const isHit = !!hitTest(mx, my);
@@ -289,20 +298,25 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
       if (drawRef.current.phase === 'drawing') {
         const ds = drawRef.current;
+        const isHorizontal = activeTool === 'horizontal';
         const dist = Math.hypot(mx - ds.startX, my - ds.startY);
-        if (dist > 10) {
+        if (isHorizontal || dist > 10) {
           const start = pixelToCoords(ds.startX, ds.startY);
-          const end = pixelToCoords(mx, my);
-          if (start && end) {
+          const end = isHorizontal ? null : pixelToCoords(mx, my);
+          if (start && (isHorizontal || end)) {
+            const { candles: c } = useChartStore.getState();
+            const endTime = isHorizontal
+              ? (c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : start.time + 86400)
+              : end!.time;
             addTrendline({
               id: crypto.randomUUID(),
               symbol,
               timeframe,
-              startTime: start.time,
+              startTime: isHorizontal ? (c.length > 0 ? c[0].time : start.time) : start.time,
               startPrice: start.price,
-              endTime: end.time,
-              endPrice: end.price,
-              color: '#2563eb',
+              endTime,
+              endPrice: isHorizontal ? start.price : end!.price,
+              color: isHorizontal ? '#eab308' : '#2563eb',
               thickness: 2,
               createdAt: Date.now(),
             });
@@ -342,7 +356,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
-  const shouldCapture = activeTool === 'trendline' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
 
   return (
     <>
