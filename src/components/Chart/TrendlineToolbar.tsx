@@ -159,6 +159,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
             setShowAlertMenu(!showAlertMenu);
             setShowColors(false);
             setShowThickness(false);
+            setShowLineStyle(false);
           }}
           badge={existingAlerts.length > 0 ? existingAlerts.length : undefined}
         />
