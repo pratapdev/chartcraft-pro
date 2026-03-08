@@ -136,6 +136,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     ro.observe(containerRef.current);
 
     return () => {
+      clearInterval(interval);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
