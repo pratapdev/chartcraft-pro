@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
@@ -62,6 +62,12 @@ interface ChartStore {
   removeAlert: (id: string) => void;
   clearAllAlerts: () => void;
   addAlertLog: (log: AlertLog) => void;
+
+  // Indicator cross alerts
+  indicatorCrossAlerts: IndicatorCrossAlert[];
+  addIndicatorCrossAlert: (alert: IndicatorCrossAlert) => void;
+  removeIndicatorCrossAlert: (id: string) => void;
+  clearAllIndicatorCrossAlerts: () => void;
 
   // Indicators
   selectedIndicatorId: string | null;
@@ -223,8 +229,13 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     }
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  clearAllAlerts: () => set({ alerts: [] }),
+  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
+
+  indicatorCrossAlerts: [],
+  addIndicatorCrossAlert: (alert) => set((s) => ({ indicatorCrossAlerts: [...s.indicatorCrossAlerts, alert] })),
+  removeIndicatorCrossAlert: (id) => set((s) => ({ indicatorCrossAlerts: s.indicatorCrossAlerts.filter((a) => a.id !== id) })),
+  clearAllIndicatorCrossAlerts: () => set({ indicatorCrossAlerts: [] }),
 
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
@@ -303,6 +314,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     alerts: state.alerts,
     alertLogs: state.alertLogs,
     indicators: state.indicators,
+    indicatorCrossAlerts: state.indicatorCrossAlerts,
     fibonacciDrawings: state.fibonacciDrawings,
     symbol: state.symbol,
     timeframe: state.timeframe,
