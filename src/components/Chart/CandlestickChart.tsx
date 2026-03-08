@@ -187,6 +187,7 @@ export const CandlestickChart: React.FC = () => {
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
     </div>
   );
 };
