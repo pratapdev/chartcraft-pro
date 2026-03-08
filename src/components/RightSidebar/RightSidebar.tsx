@@ -100,6 +100,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 </button>
               ))}
             </div>
+          </div>
           {ind.type === 'STOCH_RSI' && (
             <>
               <div className="flex items-center justify-between">
