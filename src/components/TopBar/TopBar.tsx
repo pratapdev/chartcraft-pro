@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp } from 'lucide-react';
-import { INDIAN_STOCKS } from '@/lib/upstoxData';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings } from 'lucide-react';
+import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
 
 const CRYPTO_SYMBOLS = [
@@ -29,6 +29,50 @@ const MARKET_OPTIONS: { value: MarketType; label: string; icon: string }[] = [
   { value: 'crypto', label: 'Crypto', icon: '₿' },
   { value: 'indian', label: 'Indian Stocks', icon: '🇮🇳' },
 ];
+
+const UpstoxCredentialsForm: React.FC = () => {
+  const stored = getUpstoxCredentials();
+  const [apiKey, setApiKey] = useState(stored.apiKey);
+  const [accessToken, setAccessToken] = useState(stored.accessToken);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    saveUpstoxCredentials(apiKey, accessToken);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="border-t border-border p-2 space-y-1.5">
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+        <Settings size={10} />
+        Upstox Credentials
+      </div>
+      <input
+        type="password"
+        placeholder="API Key"
+        value={apiKey}
+        onChange={(e) => setApiKey(e.target.value)}
+        className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <input
+        type="password"
+        placeholder="Access Token"
+        value={accessToken}
+        onChange={(e) => setAccessToken(e.target.value)}
+        className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        onClick={handleSave}
+        className="w-full text-xs py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+      >
+        {saved ? '✓ Saved' : 'Save Credentials'}
+      </button>
+    </div>
+  );
+};
 
 export const TopBar: React.FC = () => {
   const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType } = useChartStore();
@@ -118,7 +162,7 @@ export const TopBar: React.FC = () => {
         </button>
 
         {showMarketDropdown && (
-          <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-xl z-50 min-w-[160px] overflow-hidden">
+          <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-xl z-50 min-w-[240px] overflow-hidden">
             {MARKET_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -134,6 +178,8 @@ export const TopBar: React.FC = () => {
                 <span className="font-medium">{opt.label}</span>
               </button>
             ))}
+
+            <UpstoxCredentialsForm />
           </div>
         )}
       </div>

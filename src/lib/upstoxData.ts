@@ -1,5 +1,18 @@
 import { Candle, Timeframe } from '@/types/trading';
 
+// Upstox credential helpers (localStorage)
+export function getUpstoxCredentials(): { apiKey: string; accessToken: string } {
+  return {
+    apiKey: localStorage.getItem('upstox-api-key') || '',
+    accessToken: localStorage.getItem('upstox-access-token') || '',
+  };
+}
+
+export function saveUpstoxCredentials(apiKey: string, accessToken: string) {
+  localStorage.setItem('upstox-api-key', apiKey.trim());
+  localStorage.setItem('upstox-access-token', accessToken.trim());
+}
+
 export interface IndianStock {
   name: string;
   label: string;
@@ -59,13 +72,18 @@ export async function fetchUpstoxCandles(
   const encodedKey = encodeURIComponent(instrumentKey);
   const url = `https://api.upstox.com/v2/historical-candle/${encodedKey}/${interval}/${formatDate(toDate)}/${formatDate(fromDate)}`;
 
+  const { accessToken } = getUpstoxCredentials();
+
   try {
-    const res = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(url, { headers });
 
     if (!res.ok) throw new Error(`Upstox API error: ${res.status}`);
     const json = await res.json();
