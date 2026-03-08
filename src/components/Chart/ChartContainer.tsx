@@ -5,7 +5,7 @@ import { IndicatorPane } from './IndicatorPane';
 import { ChartSyncProvider } from './ChartSyncContext';
 import { useChartStore } from '@/stores/chartStore';
 
-const SUB_CHART_TYPES = new Set(['RSI', 'STOCH_RSI', 'MACD', 'ADX', 'ATR', 'OBV']);
+const SUB_CHART_TYPES = new Set(['RSI', 'STOCH_RSI', 'MACD', 'ADX', 'ATR', 'OBV', 'PCT_DIFF_DON']);
 
 export const ChartContainer: React.FC = () => {
   const indicators = useChartStore((s) => s.indicators);
