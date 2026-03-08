@@ -13,6 +13,7 @@ import { useChartStore } from '@/stores/chartStore';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
+import { CrosshairLegend } from './CrosshairLegend';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
