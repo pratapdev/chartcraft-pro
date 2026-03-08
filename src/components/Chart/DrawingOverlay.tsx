@@ -375,9 +375,52 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   const [hoveringLine, setHoveringLine] = useState(false);
 
+  // Check if mouse hits the ⊕ alert button on a horizontal line
+  const hitAlertButton = useCallback(
+    (mx: number, my: number): string | null => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const w = canvas.parentElement?.clientWidth ?? canvas.width;
+      const btnX = w - 80;
+      const btnR = 12; // slightly larger than visual for easier click
+      for (const line of trendlines) {
+        const isHorizontal = Math.abs(line.startPrice - line.endPrice) < 0.0001;
+        if (!isHorizontal) continue;
+        const px = lineToPixels(line);
+        if (!px) continue;
+        const dist = Math.hypot(mx - btnX, my - px.y1);
+        if (dist <= btnR) return line.id;
+      }
+      return null;
+    },
+    [trendlines, lineToPixels]
+  );
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
+
+      // Check ⊕ alert button click on horizontal lines
+      const alertBtnHit = hitAlertButton(mx, my);
+      if (alertBtnHit) {
+        const line = trendlines.find((t) => t.id === alertBtnHit);
+        if (line) {
+          addAlert({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            trendlineId: line.id,
+            condition: 'cross_any' as AlertCondition,
+            active: true,
+            triggered: false,
+            message: `Price crosses ${line.startPrice.toFixed(2)}`,
+            createdAt: Date.now(),
+          });
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
 
       if (activeTool === 'horizontal') {
         // Single-click placement like TradingView
