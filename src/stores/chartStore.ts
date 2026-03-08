@@ -387,6 +387,15 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       [type]: { ...s.drawingDefaults[type], ...updates },
     },
   })),
+
+  compoundAlerts: [],
+  addCompoundAlert: (alert) => set((s) => ({ compoundAlerts: [...s.compoundAlerts, alert] })),
+  removeCompoundAlert: (id) => set((s) => ({ compoundAlerts: s.compoundAlerts.filter((a) => a.id !== id) })),
+  clearCompoundAlerts: () => set({ compoundAlerts: [] }),
+
+  alertTemplates: [],
+  addAlertTemplate: (template) => set((s) => ({ alertTemplates: [...s.alertTemplates, template] })),
+  removeAlertTemplate: (id) => set((s) => ({ alertTemplates: s.alertTemplates.filter((t) => t.id !== id) })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
