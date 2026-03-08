@@ -59,6 +59,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [selectedFibId, setSelectedFibId] = useState<string | null>(null);
   const [fibDeletePos, setFibDeletePos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredAlertBtn, setHoveredAlertBtn] = useState<string | null>(null);
+  const [hoveredCrosshairBtn, setHoveredCrosshairBtn] = useState(false);
+  const crosshairMouseY = useRef<number | null>(null);
+  const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
 
@@ -252,6 +255,32 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.setLineDash([]);
     }
 
+    // Crosshair "+" alert button (only in cursor mode, when not drawing/dragging)
+    if (activeTool === 'cursor' && crosshairMouseY.current !== null && !dragRef.current && !isInteracting) {
+      const btnX = w - 28;
+      const btnY = crosshairMouseY.current;
+      const btnR = 10;
+      const isHover = hoveredCrosshairBtn;
+
+      ctx.beginPath();
+      ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
+      ctx.fillStyle = isHover ? '#2563eb' : 'rgba(37, 99, 235, 0.75)';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Plus icon
+      ctx.beginPath();
+      ctx.moveTo(btnX - 5, btnY);
+      ctx.lineTo(btnX + 5, btnY);
+      ctx.moveTo(btnX, btnY - 5);
+      ctx.lineTo(btnX, btnY + 5);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
     const ds = drawRef.current;
     if (ds.phase === 'drawing') {
       ctx.beginPath();
@@ -357,7 +386,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn]);
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, hoveredCrosshairBtn, isInteracting]);
 
   useEffect(() => {
     let raf: number;
@@ -396,9 +425,59 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     [trendlines, lineToPixels]
   );
 
+  // Check if mouse hits the crosshair "+" alert button
+  const hitCrosshairAlertBtn = useCallback(
+    (mx: number, my: number): boolean => {
+      const canvas = canvasRef.current;
+      if (!canvas || activeTool !== 'cursor' || crosshairMouseY.current === null) return false;
+      const w = canvas.parentElement?.clientWidth ?? canvas.width;
+      const btnX = w - 28;
+      const btnY = crosshairMouseY.current;
+      return Math.hypot(mx - btnX, my - btnY) <= 12;
+    },
+    [activeTool]
+  );
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
+
+      // Check crosshair "+" alert button click
+      if (hitCrosshairAlertBtn(mx, my) && crosshairPrice.current !== null) {
+        const price = crosshairPrice.current;
+        const { candles: c } = useChartStore.getState();
+        const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
+        const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
+        // Create a horizontal line at this price
+        const lineId = crypto.randomUUID();
+        addTrendline({
+          id: lineId,
+          symbol,
+          timeframe,
+          startTime,
+          startPrice: price,
+          endTime,
+          endPrice: price,
+          color: '#eab308',
+          thickness: 2,
+          createdAt: Date.now(),
+        });
+        // Create an alert on that line
+        addAlert({
+          id: crypto.randomUUID(),
+          symbol,
+          timeframe,
+          trendlineId: lineId,
+          condition: 'cross_any' as AlertCondition,
+          active: true,
+          triggered: false,
+          message: `Price crosses ${price.toFixed(2)}`,
+          createdAt: Date.now(),
+        });
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
 
       // Check ⊕ alert button click on horizontal lines
       const alertBtnHit = hitAlertButton(mx, my);
@@ -535,7 +614,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       setSelectedFibId(null);
       setFibDeletePos(null);
     },
-    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
+    [activeTool, hitTest, hitAlertButton, hitCrosshairAlertBtn, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
   );
 
   const handleMouseMove = useCallback(
@@ -589,10 +668,19 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      // Update crosshair position for "+" button
+      crosshairMouseY.current = my;
+      const coords = pixelToCoords(mx, my);
+      crosshairPrice.current = coords ? coords.price : null;
+
       // Update cursor and hover state
       // Check ⊕ button hover
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
+
+      // Check crosshair alert button hover
+      const crosshairBtnHover = hitCrosshairAlertBtn(mx, my);
+      setHoveredCrosshairBtn(crosshairBtnHover);
 
       if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
@@ -604,11 +692,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         } else {
           const isHit = !!hitTest(mx, my);
           setHoveringLine(isHit);
-          eventLayerRef.current.style.cursor = alertHover ? 'pointer' : isHit ? 'pointer' : '';
+          eventLayerRef.current.style.cursor = (alertHover || crosshairBtnHover) ? 'pointer' : isHit ? 'pointer' : '';
         }
       }
     },
-    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton]
+    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton, hitCrosshairAlertBtn]
   );
 
   const handleMouseUp = useCallback(
@@ -711,8 +799,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool]);
 
-  // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || (activeTool === 'cursor' && (trendlines.length > 0 || fibonacciDrawings.length > 0));
+  // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
 
   return (
     <>
@@ -726,8 +814,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         style={{ right: 65, bottom: 28, pointerEvents: shouldCapture ? 'auto' : 'none' }}
         onMouseDown={(e) => {
           const { mx, my } = getPos(e.nativeEvent);
-          // In cursor mode, check trendline and fib hits
-          if (activeTool === 'cursor' && !hitTest(mx, my)) {
+          // In cursor mode, check crosshair btn, trendline and fib hits
+          if (activeTool === 'cursor' && !hitTest(mx, my) && !hitCrosshairAlertBtn(mx, my)) {
             // Check if clicking on a fib level
             const series = seriesRef.current;
             let fibHit = false;
@@ -778,6 +866,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           if (dragRef.current) { dragRef.current = null; setIsInteracting(false); }
           setHoveringLine(false);
           setHoverY(null);
+          crosshairMouseY.current = null;
+          crosshairPrice.current = null;
+          setHoveredCrosshairBtn(false);
         }}
       />
 
