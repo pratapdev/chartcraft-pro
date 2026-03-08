@@ -8,8 +8,10 @@ import {
   Time,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { IndicatorConfig } from '@/types/trading';
+import { IndicatorConfig, LineStyleType } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV } from '@/lib/marketData';
+
+const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
