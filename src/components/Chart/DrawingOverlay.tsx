@@ -406,43 +406,6 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
 
-      // Check crosshair "+" alert button click
-      if (hitCrosshairAlertBtn(mx, my) && crosshairPrice.current !== null) {
-        const price = crosshairPrice.current;
-        const { candles: c } = useChartStore.getState();
-        const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
-        const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
-        // Create a horizontal line at this price
-        const lineId = crypto.randomUUID();
-        addTrendline({
-          id: lineId,
-          symbol,
-          timeframe,
-          startTime,
-          startPrice: price,
-          endTime,
-          endPrice: price,
-          color: '#eab308',
-          thickness: 2,
-          createdAt: Date.now(),
-        });
-        // Create an alert on that line
-        addAlert({
-          id: crypto.randomUUID(),
-          symbol,
-          timeframe,
-          trendlineId: lineId,
-          condition: 'cross_any' as AlertCondition,
-          active: true,
-          triggered: false,
-          message: `Price crosses ${price.toFixed(2)}`,
-          createdAt: Date.now(),
-        });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
       // Check ⊕ alert button click on horizontal lines
       const alertBtnHit = hitAlertButton(mx, my);
       if (alertBtnHit) {
