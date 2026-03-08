@@ -178,5 +178,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     indicators: state.indicators,
     symbol: state.symbol,
     timeframe: state.timeframe,
+    marketType: state.marketType,
   }),
 }));
