@@ -282,7 +282,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       chart.remove();
       chartRef.current = null;
     };
-  }, [candles, indicator]);
+  }, [candles, indicator, chartFontSize]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
