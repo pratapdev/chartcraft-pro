@@ -367,5 +367,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     symbol: state.symbol,
     timeframe: state.timeframe,
     marketType: state.marketType,
+    chartFontSize: state.chartFontSize,
   }),
 }));
