@@ -314,6 +314,67 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
         )}
       </div>
 
+      {/* Line Style */}
+      <div className="relative">
+        <ToolbarBtn
+          icon={
+            <svg width="14" height="10" viewBox="0 0 14 10">
+              {(selectedLine.lineStyle ?? 'solid') === 'solid' && (
+                <line x1="0" y1="5" x2="14" y2="5" stroke="currentColor" strokeWidth="2" />
+              )}
+              {(selectedLine.lineStyle ?? 'solid') === 'dashed' && (
+                <line x1="0" y1="5" x2="14" y2="5" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" />
+              )}
+              {(selectedLine.lineStyle ?? 'solid') === 'dotted' && (
+                <line x1="0" y1="5" x2="14" y2="5" stroke="currentColor" strokeWidth="2" strokeDasharray="1.5 2" />
+              )}
+            </svg>
+          }
+          tooltip="Line Style"
+          active={showLineStyle}
+          onClick={() => {
+            setShowLineStyle(!showLineStyle);
+            setShowColors(false);
+            setShowThickness(false);
+            setShowAlertMenu(false);
+          }}
+        />
+        {showLineStyle && (
+          <div
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col gap-1 p-2 rounded-md border shadow-xl"
+            style={{
+              background: 'hsl(var(--popover))',
+              borderColor: 'hsl(var(--border))',
+              minWidth: '90px',
+            }}
+          >
+            {LINE_STYLES.map((s) => (
+              <button
+                key={s.value}
+                className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors"
+                style={{
+                  background: (selectedLine.lineStyle ?? 'solid') === s.value ? 'hsl(var(--accent))' : 'transparent',
+                }}
+                onClick={() => {
+                  updateTrendline(selectedLine.id, { lineStyle: s.value });
+                  setShowLineStyle(false);
+                }}
+              >
+                <svg width="24" height="6" viewBox="0 0 24 6">
+                  <line
+                    x1="0" y1="3" x2="24" y2="3"
+                    stroke={selectedLine.color}
+                    strokeWidth={selectedLine.thickness}
+                    strokeDasharray={s.value === 'dashed' ? '6 4' : s.value === 'dotted' ? '2 2' : 'none'}
+                  />
+                </svg>
+                <span className="text-[10px]" style={{ color: 'hsl(var(--foreground))' }}>{s.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <Divider />
 
       {/* Delete */}
