@@ -87,6 +87,9 @@ interface ChartStore {
   setRightPanelOpen: (open: boolean) => void;
   setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings') => void;
 
+  // Undo
+  undoLastDeletion: () => void;
+
   // Multi-timeframe
   multiTfMode: boolean;
   setMultiTfMode: (v: boolean) => void;
