@@ -776,11 +776,20 @@ const SyncControls: React.FC = () => {
           placeholder="http://localhost:3001"
         />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
         <button onClick={handleCheckHealth} className="flex items-center gap-1 text-xs text-primary hover:opacity-80 transition-opacity">
           {status === 'checking' ? <RefreshCw size={10} className="animate-spin" /> : status === 'online' ? <Cloud size={10} /> : <CloudOff size={10} />}
           {status === 'idle' ? 'Check' : status === 'checking' ? 'Checking...' : status === 'online' ? 'Online' : 'Offline'}
         </button>
+        <div className="flex items-center gap-1.5">
+          <label className="text-muted-foreground text-[10px]">Auto-sync</label>
+          <button
+            onClick={() => setAutoSync(!autoSync)}
+            className={`w-8 h-4 rounded-full transition-colors relative ${autoSync ? 'bg-primary' : 'bg-accent'}`}
+          >
+            <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${autoSync ? 'left-4' : 'left-0.5'}`} />
+          </button>
+        </div>
       </div>
       <div className="flex gap-2">
         <button
