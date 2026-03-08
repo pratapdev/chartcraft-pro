@@ -157,7 +157,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
         />
         {showAlertMenu && (
           <div
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-48 rounded-md border shadow-xl p-1 space-y-0.5"
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-48 rounded-md border shadow-xl p-1 space-y-0.5"
             style={{
               background: 'hsl(var(--popover))',
               borderColor: 'hsl(var(--border))',
@@ -236,7 +236,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
         />
         {showColors && (
           <div
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 grid grid-cols-4 gap-1 p-2 rounded-md border shadow-xl"
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 grid grid-cols-4 gap-1 p-2 rounded-md border shadow-xl"
             style={{
               background: 'hsl(var(--popover))',
               borderColor: 'hsl(var(--border))',
@@ -278,7 +278,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
         />
         {showThickness && (
           <div
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 flex flex-col gap-1 p-2 rounded-md border shadow-xl"
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col gap-1 p-2 rounded-md border shadow-xl"
             style={{
               background: 'hsl(var(--popover))',
               borderColor: 'hsl(var(--border))',
