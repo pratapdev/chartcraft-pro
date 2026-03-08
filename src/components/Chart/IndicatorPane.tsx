@@ -21,6 +21,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const { candles, removeIndicator } = useChartStore();
+  const chartSync = useChartSync();
+  const chartId = `indicator-${indicator.id}`;
 
   useEffect(() => {
     if (!containerRef.current || candles.length === 0) return;
