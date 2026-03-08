@@ -21,6 +21,26 @@ interface MeasureState {
 }
 const EMPTY_MEASURE: MeasureState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
 
+interface FibDrawState {
+  phase: 'idle' | 'drawing';
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+  startPrice: number; currentPrice: number;
+  startTime: number; currentTime: number;
+}
+const EMPTY_FIB: FibDrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIB_COLORS: Record<number, string> = {
+  0: '#787b86',
+  0.236: '#f44336',
+  0.382: '#ff9800',
+  0.5: '#4caf50',
+  0.618: '#089981',
+  0.786: '#00bcd4',
+  1: '#787b86',
+};
+
 export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventLayerRef = useRef<HTMLDivElement>(null);
