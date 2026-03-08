@@ -256,6 +256,98 @@ const QuickPriceAlert: React.FC = () => {
   );
 };
 
+const IndicatorCrossAlertForm: React.FC = () => {
+  const { symbol, timeframe, indicators, addIndicatorCrossAlert } = useChartStore();
+  const overlayIndicators = indicators.filter((i) => i.visible && (i.type === 'EMA' || i.type === 'SMA'));
+  const [ind1, setInd1] = useState('');
+  const [ind2, setInd2] = useState('');
+  const [condition, setCondition] = useState<AlertCondition>('cross_above');
+
+  if (overlayIndicators.length < 2) {
+    return (
+      <div className="panel-section rounded p-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 font-medium text-foreground mb-1">
+          <ArrowRightLeft size={12} className="text-primary" />
+          Indicator Crossover Alert
+        </div>
+        <p>Add at least 2 EMA/SMA indicators to create crossover alerts.</p>
+      </div>
+    );
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const i1 = ind1 || overlayIndicators[0]?.id;
+    const i2 = ind2 || overlayIndicators[1]?.id;
+    if (!i1 || !i2 || i1 === i2) return;
+
+    const label1 = overlayIndicators.find((i) => i.id === i1);
+    const label2 = overlayIndicators.find((i) => i.id === i2);
+
+    addIndicatorCrossAlert({
+      id: crypto.randomUUID(),
+      symbol,
+      timeframe,
+      indicatorId1: i1,
+      indicatorId2: i2,
+      condition,
+      active: true,
+      triggered: false,
+      message: `${label1?.type}(${label1?.period}) ${condition.replace('_', ' ')} ${label2?.type}(${label2?.period})`,
+      createdAt: Date.now(),
+    });
+  };
+
+  const selected1 = ind1 || overlayIndicators[0]?.id;
+  const selected2 = ind2 || overlayIndicators[1]?.id;
+
+  return (
+    <form onSubmit={handleSubmit} className="panel-section rounded p-2 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <ArrowRightLeft size={12} className="text-primary" />
+        Indicator Crossover Alert
+      </div>
+      <div className="flex gap-1.5 items-center">
+        <select
+          value={selected1}
+          onChange={(e) => setInd1(e.target.value)}
+          className="flex-1 bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none"
+        >
+          {overlayIndicators.map((ind) => (
+            <option key={ind.id} value={ind.id}>{ind.type}({ind.period})</option>
+          ))}
+        </select>
+        <span className="text-muted-foreground text-[10px]">×</span>
+        <select
+          value={selected2}
+          onChange={(e) => setInd2(e.target.value)}
+          className="flex-1 bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none"
+        >
+          {overlayIndicators.map((ind) => (
+            <option key={ind.id} value={ind.id}>{ind.type}({ind.period})</option>
+          ))}
+        </select>
+      </div>
+      <select
+        value={condition}
+        onChange={(e) => setCondition(e.target.value as AlertCondition)}
+        className="w-full bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none"
+      >
+        <option value="cross_above">Cross Above</option>
+        <option value="cross_below">Cross Below</option>
+        <option value="cross_any">Any Cross</option>
+      </select>
+      <button
+        type="submit"
+        disabled={selected1 === selected2}
+        className="w-full text-xs py-1.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Set Crossover Alert
+      </button>
+    </form>
+  );
+};
+
 const SettingsPanel: React.FC = () => {
   const trendlines = useChartStore((s) => s.trendlines);
   const fibonacciDrawings = useChartStore((s) => s.fibonacciDrawings);
