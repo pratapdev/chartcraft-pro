@@ -7,10 +7,12 @@ import { RightSidebar } from '@/components/RightSidebar/RightSidebar';
 import { BottomPanel } from '@/components/BottomPanel/BottomPanel';
 import { KeyboardShortcuts } from '@/components/KeyboardShortcuts';
 import { useAlertChecker } from '@/hooks/useAlertChecker';
+import { useAlertPriceTracker } from '@/hooks/useAlertPriceTracker';
 import { useChartStore } from '@/stores/chartStore';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 const Index: React.FC = () => {
+  useAlertPriceTracker();
   useAlertChecker();
   const multiTfMode = useChartStore((s) => s.multiTfMode);
   const rightPanelOpen = useChartStore((s) => s.rightPanelOpen);
