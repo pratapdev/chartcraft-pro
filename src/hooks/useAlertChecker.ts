@@ -157,6 +157,9 @@ export function useAlertChecker() {
           description: `Alert triggered at ${new Date(curr.time * 1000).toLocaleTimeString()}`,
         });
 
+        // Send browser notification
+        sendBrowserNotification(`⚠️ ${alert.symbol} Alert`, message);
+
         // Log the alert
         addAlertLog({
           id: crypto.randomUUID(),
