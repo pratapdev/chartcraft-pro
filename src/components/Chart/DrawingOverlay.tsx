@@ -214,7 +214,33 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
 
-      if (activeTool === 'trendline' || activeTool === 'horizontal') {
+      if (activeTool === 'horizontal') {
+        // Single-click placement like TradingView
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          const { candles: c } = useChartStore.getState();
+          const startTime = c.length > 0 ? c[0].time : coords.time - 86400;
+          const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : coords.time + 86400;
+          addTrendline({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            startTime,
+            startPrice: coords.price,
+            endTime,
+            endPrice: coords.price,
+            color: '#eab308',
+            thickness: 2,
+            createdAt: Date.now(),
+          });
+        }
+        setActiveTool('cursor');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (activeTool === 'trendline') {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
         bump((n) => n + 1);
