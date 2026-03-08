@@ -11,7 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
