@@ -64,6 +64,8 @@ interface ChartStore {
   addAlertLog: (log: AlertLog) => void;
 
   // Indicators
+  selectedIndicatorId: string | null;
+  setSelectedIndicatorId: (id: string | null) => void;
   indicators: IndicatorConfig[];
   addIndicator: (ind: IndicatorConfig) => void;
   removeIndicator: (id: string) => void;
@@ -224,12 +226,14 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   clearAllAlerts: () => set({ alerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
+  selectedIndicatorId: null,
+  setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
   indicators: [
     { id: 'ema-20', type: 'EMA', period: 20, color: '#2962FF', visible: true },
     { id: 'ema-50', type: 'EMA', period: 50, color: '#FF6D00', visible: true },
   ],
   addIndicator: (ind) => set((s) => ({ indicators: [...s.indicators, ind] })),
-  removeIndicator: (id) => set((s) => ({ indicators: s.indicators.filter((i) => i.id !== id) })),
+  removeIndicator: (id) => set((s) => ({ indicators: s.indicators.filter((i) => i.id !== id), selectedIndicatorId: s.selectedIndicatorId === id ? null : s.selectedIndicatorId })),
   clearAllIndicators: () => set({ indicators: [] }),
   toggleIndicator: (id) =>
     set((s) => ({
