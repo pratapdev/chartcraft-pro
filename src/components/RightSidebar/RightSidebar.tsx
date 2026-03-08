@@ -229,6 +229,7 @@ export const RightSidebar: React.FC = () => {
       kPeriod: preset.defaults.kPeriod,
       dPeriod: preset.defaults.dPeriod,
       color2: preset.defaults.color2,
+      stdDev: preset.defaults.stdDev,
     });
     setShowAdd(false);
   };

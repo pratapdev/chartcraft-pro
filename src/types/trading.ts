@@ -75,4 +75,6 @@ export interface IndicatorConfig {
   dPeriod?: number;
   /** Secondary color for D line in StochRSI */
   color2?: string;
+  /** Standard deviation multiplier for Bollinger Bands */
+  stdDev?: number;
 }
