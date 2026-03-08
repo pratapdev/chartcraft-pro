@@ -704,6 +704,38 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   // Keyboard
   useEffect(() => {
+    const addAlertAtCrosshair = () => {
+      const price = crosshairPrice.current;
+      if (price === null) return;
+      const { candles: c } = useChartStore.getState();
+      const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
+      const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
+      const lineId = crypto.randomUUID();
+      addTrendline({
+        id: lineId,
+        symbol,
+        timeframe,
+        startTime,
+        startPrice: price,
+        endTime,
+        endPrice: price,
+        color: '#eab308',
+        thickness: 2,
+        createdAt: Date.now(),
+      });
+      addAlert({
+        id: crypto.randomUUID(),
+        symbol,
+        timeframe,
+        trendlineId: lineId,
+        condition: 'cross_any' as AlertCondition,
+        active: true,
+        triggered: false,
+        message: `Price crosses ${price.toFixed(2)}`,
+        createdAt: Date.now(),
+      });
+    };
+
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedTrendlineId) removeTrendline(selectedTrendlineId);
@@ -724,10 +756,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setIsInteracting(false);
         bump((n) => n + 1);
       }
+      // '+' or '=' key to add alert at crosshair
+      if ((e.key === '+' || e.key === '=') && activeTool === 'cursor') {
+        addAlertAtCrosshair();
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool]);
+  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
   const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
