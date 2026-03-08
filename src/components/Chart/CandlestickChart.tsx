@@ -184,7 +184,10 @@ export const CandlestickChart: React.FC = () => {
 
   // Update candle data
   useEffect(() => {
-    if (!candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return;
+    if (!candleSeriesRef.current || !volumeSeriesRef.current || !chartRef.current || candles.length === 0) return;
+
+    // Preserve scroll position
+    const range = chartRef.current.timeScale().getVisibleLogicalRange();
 
     const candleData: CandlestickData[] = candles.map((c) => ({
       time: c.time as Time,
@@ -202,6 +205,11 @@ export const CandlestickChart: React.FC = () => {
 
     candleSeriesRef.current.setData(candleData);
     volumeSeriesRef.current.setData(volumeData);
+
+    // Restore scroll position if user had scrolled
+    if (range) {
+      chartRef.current.timeScale().setVisibleLogicalRange(range);
+    }
   }, [candles]);
 
   // Update indicators
