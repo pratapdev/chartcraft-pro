@@ -206,7 +206,17 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   alerts: [],
   alertLogs: [],
   addAlert: (alert) => set((s) => ({ alerts: [...s.alerts, alert] })),
-  removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
+  removeAlert: (id) => {
+    const alert = get().alerts.find((a) => a.id === id);
+    if (alert) {
+      undoStack.push({ type: 'alert', alert });
+      toast('Alert deleted', {
+        action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
+        duration: 5000,
+      });
+    }
+    set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
+  },
   clearAllAlerts: () => set({ alerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
