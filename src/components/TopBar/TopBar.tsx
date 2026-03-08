@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid } from 'lucide-react';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
 
@@ -75,7 +75,7 @@ const UpstoxCredentialsForm: React.FC = () => {
 };
 
 export const TopBar: React.FC = () => {
-  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType } = useChartStore();
+  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore();
   const [showSymbols, setShowSymbols] = useState(false);
   const [showMarketDropdown, setShowMarketDropdown] = useState(false);
   const [search, setSearch] = useState('');
@@ -279,6 +279,15 @@ export const TopBar: React.FC = () => {
           <span className="text-[10px] text-muted-foreground">NSE</span>
         )}
       </div>
+
+      <button
+        onClick={() => setMultiTfMode(!multiTfMode)}
+        className={`trading-btn flex items-center gap-1 ${multiTfMode ? 'text-primary' : ''}`}
+        title="Multi-timeframe view"
+      >
+        <LayoutGrid size={14} />
+        <span className="hidden sm:inline">Multi-TF</span>
+      </button>
 
       <button
         onClick={() => setRightPanelTab('indicators')}
