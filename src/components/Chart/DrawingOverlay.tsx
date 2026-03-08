@@ -491,6 +491,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       if (e.key === 'Escape') {
         setSelectedTrendlineId(null);
         drawRef.current = EMPTY_DRAW;
+        measureRef.current = EMPTY_MEASURE;
         setActiveTool('cursor');
         setIsInteracting(false);
         bump((n) => n + 1);
