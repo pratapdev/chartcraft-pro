@@ -239,13 +239,21 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     }
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [] }),
+  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [], indicatorThresholdAlerts: [], stochRSICrossAlerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
   indicatorCrossAlerts: [],
   addIndicatorCrossAlert: (alert) => set((s) => ({ indicatorCrossAlerts: [...s.indicatorCrossAlerts, alert] })),
   removeIndicatorCrossAlert: (id) => set((s) => ({ indicatorCrossAlerts: s.indicatorCrossAlerts.filter((a) => a.id !== id) })),
   clearAllIndicatorCrossAlerts: () => set({ indicatorCrossAlerts: [] }),
+
+  indicatorThresholdAlerts: [],
+  addIndicatorThresholdAlert: (alert) => set((s) => ({ indicatorThresholdAlerts: [...s.indicatorThresholdAlerts, alert] })),
+  removeIndicatorThresholdAlert: (id) => set((s) => ({ indicatorThresholdAlerts: s.indicatorThresholdAlerts.filter((a) => a.id !== id) })),
+
+  stochRSICrossAlerts: [],
+  addStochRSICrossAlert: (alert) => set((s) => ({ stochRSICrossAlerts: [...s.stochRSICrossAlerts, alert] })),
+  removeStochRSICrossAlert: (id) => set((s) => ({ stochRSICrossAlerts: s.stochRSICrossAlerts.filter((a) => a.id !== id) })),
 
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
