@@ -811,7 +811,10 @@ export const RightSidebar: React.FC = () => {
             ))}
             {alertLogs.length > 0 && (
               <>
-                <div className="text-xs font-semibold text-muted-foreground mt-4 px-1">Recent Alerts</div>
+                <div className="flex items-center justify-between mt-4 px-1">
+                  <span className="text-xs font-semibold text-muted-foreground">Recent Alerts</span>
+                  <button onClick={() => useChartStore.getState().clearAlertLogs()} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">Clear All</button>
+                </div>
                 {alertLogs.slice(0, 10).map((log) => (
                   <div key={log.id} className="panel-section rounded p-2 text-xs">
                     <div className="text-foreground">{log.message}</div>
