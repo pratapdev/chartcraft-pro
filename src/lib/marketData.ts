@@ -417,3 +417,92 @@ export function computeSupertrend(
 
   return { line, signals };
 }
+
+// Compute ADX (Average Directional Index)
+export function computeADX(
+  candles: Candle[],
+  period: number = 14
+): { adx: { time: number; value: number }[]; plusDI: { time: number; value: number }[]; minusDI: { time: number; value: number }[] } {
+  if (candles.length < period * 2 + 1) return { adx: [], plusDI: [], minusDI: [] };
+
+  const tr: number[] = [];
+  const plusDM: number[] = [];
+  const minusDM: number[] = [];
+
+  for (let i = 1; i < candles.length; i++) {
+    const high = candles[i].high, low = candles[i].low;
+    const prevHigh = candles[i - 1].high, prevLow = candles[i - 1].low, prevClose = candles[i - 1].close;
+
+    tr.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+
+    const upMove = high - prevHigh;
+    const downMove = prevLow - low;
+    plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
+  }
+
+  // Smoothed TR, +DM, -DM using Wilder's smoothing
+  const smooth = (arr: number[], p: number): number[] => {
+    const result: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < p; i++) sum += arr[i];
+    result.push(sum);
+    for (let i = p; i < arr.length; i++) {
+      result.push(result[result.length - 1] - result[result.length - 1] / p + arr[i]);
+    }
+    return result;
+  };
+
+  const smoothTR = smooth(tr, period);
+  const smoothPlusDM = smooth(plusDM, period);
+  const smoothMinusDM = smooth(minusDM, period);
+
+  const plusDIArr: number[] = [];
+  const minusDIArr: number[] = [];
+  const dxArr: number[] = [];
+
+  for (let i = 0; i < smoothTR.length; i++) {
+    const pdi = smoothTR[i] === 0 ? 0 : (smoothPlusDM[i] / smoothTR[i]) * 100;
+    const mdi = smoothTR[i] === 0 ? 0 : (smoothMinusDM[i] / smoothTR[i]) * 100;
+    plusDIArr.push(pdi);
+    minusDIArr.push(mdi);
+    const sum = pdi + mdi;
+    dxArr.push(sum === 0 ? 0 : (Math.abs(pdi - mdi) / sum) * 100);
+  }
+
+  // ADX = smoothed DX
+  const adxValues: number[] = [];
+  if (dxArr.length >= period) {
+    let adxSum = 0;
+    for (let i = 0; i < period; i++) adxSum += dxArr[i];
+    adxValues.push(adxSum / period);
+    for (let i = period; i < dxArr.length; i++) {
+      adxValues.push((adxValues[adxValues.length - 1] * (period - 1) + dxArr[i]) / period);
+    }
+  }
+
+  // Map to time-based output. The smoothed arrays start at index (period-1) of the diff arrays,
+  // which start at index 1 of candles. So smoothed[0] corresponds to candle[period].
+  const adx: { time: number; value: number }[] = [];
+  const plusDI: { time: number; value: number }[] = [];
+  const minusDI: { time: number; value: number }[] = [];
+
+  const baseIdx = period; // candle index where smoothed data starts
+  for (let i = 0; i < plusDIArr.length; i++) {
+    const candleIdx = baseIdx + i;
+    if (candleIdx >= candles.length) break;
+    const t = candles[candleIdx].time;
+    plusDI.push({ time: t, value: Math.round(plusDIArr[i] * 100) / 100 });
+    minusDI.push({ time: t, value: Math.round(minusDIArr[i] * 100) / 100 });
+  }
+
+  // ADX starts period bars after +DI/-DI
+  const adxBaseIdx = baseIdx + period - 1;
+  for (let i = 0; i < adxValues.length; i++) {
+    const candleIdx = adxBaseIdx + i;
+    if (candleIdx >= candles.length) break;
+    adx.push({ time: candles[candleIdx].time, value: Math.round(adxValues[i] * 100) / 100 });
+  }
+
+  return { adx, plusDI, minusDI };
+}

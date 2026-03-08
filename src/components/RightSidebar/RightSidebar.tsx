@@ -12,6 +12,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'BBANDS', label: 'Bollinger Bands', defaults: { period: 20, color: '#2196F3', color2: 'rgba(33,150,243,0.08)', stdDev: 2 } },
   { type: 'VWAP', label: 'VWAP', defaults: { period: 1, color: '#FFEB3B' } },
   { type: 'SUPERTREND', label: 'Supertrend', defaults: { period: 10, color: '#22c55e', color2: '#ef4444', multiplier: 3 } },
+  { type: 'ADX', label: 'ADX', defaults: { period: 14, color: '#FFEB3B' } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
