@@ -948,6 +948,8 @@ export const RightSidebar: React.FC = () => {
       emaSmoothing: (preset.defaults as any).emaSmoothing,
       donchianLength: (preset.defaults as any).donchianLength,
       donLineDiff: (preset.defaults as any).donLineDiff,
+      zigzagLength: (preset.defaults as any).zigzagLength,
+      fibFactor: (preset.defaults as any).fibFactor,
     });
     setShowAdd(false);
   };
