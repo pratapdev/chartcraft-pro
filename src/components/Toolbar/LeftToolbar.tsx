@@ -28,6 +28,8 @@ export const LeftToolbar: React.FC = () => {
     selectedTrendlineId,
     removeTrendline,
     setRightPanelTab,
+    indicators,
+    addIndicator,
   } = useChartStore();
 
   const tools: ToolButton[] = [
