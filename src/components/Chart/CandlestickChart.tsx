@@ -185,6 +185,12 @@ export const CandlestickChart: React.FC = () => {
     };
   }, []);
 
+  // Update font size reactively
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({ layout: { fontSize: chartFontSize } });
+  }, [chartFontSize]);
+
   // Update candle data
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || !chartRef.current || candles.length === 0) return;
