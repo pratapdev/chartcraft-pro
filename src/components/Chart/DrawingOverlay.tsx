@@ -36,6 +36,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [isInteracting, setIsInteracting] = useState(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [, bump] = useState(0);
+  const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
 
   const {
     activeTool,
