@@ -33,6 +33,7 @@ export const LeftToolbar: React.FC = () => {
     { id: 'cursor', icon: <MousePointer2 size={18} />, label: 'Cursor' },
     { id: 'trendline', icon: <TrendingUp size={18} />, label: 'Trendline' },
     { id: 'horizontal', icon: <Minus size={18} />, label: 'Horizontal Line' },
+    { id: 'fibonacci', icon: <GitFork size={18} />, label: 'Fibonacci Retracement' },
     { id: 'measure', icon: <Ruler size={18} />, label: 'Measure' },
   ];
 
