@@ -358,7 +358,25 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           const { mx, my } = getPos(e.nativeEvent);
           // In cursor mode, only capture if clicking on a trendline
           if (activeTool === 'cursor' && !hitTest(mx, my)) {
-            // Let the event pass through to the chart
+            // Temporarily disable pointer events so the chart gets this click
+            if (eventLayerRef.current) {
+              eventLayerRef.current.style.pointerEvents = 'none';
+              // Re-dispatch the event so the chart element underneath receives it
+              const el = document.elementFromPoint(e.clientX, e.clientY);
+              if (el) {
+                el.dispatchEvent(new MouseEvent('mousedown', {
+                  clientX: e.clientX, clientY: e.clientY,
+                  bubbles: true, cancelable: true,
+                }));
+              }
+              // Re-enable on next frame
+              requestAnimationFrame(() => {
+                if (eventLayerRef.current) {
+                  eventLayerRef.current.style.pointerEvents = shouldCapture ? 'auto' : 'none';
+                }
+              });
+            }
+            setSelectedTrendlineId(null);
             return;
           }
           handleMouseDown(e);
