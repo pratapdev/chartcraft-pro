@@ -266,10 +266,31 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
         action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
         duration: 5000,
       });
+      // Remove the associated trendline if no other alerts reference it
+      const otherAlerts = get().alerts.filter((a) => a.id !== id && a.trendlineId === alert.trendlineId);
+      if (otherAlerts.length === 0 && alert.trendlineId) {
+        set((s) => ({
+          alerts: s.alerts.filter((a) => a.id !== id),
+          trendlines: s.trendlines.filter((t) => t.id !== alert.trendlineId),
+          selectedTrendlineId: s.selectedTrendlineId === alert.trendlineId ? null : s.selectedTrendlineId,
+        }));
+        return;
+      }
     }
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [], indicatorThresholdAlerts: [], stochRSICrossAlerts: [] }),
+  clearAllAlerts: () => {
+    const s = get();
+    const alertTrendlineIds = new Set(s.alerts.map((a) => a.trendlineId).filter(Boolean));
+    set({
+      alerts: [],
+      indicatorCrossAlerts: [],
+      indicatorThresholdAlerts: [],
+      stochRSICrossAlerts: [],
+      trendlines: s.trendlines.filter((t) => !alertTrendlineIds.has(t.id)),
+      selectedTrendlineId: alertTrendlineIds.has(s.selectedTrendlineId ?? '') ? null : s.selectedTrendlineId,
+    });
+  },
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
   clearAlertLogs: () => set({ alertLogs: [] }),
 
