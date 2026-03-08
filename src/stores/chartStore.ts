@@ -5,7 +5,9 @@ import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 
 interface ChartStore {
-  // Symbol & timeframe
+  // Market type & Symbol & timeframe
+  marketType: MarketType;
+  setMarketType: (mt: MarketType) => void;
   symbol: string;
   timeframe: Timeframe;
   setSymbol: (s: string) => void;
