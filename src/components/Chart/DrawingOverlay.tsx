@@ -341,20 +341,28 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
-  // Event layer should capture when: drawing tool active, or actively interacting
-  const shouldCapture = activeTool === 'trendline' || isInteracting || hoveringLine;
+  // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
+  const shouldCapture = activeTool === 'trendline' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
 
   return (
     <>
       {/* Render-only canvas - never captures events */}
       <canvas ref={canvasRef} className="absolute inset-0 z-10 pointer-events-none" />
 
-      {/* Event capture layer - only active during drawing/dragging */}
+      {/* Event capture layer */}
       <div
         ref={eventLayerRef}
         className="absolute inset-0 z-20"
         style={{ pointerEvents: shouldCapture ? 'auto' : 'none' }}
-        onMouseDown={handleMouseDown}
+        onMouseDown={(e) => {
+          const { mx, my } = getPos(e.nativeEvent);
+          // In cursor mode, only capture if clicking on a trendline
+          if (activeTool === 'cursor' && !hitTest(mx, my)) {
+            // Let the event pass through to the chart
+            return;
+          }
+          handleMouseDown(e);
+        }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => {
