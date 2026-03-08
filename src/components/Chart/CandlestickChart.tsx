@@ -12,6 +12,9 @@ import {
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend } from '@/lib/marketData';
+import { LineStyleType } from '@/types/trading';
+
+const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
@@ -230,6 +233,7 @@ export const CandlestickChart: React.FC = () => {
         const series = chartRef.current.addLineSeries({
           color: ind.color,
           lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(ind.lineStyle),
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -247,6 +251,7 @@ export const CandlestickChart: React.FC = () => {
         const middleSeries = chartRef.current.addLineSeries({
           color: ind.color,
           lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(ind.lineStyle),
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -257,7 +262,7 @@ export const CandlestickChart: React.FC = () => {
         const upperSeries = chartRef.current.addLineSeries({
           color: ind.color,
           lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-          lineStyle: 2,
+          lineStyle: toLWLineStyle(ind.lineStyle) || 2,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -268,7 +273,7 @@ export const CandlestickChart: React.FC = () => {
         const lowerSeries = chartRef.current.addLineSeries({
           color: ind.color,
           lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-          lineStyle: 2,
+          lineStyle: toLWLineStyle(ind.lineStyle) || 2,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -283,6 +288,7 @@ export const CandlestickChart: React.FC = () => {
         const series = chartRef.current.addLineSeries({
           color: ind.color,
           lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(ind.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: false,
@@ -319,6 +325,7 @@ export const CandlestickChart: React.FC = () => {
           const greenSeries = chartRef.current.addLineSeries({
             color: ind.color || '#22c55e',
             lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+            lineStyle: toLWLineStyle(ind.lineStyle),
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerVisible: false,
@@ -331,6 +338,7 @@ export const CandlestickChart: React.FC = () => {
           const redSeries = chartRef.current.addLineSeries({
             color: ind.color2 || '#ef4444',
             lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+            lineStyle: toLWLineStyle(ind.lineStyle),
             priceLineVisible: false,
             lastValueVisible: false,
             crosshairMarkerVisible: false,

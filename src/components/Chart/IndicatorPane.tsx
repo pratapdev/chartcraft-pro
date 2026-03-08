@@ -8,8 +8,10 @@ import {
   Time,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { IndicatorConfig } from '@/types/trading';
+import { IndicatorConfig, LineStyleType } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV } from '@/lib/marketData';
+
+const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
@@ -76,6 +78,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         const series = chart.addLineSeries({
           color: indicator.color,
           lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -111,6 +114,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         const kSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -121,6 +125,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
           const dSeries = chart.addLineSeries({
             color: indicator.color2 ?? '#FF5722',
             lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+            lineStyle: toLWLineStyle(indicator.lineStyle),
             priceLineVisible: false,
             lastValueVisible: true,
             crosshairMarkerVisible: false,
@@ -142,6 +147,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         const macdSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -151,6 +157,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         const sigSeries = chart.addLineSeries({
           color: indicator.color2 ?? '#FF5722',
           lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: false,
@@ -180,6 +187,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         const adxSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: (indicator.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -217,7 +225,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (data.length > 0) {
         const series = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 1,
+          lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
@@ -231,7 +240,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (data.length > 0) {
         const series = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 1,
+          lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,

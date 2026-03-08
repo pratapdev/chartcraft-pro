@@ -11,6 +11,8 @@ export type Timeframe = '1m' | '3m' | '5m' | '15m' | '1h' | '4h' | '1D' | '1W';
 
 export type MarketType = 'crypto' | 'indian';
 
+export type LineStyleType = 'solid' | 'dashed' | 'dotted';
+
 export interface Trendline {
   id: string;
   symbol: string;
@@ -21,6 +23,7 @@ export interface Trendline {
   endPrice: number;
   color: string;
   thickness: number;
+  lineStyle?: LineStyleType;
   createdAt: number;
 }
 
@@ -72,6 +75,8 @@ export interface IndicatorConfig {
   visible: boolean;
   /** Line width for the indicator */
   lineWidth?: number;
+  /** Line style for the indicator */
+  lineStyle?: LineStyleType;
   /** For StochRSI: smoothing K period */
   kPeriod?: number;
   /** For StochRSI: smoothing D period */
