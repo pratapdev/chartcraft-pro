@@ -12,6 +12,15 @@ type DrawPhase = 'idle' | 'drawing';
 interface DrawState { phase: DrawPhase; startX: number; startY: number; currentX: number; currentY: number; }
 const EMPTY_DRAW: DrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
+interface MeasureState {
+  phase: 'idle' | 'measuring';
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+  startPrice: number; currentPrice: number;
+  startTime: number; currentTime: number;
+}
+const EMPTY_MEASURE: MeasureState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
 export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventLayerRef = useRef<HTMLDivElement>(null);
