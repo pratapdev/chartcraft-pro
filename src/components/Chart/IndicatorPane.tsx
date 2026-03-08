@@ -9,7 +9,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR } from '@/lib/marketData';
+import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV } from '@/lib/marketData';
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
@@ -223,6 +223,23 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
           crosshairMarkerVisible: true,
         });
         series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+      }
+    }
+
+    if (indicator.type === 'OBV') {
+      const data = computeOBV(candles);
+      if (data.length > 0) {
+        const series = chart.addLineSeries({
+          color: indicator.color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+
+        const zeroLine = chart.addLineSeries({ color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        zeroLine.setData(data.map((d) => ({ time: d.time as Time, value: 0 })) as LineData[]);
       }
     }
 
