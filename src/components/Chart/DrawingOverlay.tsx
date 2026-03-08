@@ -445,8 +445,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
             startPrice: coords.price,
             endTime,
             endPrice: coords.price,
-            color: '#eab308',
-            thickness: 2,
+            color: useChartStore.getState().drawingDefaults.horizontal.color,
+            thickness: useChartStore.getState().drawingDefaults.horizontal.thickness,
+            lineStyle: useChartStore.getState().drawingDefaults.horizontal.lineStyle,
             createdAt: Date.now(),
           });
         }
