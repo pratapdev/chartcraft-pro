@@ -649,8 +649,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
               startPrice: start.price,
               endTime: end.time,
               endPrice: end.price,
-              color: '#2563eb',
-              thickness: 2,
+              color: useChartStore.getState().drawingDefaults.trendline.color,
+              thickness: useChartStore.getState().drawingDefaults.trendline.thickness,
+              lineStyle: useChartStore.getState().drawingDefaults.trendline.lineStyle,
               createdAt: Date.now(),
             });
           }
