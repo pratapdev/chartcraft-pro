@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
+import { checkSyncHealth, pushState, extractSyncPayload, getSyncServerUrl } from '@/lib/syncService';
 
 const CRYPTO_SYMBOLS = [
   { name: 'BTC/USD', label: 'Bitcoin' },
@@ -71,6 +72,62 @@ const UpstoxCredentialsForm: React.FC = () => {
         {saved ? '✓ Saved' : 'Save Credentials'}
       </button>
     </div>
+  );
+};
+
+const SyncStatusIndicator: React.FC = () => {
+  const [syncStatus, setSyncStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
+  const [lastSync, setLastSync] = useState<string | null>(null);
+  const autoSync = localStorage.getItem('auto-sync') === 'true';
+
+  useEffect(() => {
+    const check = async () => {
+      const ok = await checkSyncHealth();
+      setSyncStatus(ok ? 'online' : 'offline');
+    };
+    check();
+    const interval = setInterval(check, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for auto-sync pushes by polling localStorage timestamp
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const ts = localStorage.getItem('last-sync-time');
+      if (ts) setLastSync(ts);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleManualSync = async () => {
+    const payload = extractSyncPayload(useChartStore.getState());
+    const ok = await pushState(payload);
+    if (ok) {
+      const now = new Date().toLocaleTimeString();
+      setLastSync(now);
+      localStorage.setItem('last-sync-time', now);
+      setSyncStatus('online');
+    } else {
+      setSyncStatus('offline');
+    }
+  };
+
+  return (
+    <button
+      onClick={handleManualSync}
+      className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors mr-2"
+      title={`Sync: ${syncStatus}${lastSync ? ` | Last: ${lastSync}` : ''}${autoSync ? ' | Auto-sync ON' : ''}\nClick to sync now`}
+    >
+      {syncStatus === 'online' ? (
+        <Cloud size={12} className="text-bull" />
+      ) : syncStatus === 'offline' ? (
+        <CloudOff size={12} className="text-bear" />
+      ) : (
+        <Cloud size={12} />
+      )}
+      {lastSync && <span className="hidden sm:inline font-mono">{lastSync}</span>}
+      {autoSync && <RefreshCw size={8} className="text-primary" />}
+    </button>
   );
 };
 
@@ -267,6 +324,8 @@ export const TopBar: React.FC = () => {
       </div>
 
       <div className="flex-1" />
+
+      <SyncStatusIndicator />
 
       <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
         {marketType === 'crypto' ? (
