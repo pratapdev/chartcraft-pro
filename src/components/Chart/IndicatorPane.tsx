@@ -180,7 +180,12 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     });
     ro.observe(containerRef.current);
 
-    // Register with sync context
+    // Restore saved range or sync from main chart
+    if (savedRangeRef.current) {
+      chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
+    }
+
+    // Register with sync context (after restoring range to avoid triggering sync)
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
       chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
@@ -190,6 +195,10 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
     return () => {
       ro.disconnect();
+      if (chartRef.current) {
+        const range = chartRef.current.timeScale().getVisibleLogicalRange();
+        if (range) savedRangeRef.current = range;
+      }
       if (chartSync) chartSync.unregisterChart(chartId);
       chart.remove();
       chartRef.current = null;
