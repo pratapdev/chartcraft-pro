@@ -412,5 +412,11 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     marketType: state.marketType,
     chartFontSize: state.chartFontSize,
     drawingDefaults: state.drawingDefaults,
+    compoundAlerts: state.compoundAlerts,
+    alertTemplates: state.alertTemplates,
+  }),
+}));
+    chartFontSize: state.chartFontSize,
+    drawingDefaults: state.drawingDefaults,
   }),
 }));
