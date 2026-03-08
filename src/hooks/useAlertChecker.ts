@@ -82,12 +82,18 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
 
 export function useAlertChecker() {
   const { candles, alerts, trendlines, addAlertLog } = useChartStore();
-  const prevCandleCountRef = useRef(0);
+  const prevCloseRef = useRef<number | null>(null);
+  const triggeredSetRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    // Only check when we get new candle data
-    if (candles.length < 2 || candles.length === prevCandleCountRef.current) return;
-    prevCandleCountRef.current = candles.length;
+    if (candles.length < 2) return;
+
+    const curr = candles[candles.length - 1];
+    const prev = candles[candles.length - 2];
+
+    // Skip if close price hasn't changed
+    if (prevCloseRef.current === curr.close) return;
+    prevCloseRef.current = curr.close;
 
     const activeAlerts = alerts.filter((a) => a.active && !a.triggered);
     if (activeAlerts.length === 0) return;
@@ -98,29 +104,35 @@ export function useAlertChecker() {
     );
     if (alertedTrendlines.length === 0) return;
 
-    const crossings = checkAllCrossings(candles, alertedTrendlines);
+    // Check crossings between previous candle and current (live-updating) candle
+    for (const line of alertedTrendlines) {
+      const dir = detectCrossingDynamic(prev, curr, line);
+      if (!dir) continue;
 
-    for (const crossing of crossings) {
       const matchingAlerts = activeAlerts.filter((a) => {
-        if (a.trendlineId !== crossing.trendline.id) return false;
+        if (a.trendlineId !== line.id) return false;
+        // Skip if already triggered in this session
+        if (triggeredSetRef.current.has(a.id)) return false;
         if (a.condition === 'cross_any') return true;
-        if (a.condition === 'cross_above' && crossing.direction === 'above') return true;
-        if (a.condition === 'cross_below' && crossing.direction === 'below') return true;
+        if (a.condition === 'cross_above' && dir === 'above') return true;
+        if (a.condition === 'cross_below' && dir === 'below') return true;
         return false;
       });
 
       for (const alert of matchingAlerts) {
-        const dirLabel = crossing.direction === 'above' ? '↑ Crossed Above' : '↓ Crossed Below';
-        const message = `${alert.symbol} ${dirLabel} trendline at ${crossing.candle.close.toFixed(2)}`;
+        triggeredSetRef.current.add(alert.id);
+
+        const dirLabel = dir === 'above' ? '↑ Crossed Above' : '↓ Crossed Below';
+        const message = `${alert.symbol} ${dirLabel} trendline at ${curr.close.toFixed(2)}`;
 
         // Play sound
-        const soundDir = alert.condition === 'cross_any' ? 'any' : crossing.direction!;
+        const soundDir = alert.condition === 'cross_any' ? 'any' : dir;
         playAlertSound(soundDir);
 
         // Show toast notification
         toast.warning(message, {
           duration: 5000,
-          description: `Alert triggered at ${new Date(crossing.candle.time * 1000).toLocaleTimeString()}`,
+          description: `Alert triggered at ${new Date(curr.time * 1000).toLocaleTimeString()}`,
         });
 
         // Log the alert
@@ -130,7 +142,7 @@ export function useAlertChecker() {
           symbol: alert.symbol,
           message,
           timestamp: Date.now(),
-          price: crossing.candle.close,
+          price: curr.close,
         });
 
         // Mark alert as triggered
@@ -139,4 +151,28 @@ export function useAlertChecker() {
       }
     }
   }, [candles, alerts, trendlines, addAlertLog]);
+}
+
+/**
+ * Detect crossing between previous candle close and current candle close
+ * relative to trendline price at those times.
+ */
+function detectCrossingDynamic(
+  prev: { time: number; close: number },
+  curr: { time: number; close: number },
+  line: { startTime: number; endTime: number; startPrice: number; endPrice: number }
+): 'above' | 'below' | null {
+  const slope =
+    line.endTime === line.startTime
+      ? 0
+      : (line.endPrice - line.startPrice) / (line.endTime - line.startTime);
+  const prevLinePrice = line.startPrice + slope * (prev.time - line.startTime);
+  const currLinePrice = line.startPrice + slope * (curr.time - line.startTime);
+
+  const prevDiff = prev.close - prevLinePrice;
+  const currDiff = curr.close - currLinePrice;
+
+  if (prevDiff <= 0 && currDiff > 0) return 'above';
+  if (prevDiff >= 0 && currDiff < 0) return 'below';
+  return null;
 }
