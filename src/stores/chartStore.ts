@@ -48,6 +48,7 @@ interface ChartStore {
   alertLogs: AlertLog[];
   addAlert: (alert: Alert) => void;
   removeAlert: (id: string) => void;
+  clearAllAlerts: () => void;
   addAlertLog: (log: AlertLog) => void;
 
   // Indicators
