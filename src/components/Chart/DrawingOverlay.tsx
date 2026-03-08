@@ -311,7 +311,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     const series = seriesRef.current;
     if (series) {
       for (const fib of fibonacciDrawings) {
-        renderFibLevels(ctx, fib, w, series);
+        const isSelected = selectedFibId === fib.id;
+        renderFibLevels(ctx, fib, w, series, isSelected);
       }
     }
 
