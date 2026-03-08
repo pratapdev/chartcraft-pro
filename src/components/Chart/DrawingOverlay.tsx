@@ -392,11 +392,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       {/* Render-only canvas - never captures events */}
       <canvas ref={canvasRef} className="absolute inset-0 z-10 pointer-events-none" />
 
-      {/* Event capture layer */}
+      {/* Event capture layer - leave right (price scale) and bottom (time scale) uncovered for resize dragging */}
       <div
         ref={eventLayerRef}
-        className="absolute inset-0 z-20"
-        style={{ pointerEvents: shouldCapture ? 'auto' : 'none' }}
+        className="absolute top-0 left-0 z-20"
+        style={{ right: 65, bottom: 28, pointerEvents: shouldCapture ? 'auto' : 'none' }}
         onMouseDown={(e) => {
           const { mx, my } = getPos(e.nativeEvent);
           // In cursor mode, only capture if clicking on a trendline
