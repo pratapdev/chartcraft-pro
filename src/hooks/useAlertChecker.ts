@@ -48,8 +48,7 @@ function sendBrowserNotification(title: string, body: string) {
         body,
         icon: '/favicon.ico',
         tag: 'price-alert',
-        renotify: true,
-      });
+      } as NotificationOptions);
     } catch {
       // Notification API not available
     }
