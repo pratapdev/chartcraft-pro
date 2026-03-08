@@ -70,6 +70,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     setSelectedTrendlineId,
     symbol,
     timeframe,
+    fibonacciDrawings,
+    addFibonacci,
+    removeFibonacci,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
