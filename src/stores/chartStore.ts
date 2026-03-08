@@ -39,6 +39,7 @@ interface ChartStore {
   addTrendline: (line: Trendline) => void;
   updateTrendline: (id: string, updates: Partial<Trendline>) => void;
   removeTrendline: (id: string) => void;
+  clearAllTrendlines: () => void;
   selectedTrendlineId: string | null;
   setSelectedTrendlineId: (id: string | null) => void;
 
@@ -47,12 +48,14 @@ interface ChartStore {
   alertLogs: AlertLog[];
   addAlert: (alert: Alert) => void;
   removeAlert: (id: string) => void;
+  clearAllAlerts: () => void;
   addAlertLog: (log: AlertLog) => void;
 
   // Indicators
   indicators: IndicatorConfig[];
   addIndicator: (ind: IndicatorConfig) => void;
   removeIndicator: (id: string) => void;
+  clearAllIndicators: () => void;
   toggleIndicator: (id: string) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
 
@@ -60,6 +63,7 @@ interface ChartStore {
   fibonacciDrawings: FibonacciDrawing[];
   addFibonacci: (fib: FibonacciDrawing) => void;
   removeFibonacci: (id: string) => void;
+  clearAllDrawings: () => void;
 
   // Crosshair
   crosshairData: CrosshairData | null;
@@ -169,6 +173,8 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       alerts: s.alerts.filter((a) => a.trendlineId !== id),
       selectedTrendlineId: s.selectedTrendlineId === id ? null : s.selectedTrendlineId,
     })),
+  clearAllTrendlines: () => set({ trendlines: [], selectedTrendlineId: null }),
+  clearAllDrawings: () => set({ trendlines: [], fibonacciDrawings: [], selectedTrendlineId: null, alerts: [] }),
   selectedTrendlineId: null,
   setSelectedTrendlineId: (id) => set({ selectedTrendlineId: id }),
 
@@ -176,6 +182,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   alertLogs: [],
   addAlert: (alert) => set((s) => ({ alerts: [...s.alerts, alert] })),
   removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
+  clearAllAlerts: () => set({ alerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
   indicators: [
@@ -184,6 +191,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   ],
   addIndicator: (ind) => set((s) => ({ indicators: [...s.indicators, ind] })),
   removeIndicator: (id) => set((s) => ({ indicators: s.indicators.filter((i) => i.id !== id) })),
+  clearAllIndicators: () => set({ indicators: [] }),
   toggleIndicator: (id) =>
     set((s) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, visible: !i.visible } : i)),

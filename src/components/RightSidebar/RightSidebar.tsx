@@ -258,6 +258,8 @@ const QuickPriceAlert: React.FC = () => {
 
 const SettingsPanel: React.FC = () => {
   const trendlines = useChartStore((s) => s.trendlines);
+  const fibonacciDrawings = useChartStore((s) => s.fibonacciDrawings);
+  const clearAllDrawings = useChartStore((s) => s.clearAllDrawings);
   const stored = getTelegramCredentials();
   const [botToken, setBotToken] = useState(stored.botToken);
   const [chatId, setChatId] = useState(stored.chatId);
@@ -282,8 +284,16 @@ const SettingsPanel: React.FC = () => {
   return (
     <div className="space-y-3 text-xs text-muted-foreground p-1">
       <div>
-        <p className="font-semibold text-foreground mb-1">Trendlines</p>
-        <p>{trendlines.length} line(s) drawn</p>
+        <p className="font-semibold text-foreground mb-1">Drawings</p>
+        <p>{trendlines.length} line(s), {fibonacciDrawings.length} fibonacci</p>
+        {(trendlines.length > 0 || fibonacciDrawings.length > 0) && (
+          <button
+            onClick={clearAllDrawings}
+            className="mt-1 text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+          >
+            Delete All Drawings
+          </button>
+        )}
       </div>
       <div>
         <p className="font-semibold text-foreground mb-1">Shortcuts</p>
@@ -356,9 +366,13 @@ export const RightSidebar: React.FC = () => {
     alerts,
     alertLogs,
     removeAlert,
+    clearAllAlerts,
     indicators,
     addIndicator,
+    clearAllIndicators,
     trendlines,
+    fibonacciDrawings,
+    clearAllDrawings,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -397,9 +411,19 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
-            <p className="text-xs text-muted-foreground px-1">
-              {alerts.length === 0 ? 'No alerts set.' : `${alerts.length} active alert(s)`}
-            </p>
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs text-muted-foreground">
+                {alerts.length === 0 ? 'No alerts set.' : `${alerts.length} active alert(s)`}
+              </p>
+              {alerts.length > 0 && (
+                <button
+                  onClick={clearAllAlerts}
+                  className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+                >
+                  Delete All
+                </button>
+              )}
+            </div>
             {alerts.map((alert) => (
               <div key={alert.id} className="panel-section rounded p-2 text-xs">
                 <div className="flex items-center justify-between">
@@ -442,6 +466,16 @@ export const RightSidebar: React.FC = () => {
 
         {rightPanelTab === 'indicators' && (
           <div className="space-y-2">
+            {indicators.length > 0 && (
+              <div className="flex justify-end px-1">
+                <button
+                  onClick={clearAllIndicators}
+                  className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+                >
+                  Delete All
+                </button>
+              </div>
+            )}
             {indicators.map((ind) => (
               <IndicatorRow key={ind.id} ind={ind} />
             ))}
