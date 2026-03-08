@@ -460,6 +460,8 @@ const SettingsPanel: React.FC = () => {
   const trendlines = useChartStore((s) => s.trendlines);
   const fibonacciDrawings = useChartStore((s) => s.fibonacciDrawings);
   const clearAllDrawings = useChartStore((s) => s.clearAllDrawings);
+  const chartFontSize = useChartStore((s) => s.chartFontSize);
+  const setChartFontSize = useChartStore((s) => s.setChartFontSize);
   const stored = getTelegramCredentials();
   const [botToken, setBotToken] = useState(stored.botToken);
   const [chatId, setChatId] = useState(stored.chatId);
@@ -481,9 +483,49 @@ const SettingsPanel: React.FC = () => {
     setTesting(false);
   };
 
+  const FONT_SIZES = [9, 10, 11, 12, 13, 14, 16, 18, 20];
+
   return (
     <div className="space-y-3 text-xs text-muted-foreground p-1">
       <div>
+        <p className="font-semibold text-foreground mb-2">Chart Font Size</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-muted-foreground">Scale & Legend Size</label>
+            <span className="text-foreground font-medium">{chartFontSize}px</span>
+          </div>
+          <input
+            type="range"
+            min={9}
+            max={20}
+            step={1}
+            value={chartFontSize}
+            onChange={(e) => setChartFontSize(parseInt(e.target.value))}
+            className="w-full accent-primary h-1 cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>9px</span>
+            <span>14px</span>
+            <span>20px</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {FONT_SIZES.map((size) => (
+              <button
+                key={size}
+                onClick={() => setChartFontSize(size)}
+                className={`px-2 py-1 rounded text-[10px] transition-colors ${
+                  chartFontSize === size
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-accent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-border pt-3">
         <p className="font-semibold text-foreground mb-1">Drawings</p>
         <p>{trendlines.length} line(s), {fibonacciDrawings.length} fibonacci</p>
         {(trendlines.length > 0 || fibonacciDrawings.length > 0) && (

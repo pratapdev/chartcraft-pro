@@ -22,7 +22,7 @@ interface IndicatorPaneProps {
 export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const { candles, removeIndicator } = useChartStore();
+  const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartSync = useChartSync();
   const chartId = `indicator-${indicator.id}`;
   const savedRangeRef = useRef<{ from: number; to: number } | null>(null);
@@ -45,7 +45,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       layout: {
         background: { color: '#0d1117' },
         textColor: '#6b7280',
-        fontSize: 10,
+        fontSize: chartFontSize - 1,
         fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {
@@ -282,7 +282,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       chart.remove();
       chartRef.current = null;
     };
-  }, [candles, indicator]);
+  }, [candles, indicator, chartFontSize]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :

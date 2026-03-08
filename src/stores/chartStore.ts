@@ -114,6 +114,10 @@ interface ChartStore {
   multiTfMode: boolean;
   setMultiTfMode: (v: boolean) => void;
 
+  // Chart font size
+  chartFontSize: number;
+  setChartFontSize: (size: number) => void;
+
   // Background alert candle data (keyed by "symbol:timeframe")
   alertCandles: Record<string, Candle[]>;
   setAlertCandles: (key: string, candles: Candle[]) => void;
@@ -331,6 +335,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   multiTfMode: false,
   setMultiTfMode: (multiTfMode) => set({ multiTfMode }),
 
+  chartFontSize: 11,
+  setChartFontSize: (chartFontSize) => set({ chartFontSize }),
+
   alertCandles: {},
   setAlertCandles: (key, candles) => set((s) => ({ alertCandles: { ...s.alertCandles, [key]: candles } })),
   updateAlertCandle: (key, candle) => set((s) => {
@@ -360,5 +367,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     symbol: state.symbol,
     timeframe: state.timeframe,
     marketType: state.marketType,
+    chartFontSize: state.chartFontSize,
   }),
 }));

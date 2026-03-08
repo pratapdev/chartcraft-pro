@@ -27,7 +27,7 @@ export const CandlestickChart: React.FC = () => {
   const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
   const chartSync = useChartSync();
 
-  const { candles, indicators, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
+  const { candles, indicators, chartFontSize, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
   useEffect(() => {
     loadCandles().then(() => startLiveUpdates());
@@ -49,7 +49,7 @@ export const CandlestickChart: React.FC = () => {
       layout: {
         background: { color: '#0d1117' },
         textColor: '#6b7280',
-        fontSize: 11,
+        fontSize: chartFontSize,
         fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {
@@ -184,6 +184,12 @@ export const CandlestickChart: React.FC = () => {
       volumeSeriesRef.current = null;
     };
   }, []);
+
+  // Update font size reactively
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({ layout: { fontSize: chartFontSize } });
+  }, [chartFontSize]);
 
   // Update candle data
   useEffect(() => {
