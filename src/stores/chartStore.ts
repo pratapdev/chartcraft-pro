@@ -213,6 +213,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     const alert = get().alerts.find((a) => a.id === id);
     if (alert) {
       undoStack.push({ type: 'alert', alert });
+      redoStack.length = 0;
       toast('Alert deleted', {
         action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
         duration: 5000,
