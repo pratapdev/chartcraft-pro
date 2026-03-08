@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, LineStyleType } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
