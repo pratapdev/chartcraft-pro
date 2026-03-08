@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3 } from 'lucide-react';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
 import { checkSyncHealth, pushState, extractSyncPayload, getSyncServerUrl } from '@/lib/syncService';
@@ -348,6 +348,24 @@ export const TopBar: React.FC = () => {
       >
         <LayoutGrid size={14} />
         <span className="hidden sm:inline">Multi-TF</span>
+      </button>
+
+      <button
+        onClick={() => setRightPanelTab('watchlist')}
+        className="trading-btn flex items-center gap-1"
+        title="Watchlist"
+      >
+        <List size={14} />
+        <span className="hidden sm:inline">Watch</span>
+      </button>
+
+      <button
+        onClick={() => setRightPanelTab('heatmap')}
+        className="trading-btn flex items-center gap-1"
+        title="Heatmap"
+      >
+        <Grid3X3 size={14} />
+        <span className="hidden sm:inline">Heat</span>
       </button>
 
       <button
