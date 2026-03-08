@@ -11,6 +11,7 @@ import {
 import { Candle, Timeframe } from '@/types/trading';
 import { fetchCandles } from '@/lib/marketData';
 import { computeEMA } from '@/lib/marketData';
+import { useChartStore } from '@/stores/chartStore';
 
 const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
