@@ -56,6 +56,11 @@ interface ChartStore {
   toggleIndicator: (id: string) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
 
+  // Fibonacci
+  fibonacciDrawings: FibonacciDrawing[];
+  addFibonacci: (fib: FibonacciDrawing) => void;
+  removeFibonacci: (id: string) => void;
+
   // Crosshair
   crosshairData: CrosshairData | null;
   setCrosshairData: (data: CrosshairData | null) => void;
