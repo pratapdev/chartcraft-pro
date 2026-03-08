@@ -335,3 +335,85 @@ export function computeVWAP(candles: Candle[]): { time: number; value: number }[
   }
   return result;
 }
+
+// Compute Supertrend
+export function computeSupertrend(
+  candles: Candle[],
+  period: number = 10,
+  multiplier: number = 3
+): { line: { time: number; value: number; color: string }[]; signals: { time: number; price: number; direction: 'buy' | 'sell' }[] } {
+  if (candles.length < period + 1) return { line: [], signals: [] };
+
+  // Compute ATR
+  const tr: number[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) {
+      tr.push(candles[i].high - candles[i].low);
+    } else {
+      tr.push(Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - candles[i - 1].close),
+        Math.abs(candles[i].low - candles[i - 1].close)
+      ));
+    }
+  }
+
+  const atr: number[] = new Array(candles.length).fill(0);
+  let atrSum = 0;
+  for (let i = 0; i < period; i++) atrSum += tr[i];
+  atr[period - 1] = atrSum / period;
+  for (let i = period; i < candles.length; i++) {
+    atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+  }
+
+  const upperBand: number[] = new Array(candles.length).fill(0);
+  const lowerBand: number[] = new Array(candles.length).fill(0);
+  const supertrend: number[] = new Array(candles.length).fill(0);
+  const direction: number[] = new Array(candles.length).fill(1); // 1 = up (bullish), -1 = down (bearish)
+
+  for (let i = period - 1; i < candles.length; i++) {
+    const hl2 = (candles[i].high + candles[i].low) / 2;
+    let basicUpper = hl2 + multiplier * atr[i];
+    let basicLower = hl2 - multiplier * atr[i];
+
+    if (i === period - 1) {
+      upperBand[i] = basicUpper;
+      lowerBand[i] = basicLower;
+      supertrend[i] = candles[i].close > basicUpper ? basicLower : basicUpper;
+      direction[i] = candles[i].close > basicUpper ? 1 : -1;
+    } else {
+      upperBand[i] = basicUpper < upperBand[i - 1] || candles[i - 1].close > upperBand[i - 1] ? basicUpper : upperBand[i - 1];
+      lowerBand[i] = basicLower > lowerBand[i - 1] || candles[i - 1].close < lowerBand[i - 1] ? basicLower : lowerBand[i - 1];
+
+      if (direction[i - 1] === 1) {
+        direction[i] = candles[i].close < lowerBand[i] ? -1 : 1;
+      } else {
+        direction[i] = candles[i].close > upperBand[i] ? 1 : -1;
+      }
+
+      supertrend[i] = direction[i] === 1 ? lowerBand[i] : upperBand[i];
+    }
+  }
+
+  const line: { time: number; value: number; color: string }[] = [];
+  const signals: { time: number; price: number; direction: 'buy' | 'sell' }[] = [];
+
+  for (let i = period; i < candles.length; i++) {
+    line.push({
+      time: candles[i].time,
+      value: Math.round(supertrend[i] * 100) / 100,
+      color: direction[i] === 1 ? '#22c55e' : '#ef4444',
+    });
+
+    // Detect direction changes for buy/sell signals
+    if (i > period && direction[i] !== direction[i - 1]) {
+      signals.push({
+        time: candles[i].time,
+        price: candles[i].close,
+        direction: direction[i] === 1 ? 'buy' : 'sell',
+      });
+    }
+  }
+
+  return { line, signals };
+}

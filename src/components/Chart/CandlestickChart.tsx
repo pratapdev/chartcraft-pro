@@ -11,7 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
@@ -289,6 +289,67 @@ export const CandlestickChart: React.FC = () => {
         });
         series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
         lineSeriesRefs.current.set(ind.id, series);
+      }
+
+      if (ind.type === 'SUPERTREND') {
+        const { line, signals } = computeSupertrend(candles, ind.period, ind.multiplier ?? 3);
+        if (line.length === 0) continue;
+
+        // Split line into colored segments
+        const greenData: (LineData | { time: Time; value: number })[] = [];
+        const redData: (LineData | { time: Time; value: number })[] = [];
+
+        for (let i = 0; i < line.length; i++) {
+          const pt = { time: line[i].time as Time, value: line[i].value };
+          if (line[i].color === '#22c55e') {
+            greenData.push(pt);
+            // Bridge: add NaN to red if previous was red
+            if (i > 0 && line[i - 1].color === '#ef4444') {
+              greenData.splice(greenData.length - 1, 0, { time: line[i - 1].time as Time, value: line[i - 1].value });
+            }
+          } else {
+            redData.push(pt);
+            if (i > 0 && line[i - 1].color === '#22c55e') {
+              redData.splice(redData.length - 1, 0, { time: line[i - 1].time as Time, value: line[i - 1].value });
+            }
+          }
+        }
+
+        if (greenData.length > 0) {
+          const greenSeries = chartRef.current.addLineSeries({
+            color: ind.color || '#22c55e',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          greenSeries.setData(greenData as LineData[]);
+          lineSeriesRefs.current.set(ind.id + '-green', greenSeries);
+        }
+
+        if (redData.length > 0) {
+          const redSeries = chartRef.current.addLineSeries({
+            color: ind.color2 || '#ef4444',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          redSeries.setData(redData as LineData[]);
+          lineSeriesRefs.current.set(ind.id + '-red', redSeries);
+        }
+
+        // Add buy/sell markers on candle series
+        if (signals.length > 0 && candleSeriesRef.current) {
+          const markers = signals.map((s) => ({
+            time: s.time as Time,
+            position: s.direction === 'buy' ? 'belowBar' as const : 'aboveBar' as const,
+            color: s.direction === 'buy' ? '#22c55e' : '#ef4444',
+            shape: s.direction === 'buy' ? 'arrowUp' as const : 'arrowDown' as const,
+            text: s.direction === 'buy' ? 'BUY' : 'SELL',
+          }));
+          candleSeriesRef.current.setMarkers(markers);
+        }
       }
     }
   }, [candles, indicators]);

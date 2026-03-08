@@ -11,6 +11,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'MACD', label: 'MACD', defaults: { period: 12, color: '#2196F3', color2: '#FF5722' } },
   { type: 'BBANDS', label: 'Bollinger Bands', defaults: { period: 20, color: '#2196F3', color2: 'rgba(33,150,243,0.08)', stdDev: 2 } },
   { type: 'VWAP', label: 'VWAP', defaults: { period: 1, color: '#FFEB3B' } },
+  { type: 'SUPERTREND', label: 'Supertrend', defaults: { period: 10, color: '#22c55e', color2: '#ef4444', multiplier: 3 } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
@@ -107,6 +108,20 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 step={0.5}
                 value={ind.stdDev ?? 2}
                 onChange={(e) => updateIndicator(ind.id, { stdDev: Math.max(0.5, parseFloat(e.target.value) || 2) })}
+                className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+              />
+            </div>
+          )}
+          {ind.type === 'SUPERTREND' && (
+            <div className="flex items-center justify-between">
+              <label className="text-muted-foreground">Multiplier</label>
+              <input
+                type="number"
+                min={0.5}
+                max={10}
+                step={0.5}
+                value={ind.multiplier ?? 3}
+                onChange={(e) => updateIndicator(ind.id, { multiplier: Math.max(0.5, parseFloat(e.target.value) || 3) })}
                 className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
               />
             </div>
@@ -232,6 +247,7 @@ export const RightSidebar: React.FC = () => {
       dPeriod: preset.defaults.dPeriod,
       color2: preset.defaults.color2,
       stdDev: preset.defaults.stdDev,
+      multiplier: preset.defaults.multiplier,
     });
     setShowAdd(false);
   };
