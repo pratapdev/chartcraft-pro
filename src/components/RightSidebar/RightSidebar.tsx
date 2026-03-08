@@ -95,6 +95,20 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               </div>
             </>
           )}
+          {ind.type === 'BBANDS' && (
+            <div className="flex items-center justify-between">
+              <label className="text-muted-foreground">Std Dev</label>
+              <input
+                type="number"
+                min={0.5}
+                max={5}
+                step={0.5}
+                value={ind.stdDev ?? 2}
+                onChange={(e) => updateIndicator(ind.id, { stdDev: Math.max(0.5, parseFloat(e.target.value) || 2) })}
+                className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
