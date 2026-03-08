@@ -10,6 +10,7 @@ import {
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD } from '@/lib/marketData';
+import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
 interface IndicatorPaneProps {
@@ -20,6 +21,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const { candles, removeIndicator } = useChartStore();
+  const chartSync = useChartSync();
+  const chartId = `indicator-${indicator.id}`;
 
   useEffect(() => {
     if (!containerRef.current || candles.length === 0) return;
@@ -172,8 +175,17 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     });
     ro.observe(containerRef.current);
 
+    // Register with sync context
+    if (chartSync) {
+      chartSync.registerChart(chartId, chart);
+      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        if (range) chartSync.syncRange(chartId, range);
+      });
+    }
+
     return () => {
       ro.disconnect();
+      if (chartSync) chartSync.unregisterChart(chartId);
       chart.remove();
       chartRef.current = null;
     };

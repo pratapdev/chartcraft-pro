@@ -10,6 +10,7 @@ import {
   MouseEventParams,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
+import { useChartSync } from './ChartSyncContext';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
@@ -21,6 +22,7 @@ export const CandlestickChart: React.FC = () => {
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  const chartSync = useChartSync();
 
   const { candles, indicators, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
@@ -162,8 +164,17 @@ export const CandlestickChart: React.FC = () => {
     });
     ro.observe(containerRef.current);
 
+    // Register with sync context
+    if (chartSync) {
+      chartSync.registerChart('main', chart);
+      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        if (range) chartSync.syncRange('main', range);
+      });
+    }
+
     return () => {
       ro.disconnect();
+      if (chartSync) chartSync.unregisterChart('main');
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
