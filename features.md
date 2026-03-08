@@ -88,8 +88,8 @@ Complete feature documentation for the Trading Chart Application — a professio
 - **Bollinger Bands** — configurable period, std deviation, color
 - **VWAP** (Volume Weighted Average Price)
 - **Supertrend** — configurable period and ATR multiplier; dual-color (green/red) with BUY/SELL arrow markers
+- **Pivot Points High/Low** — identifies swing highs and lows; configurable left/right bar lookback period; displayed as labeled circle markers (green H for highs, red L for lows)
 
-### Sub-Chart Indicators (separate panes below main chart)
 - **RSI** (Relative Strength Index) — with overbought (70) / oversold (30) reference lines
 - **Stochastic RSI** — K and D lines with configurable smoothing periods
 - **MACD** — (type defined, rendering in indicator pane)
