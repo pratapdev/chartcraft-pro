@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft, RefreshCw, CloudOff, Cloud } from 'lucide-react';
 import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition } from '@/types/trading';
@@ -687,6 +687,31 @@ const SyncControls: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
   const [syncing, setSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [autoSync, setAutoSync] = useState(() => localStorage.getItem('auto-sync') === 'true');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('auto-sync', String(autoSync));
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    if (autoSync) {
+      const doSync = async () => {
+        const ok = await checkSyncHealth();
+        if (ok) {
+          const payload = extractSyncPayload(useChartStore.getState());
+          const pushed = await pushState(payload);
+          setStatus('online');
+          setLastResult(pushed ? `Auto-synced ✓ ${new Date().toLocaleTimeString()}` : 'Auto-sync failed ✗');
+        } else {
+          setStatus('offline');
+        }
+      };
+      doSync();
+      intervalRef.current = setInterval(doSync, 30_000);
+    }
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [autoSync]);
 
   const handleCheckHealth = async () => {
     setStatus('checking');
@@ -751,11 +776,20 @@ const SyncControls: React.FC = () => {
           placeholder="http://localhost:3001"
         />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
         <button onClick={handleCheckHealth} className="flex items-center gap-1 text-xs text-primary hover:opacity-80 transition-opacity">
           {status === 'checking' ? <RefreshCw size={10} className="animate-spin" /> : status === 'online' ? <Cloud size={10} /> : <CloudOff size={10} />}
           {status === 'idle' ? 'Check' : status === 'checking' ? 'Checking...' : status === 'online' ? 'Online' : 'Offline'}
         </button>
+        <div className="flex items-center gap-1.5">
+          <label className="text-muted-foreground text-[10px]">Auto-sync</label>
+          <button
+            onClick={() => setAutoSync(!autoSync)}
+            className={`w-8 h-4 rounded-full transition-colors relative ${autoSync ? 'bg-primary' : 'bg-accent'}`}
+          >
+            <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${autoSync ? 'left-4' : 'left-0.5'}`} />
+          </button>
+        </div>
       </div>
       <div className="flex gap-2">
         <button
