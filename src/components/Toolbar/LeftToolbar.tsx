@@ -13,6 +13,7 @@ import {
   GitFork,
   Activity,
   Eraser,
+  Diamond,
 } from 'lucide-react';
 
 interface ToolButton {
@@ -66,12 +67,31 @@ export const LeftToolbar: React.FC = () => {
     }
   };
 
+  const handleTogglePivotHL = () => {
+    const existing = indicators.find((i) => i.type === 'PIVOT_HL');
+    if (existing) {
+      setRightPanelTab('indicators');
+    } else {
+      addIndicator({
+        id: `pivot-hl-${Date.now()}`,
+        type: 'PIVOT_HL',
+        period: 5,
+        color: '#22c55e',
+        color2: '#ef4444',
+        visible: true,
+      });
+      setRightPanelTab('indicators');
+    }
+  };
+
   const hasBBands = indicators.some((i) => i.type === 'BBANDS' && i.visible);
+  const hasPivotHL = indicators.some((i) => i.type === 'PIVOT_HL' && i.visible);
   const hasDrawings = trendlines.length > 0 || fibonacciDrawings.length > 0;
   const hasIndicators = indicators.length > 0;
 
   const actions: ToolButton[] = [
     { id: 'bbands', icon: <Activity size={18} />, label: 'Bollinger Bands', action: handleToggleBBands },
+    { id: 'pivot-hl', icon: <Diamond size={18} />, label: 'Pivot Points H/L', action: handleTogglePivotHL },
     { id: 'alerts', icon: <Bell size={18} />, label: 'Alerts', action: () => setRightPanelTab('alerts') },
     { id: 'indicators', icon: <BarChart3 size={18} />, label: 'Indicators', action: () => setRightPanelTab('indicators') },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings', action: () => setRightPanelTab('settings') },
@@ -103,7 +123,7 @@ export const LeftToolbar: React.FC = () => {
           key={action.id}
           onClick={action.action}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            action.id === 'bbands' && hasBBands
+            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL)
               ? 'bg-primary/15 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}
