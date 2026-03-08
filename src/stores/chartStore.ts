@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 
