@@ -251,6 +251,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   },
   clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [], indicatorThresholdAlerts: [], stochRSICrossAlerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
+  clearAlertLogs: () => set({ alertLogs: [] }),
 
   indicatorCrossAlerts: [],
   addIndicatorCrossAlert: (alert) => set((s) => ({ indicatorCrossAlerts: [...s.indicatorCrossAlerts, alert] })),
