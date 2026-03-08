@@ -12,6 +12,15 @@ type DrawPhase = 'idle' | 'drawing';
 interface DrawState { phase: DrawPhase; startX: number; startY: number; currentX: number; currentY: number; }
 const EMPTY_DRAW: DrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
+interface MeasureState {
+  phase: 'idle' | 'measuring';
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+  startPrice: number; currentPrice: number;
+  startTime: number; currentTime: number;
+}
+const EMPTY_MEASURE: MeasureState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
 export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventLayerRef = useRef<HTMLDivElement>(null);
@@ -27,6 +36,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [isInteracting, setIsInteracting] = useState(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [, bump] = useState(0);
+  const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
 
   const {
     activeTool,
@@ -196,6 +206,80 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.fillStyle = '#2563eb';
       ctx.fill();
     }
+
+    // Measure tool rendering
+    const ms = measureRef.current;
+    if (ms.phase === 'measuring') {
+      const x1 = Math.min(ms.startX, ms.currentX);
+      const y1 = Math.min(ms.startY, ms.currentY);
+      const x2 = Math.max(ms.startX, ms.currentX);
+      const y2 = Math.max(ms.startY, ms.currentY);
+
+      // Shaded rectangle
+      ctx.fillStyle = ms.currentPrice >= ms.startPrice ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.strokeStyle = ms.currentPrice >= ms.startPrice ? '#22c55e' : '#ef4444';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.setLineDash([]);
+
+      // Diagonal line
+      ctx.beginPath();
+      ctx.moveTo(ms.startX, ms.startY);
+      ctx.lineTo(ms.currentX, ms.currentY);
+      ctx.strokeStyle = ms.currentPrice >= ms.startPrice ? '#22c55e' : '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Info box
+      const priceDiff = ms.currentPrice - ms.startPrice;
+      const pctChange = ms.startPrice !== 0 ? (priceDiff / ms.startPrice) * 100 : 0;
+      const { candles: c } = useChartStore.getState();
+      let barCount = 0;
+      if (c.length >= 2) {
+        const interval = c[c.length - 1].time - c[c.length - 2].time;
+        if (interval > 0) barCount = Math.round(Math.abs(ms.currentTime - ms.startTime) / interval);
+      }
+
+      const isUp = priceDiff >= 0;
+      const sign = isUp ? '+' : '';
+      const lines = [
+        `${sign}${priceDiff.toFixed(2)}  (${sign}${pctChange.toFixed(2)}%)`,
+        `${barCount} bars`,
+      ];
+
+      const boxW = 200;
+      const boxH = 48;
+      const boxX = ms.currentX + 12;
+      const boxY = ms.currentY - boxH / 2;
+
+      // Box background
+      ctx.fillStyle = 'rgba(17,24,39,0.92)';
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+      ctx.fill();
+      ctx.strokeStyle = isUp ? '#22c55e' : '#ef4444';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+      ctx.stroke();
+
+      // Text
+      ctx.font = '12px "JetBrains Mono", monospace';
+      ctx.fillStyle = isUp ? '#22c55e' : '#ef4444';
+      ctx.fillText(lines[0], boxX + 10, boxY + 20);
+      ctx.fillStyle = '#9ca3af';
+      ctx.fillText(lines[1], boxX + 10, boxY + 38);
+
+      // Start/end dots
+      for (const [dx, dy] of [[ms.startX, ms.startY], [ms.currentX, ms.currentY]]) {
+        ctx.beginPath();
+        ctx.arc(dx, dy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = isUp ? '#22c55e' : '#ef4444';
+        ctx.fill();
+      }
+    }
   }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY]);
 
   useEffect(() => {
@@ -253,6 +337,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (activeTool === 'measure') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          measureRef.current = {
+            phase: 'measuring', startX: mx, startY: my, currentX: mx, currentY: my,
+            startPrice: coords.price, currentPrice: coords.price,
+            startTime: coords.time, currentTime: coords.time,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       // Cursor: check hit
       const hitId = hitTest(mx, my);
       if (hitId) {
@@ -284,6 +384,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (measureRef.current.phase === 'measuring') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          measureRef.current = { ...measureRef.current, currentX: mx, currentY: my, currentPrice: coords.price, currentTime: coords.time };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
       if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
@@ -309,8 +418,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       // Update cursor and hover state
-      if (activeTool === 'horizontal') {
-        setHoverY(my);
+      if (activeTool === 'horizontal' || activeTool === 'measure') {
+        if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
         setHoverY(null);
@@ -358,6 +467,13 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (measureRef.current.phase === 'measuring') {
+        measureRef.current = EMPTY_MEASURE;
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
+
       if (dragRef.current) {
         dragRef.current = null;
         setIsInteracting(false);
@@ -375,6 +491,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       if (e.key === 'Escape') {
         setSelectedTrendlineId(null);
         drawRef.current = EMPTY_DRAW;
+        measureRef.current = EMPTY_MEASURE;
         setActiveTool('cursor');
         setIsInteracting(false);
         bump((n) => n + 1);
@@ -385,7 +502,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
 
   return (
     <>

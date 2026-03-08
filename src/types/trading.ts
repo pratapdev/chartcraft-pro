@@ -24,7 +24,7 @@ export interface Trendline {
   createdAt: number;
 }
 
-export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'ray';
+export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'ray' | 'measure';
 
 export type AlertCondition = 'cross_above' | 'cross_below' | 'cross_any';
 
