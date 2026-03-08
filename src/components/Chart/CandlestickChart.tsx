@@ -90,6 +90,23 @@ export const CandlestickChart: React.FC = () => {
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
 
+    // Helper to convert time to pixel, with future extrapolation
+    const timeToPixelLocal = (t: number) => {
+      const px = chart.timeScale().timeToCoordinate(t as unknown as Time);
+      if (px !== null) return px;
+      const store = useChartStore.getState();
+      const c = store.candles;
+      if (c.length < 2) return null;
+      const lastTime = c[c.length - 1].time;
+      const interval = c[c.length - 1].time - c[c.length - 2].time;
+      const lastX = chart.timeScale().timeToCoordinate(lastTime as unknown as Time);
+      const prevX = chart.timeScale().timeToCoordinate(c[c.length - 2].time as unknown as Time);
+      if (lastX === null || prevX === null) return null;
+      const pxPerBar = lastX - prevX;
+      if (pxPerBar <= 0) return null;
+      return lastX + ((t - lastTime) / interval) * pxPerBar;
+    };
+
     // Subscribe to chart clicks for trendline selection
     chart.subscribeClick((param: MouseEventParams) => {
       if (!param.point) return;
@@ -97,15 +114,14 @@ export const CandlestickChart: React.FC = () => {
       const store = useChartStore.getState();
       if (store.activeTool !== 'cursor') return;
 
-      // Hit test trendlines
       const series = candleSeriesRef.current;
       if (!series) return;
 
       let hitId: string | null = null;
       for (let i = store.trendlines.length - 1; i >= 0; i--) {
         const line = store.trendlines[i];
-        const x1 = chart.timeScale().timeToCoordinate(line.startTime as unknown as Time);
-        const x2 = chart.timeScale().timeToCoordinate(line.endTime as unknown as Time);
+        const x1 = timeToPixelLocal(line.startTime);
+        const x2 = timeToPixelLocal(line.endTime);
         const y1 = series.priceToCoordinate(line.startPrice);
         const y2 = series.priceToCoordinate(line.endPrice);
         if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
