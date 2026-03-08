@@ -120,7 +120,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         if (d.length > 0) {
           const dSeries = chart.addLineSeries({
             color: indicator.color2 ?? '#FF5722',
-            lineWidth: 1,
+            lineWidth: (indicator.lineWidth ?? 1) as 1 | 2 | 3 | 4,
             priceLineVisible: false,
             lastValueVisible: true,
             crosshairMarkerVisible: false,
