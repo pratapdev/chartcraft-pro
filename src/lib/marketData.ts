@@ -545,3 +545,43 @@ export function computeOBV(candles: Candle[]): { time: number; value: number }[]
   }
   return result;
 }
+
+// Compute Pivot Points High/Low
+// A pivot high: candle whose high is >= highs of `leftBars` candles to the left AND `rightBars` candles to the right
+// A pivot low: candle whose low is <= lows of `leftBars` candles to the left AND `rightBars` candles to the right
+export function computePivotHighLow(
+  candles: Candle[],
+  leftBars: number = 5,
+  rightBars: number = 5
+): { highs: { time: number; price: number }[]; lows: { time: number; price: number }[] } {
+  const highs: { time: number; price: number }[] = [];
+  const lows: { time: number; price: number }[] = [];
+
+  for (let i = leftBars; i < candles.length - rightBars; i++) {
+    const candle = candles[i];
+
+    // Check pivot high
+    let isHigh = true;
+    for (let j = i - leftBars; j <= i + rightBars; j++) {
+      if (j === i) continue;
+      if (candles[j].high > candle.high) {
+        isHigh = false;
+        break;
+      }
+    }
+    if (isHigh) highs.push({ time: candle.time, price: candle.high });
+
+    // Check pivot low
+    let isLow = true;
+    for (let j = i - leftBars; j <= i + rightBars; j++) {
+      if (j === i) continue;
+      if (candles[j].low < candle.low) {
+        isLow = false;
+        break;
+      }
+    }
+    if (isLow) lows.push({ time: candle.time, price: candle.low });
+  }
+
+  return { highs, lows };
+}

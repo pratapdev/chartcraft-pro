@@ -11,7 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend, computePivotHighLow } from '@/lib/marketData';
 import { LineStyleType } from '@/types/trading';
 
 const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
@@ -230,6 +230,9 @@ export const CandlestickChart: React.FC = () => {
     });
     lineSeriesRefs.current.clear();
 
+    // Collect all markers to merge Supertrend + Pivot HL
+    let allMarkers: { time: Time; position: 'aboveBar' | 'belowBar'; color: string; shape: 'arrowUp' | 'arrowDown' | 'circle'; text: string }[] = [];
+
     for (const ind of indicators) {
       if (!ind.visible) continue;
 
@@ -307,7 +310,6 @@ export const CandlestickChart: React.FC = () => {
         const { line, signals } = computeSupertrend(candles, ind.period, ind.multiplier ?? 3);
         if (line.length === 0) continue;
 
-        // Split line into colored segments
         const greenData: (LineData | { time: Time; value: number })[] = [];
         const redData: (LineData | { time: Time; value: number })[] = [];
 
@@ -315,7 +317,6 @@ export const CandlestickChart: React.FC = () => {
           const pt = { time: line[i].time as Time, value: line[i].value };
           if (line[i].color === '#22c55e') {
             greenData.push(pt);
-            // Bridge: add NaN to red if previous was red
             if (i > 0 && line[i - 1].color === '#ef4444') {
               greenData.splice(greenData.length - 1, 0, { time: line[i - 1].time as Time, value: line[i - 1].value });
             }
@@ -353,18 +354,44 @@ export const CandlestickChart: React.FC = () => {
           lineSeriesRefs.current.set(ind.id + '-red', redSeries);
         }
 
-        // Add buy/sell markers on candle series
-        if (signals.length > 0 && candleSeriesRef.current) {
-          const markers = signals.map((s) => ({
+        if (signals.length > 0) {
+          allMarkers.push(...signals.map((s) => ({
             time: s.time as Time,
             position: s.direction === 'buy' ? 'belowBar' as const : 'aboveBar' as const,
             color: s.direction === 'buy' ? '#22c55e' : '#ef4444',
             shape: s.direction === 'buy' ? 'arrowUp' as const : 'arrowDown' as const,
             text: s.direction === 'buy' ? 'BUY' : 'SELL',
-          }));
-          candleSeriesRef.current.setMarkers(markers);
+          })));
         }
       }
+
+      if (ind.type === 'PIVOT_HL') {
+        const { highs, lows } = computePivotHighLow(candles, ind.period, ind.period);
+
+        // Add pivot high markers
+        allMarkers.push(...highs.map((p) => ({
+          time: p.time as Time,
+          position: 'aboveBar' as const,
+          color: ind.color || '#22c55e',
+          shape: 'circle' as const,
+          text: `H ${p.price.toFixed(2)}`,
+        })));
+
+        // Add pivot low markers
+        allMarkers.push(...lows.map((p) => ({
+          time: p.time as Time,
+          position: 'belowBar' as const,
+          color: ind.color2 || '#ef4444',
+          shape: 'circle' as const,
+          text: `L ${p.price.toFixed(2)}`,
+        })));
+      }
+    }
+
+    // Sort markers by time (required by lightweight-charts) and set on candle series
+    if (candleSeriesRef.current) {
+      allMarkers.sort((a, b) => (a.time as number) - (b.time as number));
+      candleSeriesRef.current.setMarkers(allMarkers);
     }
   }, [candles, indicators]);
 
