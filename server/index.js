@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { startBot, sendMessage } = require('./telegramBot');
 const { startMonitoring, setAlertCallback, getLatestPrices } = require('./priceMonitor');
+const { setupSyncRoutes } = require('./syncRoutes');
 const {
   getAllAlerts,
   getActiveIndicatorAlerts,
@@ -124,6 +125,9 @@ app.get('/api/prices', (req, res) => {
   res.json(getLatestPrices());
 });
 
+// ─── Sync Routes ─────────────────────────────────────────────
+setupSyncRoutes(app);
+
 // ─── Start Server ────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`
@@ -141,6 +145,8 @@ app.listen(PORT, () => {
 ║    POST /api/indicator-alerts                ║
 ║    GET  /api/logs                            ║
 ║    GET  /api/prices                          ║
+║    GET  /api/sync/state                      ║
+║    PUT  /api/sync/state                      ║
 ╚══════════════════════════════════════════════╝
   `);
 });
