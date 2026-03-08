@@ -62,6 +62,7 @@ interface ChartStore {
   removeAlert: (id: string) => void;
   clearAllAlerts: () => void;
   addAlertLog: (log: AlertLog) => void;
+  clearAlertLogs: () => void;
 
   // Indicator cross alerts
   indicatorCrossAlerts: IndicatorCrossAlert[];
@@ -250,6 +251,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   },
   clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [], indicatorThresholdAlerts: [], stochRSICrossAlerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
+  clearAlertLogs: () => set({ alertLogs: [] }),
 
   indicatorCrossAlerts: [],
   addIndicatorCrossAlert: (alert) => set((s) => ({ indicatorCrossAlerts: [...s.indicatorCrossAlerts, alert] })),
