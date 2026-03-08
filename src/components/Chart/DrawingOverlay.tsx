@@ -56,6 +56,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [isInteracting, setIsInteracting] = useState(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [, bump] = useState(0);
+  const [selectedFibId, setSelectedFibId] = useState<string | null>(null);
+  const [fibDeletePos, setFibDeletePos] = useState<{ x: number; y: number } | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
 
@@ -309,7 +311,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     const series = seriesRef.current;
     if (series) {
       for (const fib of fibonacciDrawings) {
-        renderFibLevels(ctx, fib, w, series);
+        const isSelected = selectedFibId === fib.id;
+        renderFibLevels(ctx, fib, w, series, isSelected);
       }
     }
 
@@ -319,7 +322,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings]);
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId]);
 
   useEffect(() => {
     let raf: number;
@@ -408,10 +411,12 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
-      // Cursor: check hit
+      // Cursor: check trendline hit first
       const hitId = hitTest(mx, my);
       if (hitId) {
         setSelectedTrendlineId(hitId);
+        setSelectedFibId(null);
+        setFibDeletePos(null);
         const line = trendlines.find((t) => t.id === hitId)!;
         const px = lineToPixels(line);
         if (px) {
@@ -423,9 +428,34 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setIsInteracting(true);
         e.preventDefault();
         e.stopPropagation();
-      } else {
-        setSelectedTrendlineId(null);
+        return;
       }
+
+      // Check fibonacci hit
+      const series = seriesRef.current;
+      if (series && fibonacciDrawings.length > 0) {
+        for (const fib of fibonacciDrawings) {
+          const diff = fib.endPrice - fib.startPrice;
+          for (const level of FIB_LEVELS) {
+            const price = fib.endPrice - diff * level;
+            const y = series.priceToCoordinate(price);
+            if (y !== null && Math.abs(my - (y as number)) < 8) {
+              setSelectedFibId(fib.id);
+              setSelectedTrendlineId(null);
+              // Position delete button near click
+              const midY = series.priceToCoordinate(fib.endPrice - diff * 0.5);
+              setFibDeletePos({ x: mx, y: midY !== null ? (midY as number) : my });
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          }
+        }
+      }
+
+      setSelectedTrendlineId(null);
+      setSelectedFibId(null);
+      setFibDeletePos(null);
     },
     [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
   );
@@ -575,11 +605,18 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTrendlineId) {
-        removeTrendline(selectedTrendlineId);
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedTrendlineId) removeTrendline(selectedTrendlineId);
+        if (selectedFibId) {
+          removeFibonacci(selectedFibId);
+          setSelectedFibId(null);
+          setFibDeletePos(null);
+        }
       }
       if (e.key === 'Escape') {
         setSelectedTrendlineId(null);
+        setSelectedFibId(null);
+        setFibDeletePos(null);
         drawRef.current = EMPTY_DRAW;
         measureRef.current = EMPTY_MEASURE;
         fibRef.current = EMPTY_FIB;
@@ -590,7 +627,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
+  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
   const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || (activeTool === 'cursor' && (trendlines.length > 0 || fibonacciDrawings.length > 0));
@@ -607,30 +644,51 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         style={{ right: 65, bottom: 28, pointerEvents: shouldCapture ? 'auto' : 'none' }}
         onMouseDown={(e) => {
           const { mx, my } = getPos(e.nativeEvent);
-          // In cursor mode, only capture if clicking on a trendline
+          // In cursor mode, check trendline and fib hits
           if (activeTool === 'cursor' && !hitTest(mx, my)) {
-            // Temporarily disable pointer events so the chart gets this click
-            if (eventLayerRef.current) {
-              eventLayerRef.current.style.pointerEvents = 'none';
-              // Re-dispatch the event so the chart element underneath receives it
-              const el = document.elementFromPoint(e.clientX, e.clientY);
-              if (el) {
-                el.dispatchEvent(new MouseEvent('mousedown', {
-                  clientX: e.clientX, clientY: e.clientY,
-                  bubbles: true, cancelable: true,
-                }));
-              }
-              // Re-enable on next frame
-              requestAnimationFrame(() => {
-                if (eventLayerRef.current) {
-                  eventLayerRef.current.style.pointerEvents = shouldCapture ? 'auto' : 'none';
+            // Check if clicking on a fib level
+            const series = seriesRef.current;
+            let fibHit = false;
+            if (series) {
+              for (const fib of fibonacciDrawings) {
+                const diff = fib.endPrice - fib.startPrice;
+                for (const level of FIB_LEVELS) {
+                  const price = fib.endPrice - diff * level;
+                  const y = series.priceToCoordinate(price);
+                  if (y !== null && Math.abs(my - (y as number)) < 8) {
+                    fibHit = true;
+                    handleMouseDown(e);
+                    break;
+                  }
                 }
-              });
+                if (fibHit) break;
+              }
             }
-            setSelectedTrendlineId(null);
-            return;
+            if (!fibHit) {
+              // Temporarily disable pointer events so the chart gets this click
+              if (eventLayerRef.current) {
+                eventLayerRef.current.style.pointerEvents = 'none';
+                const el = document.elementFromPoint(e.clientX, e.clientY);
+                if (el) {
+                  el.dispatchEvent(new MouseEvent('mousedown', {
+                    clientX: e.clientX, clientY: e.clientY,
+                    bubbles: true, cancelable: true,
+                  }));
+                }
+                requestAnimationFrame(() => {
+                  if (eventLayerRef.current) {
+                    eventLayerRef.current.style.pointerEvents = shouldCapture ? 'auto' : 'none';
+                  }
+                });
+              }
+              setSelectedTrendlineId(null);
+              setSelectedFibId(null);
+              setFibDeletePos(null);
+              return;
+            }
+          } else {
+            handleMouseDown(e);
           }
-          handleMouseDown(e);
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -640,6 +698,35 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           setHoverY(null);
         }}
       />
+
+      {/* Fibonacci delete button */}
+      {selectedFibId && fibDeletePos && (
+        <div
+          className="absolute z-30 flex items-center gap-1 rounded-md px-1.5 py-1 shadow-lg border"
+          style={{
+            left: `${fibDeletePos.x}px`,
+            top: `${fibDeletePos.y}px`,
+            transform: 'translate(-50%, -50%)',
+            background: 'hsl(var(--popover))',
+            borderColor: 'hsl(var(--border))',
+          }}
+        >
+          <button
+            className="flex items-center justify-center w-7 h-7 rounded transition-colors"
+            style={{ color: 'hsl(var(--destructive))' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            title="Delete Fibonacci"
+            onClick={() => {
+              removeFibonacci(selectedFibId);
+              setSelectedFibId(null);
+              setFibDeletePos(null);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      )}
     </>
   );
 };
@@ -662,6 +749,7 @@ function drawFibLines(
   endPrice: number,
   w: number,
   series: ISeriesApi<'Candlestick'>,
+  selected?: boolean,
 ) {
   const diff = endPrice - startPrice;
 
@@ -677,8 +765,8 @@ function drawFibLines(
     ctx.moveTo(0, y as number);
     ctx.lineTo(w, y as number);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = selected ? 2.5 : 1;
+    ctx.globalAlpha = selected ? 1 : 0.7;
     ctx.stroke();
     ctx.globalAlpha = 1;
 
@@ -709,8 +797,9 @@ function renderFibLevels(
   fib: FibonacciDrawing,
   w: number,
   series: ISeriesApi<'Candlestick'>,
+  selected?: boolean,
 ) {
-  drawFibLines(ctx, fib.startPrice, fib.endPrice, w, series);
+  drawFibLines(ctx, fib.startPrice, fib.endPrice, w, series, selected);
 }
 
 function renderFibPreview(
