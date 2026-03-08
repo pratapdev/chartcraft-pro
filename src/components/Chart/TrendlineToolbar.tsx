@@ -57,8 +57,23 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const series = seriesRef.current;
       if (!chart || !series || !selectedLine) return;
 
-      const x1 = chart.timeScale().timeToCoordinate(selectedLine.startTime as unknown as Time);
-      const x2 = chart.timeScale().timeToCoordinate(selectedLine.endTime as unknown as Time);
+      const timeToPixel = (t: number) => {
+        const px = chart.timeScale().timeToCoordinate(t as unknown as Time);
+        if (px !== null) return px;
+        const c = useChartStore.getState().candles;
+        if (c.length < 2) return null;
+        const lastTime = c[c.length - 1].time;
+        const interval = c[c.length - 1].time - c[c.length - 2].time;
+        const lastX = chart.timeScale().timeToCoordinate(lastTime as unknown as Time);
+        const prevX = chart.timeScale().timeToCoordinate(c[c.length - 2].time as unknown as Time);
+        if (lastX === null || prevX === null) return null;
+        const pxPerBar = lastX - prevX;
+        if (pxPerBar <= 0) return null;
+        return lastX + ((t - lastTime) / interval) * pxPerBar;
+      };
+
+      const x1 = timeToPixel(selectedLine.startTime);
+      const x2 = timeToPixel(selectedLine.endTime);
       const y1 = series.priceToCoordinate(selectedLine.startPrice);
       const y2 = series.priceToCoordinate(selectedLine.endPrice);
 
