@@ -102,21 +102,39 @@ function computeEMA(candles, period) {
 /**
  * Check all active price alerts against latest prices
  */
+// Track which alerts we've already seen the "initial" price for
+const alertInitialSide = new Map(); // alertId -> 'above' | 'below' | null
+
 function checkPriceAlerts() {
   const alerts = getActiveAlerts.all();
   for (const alert of alerts) {
     const symbol = toBinanceSymbol(alert.symbol);
     const price = latestPrices.get(symbol);
-    const prevPrice = previousPrices.get(symbol);
-    if (price == null || prevPrice == null) continue;
+    if (price == null) continue;
+
+    const key = `price_${alert.id}`;
+
+    // On first tick for this alert, record which side of the target price we're on
+    if (!alertInitialSide.has(key)) {
+      if (price > alert.target_price) alertInitialSide.set(key, 'above');
+      else if (price < alert.target_price) alertInitialSide.set(key, 'below');
+      else alertInitialSide.set(key, 'at');
+      continue; // Skip first tick — we need a baseline
+    }
+
+    const prevSide = alertInitialSide.get(key);
+    let currentSide = price > alert.target_price ? 'above' : price < alert.target_price ? 'below' : 'at';
 
     let triggered = false;
-    if (alert.condition === 'above' && prevPrice <= alert.target_price && price > alert.target_price) {
+    if (alert.condition === 'above' && prevSide !== 'above' && currentSide === 'above') {
       triggered = true;
     }
-    if (alert.condition === 'below' && prevPrice >= alert.target_price && price < alert.target_price) {
+    if (alert.condition === 'below' && prevSide !== 'below' && currentSide === 'below') {
       triggered = true;
     }
+
+    // Update the tracked side
+    alertInitialSide.set(key, currentSide);
 
     if (triggered) {
       const dir = alert.condition === 'above' ? '↑ Crossed Above' : '↓ Crossed Below';
