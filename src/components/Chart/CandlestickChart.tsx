@@ -72,9 +72,22 @@ export const CandlestickChart: React.FC = () => {
         borderColor: '#1c2333',
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 15,
       },
       handleScroll: { vertTouchDrag: false },
     });
+
+    // Track user drag to enable "Reset Chart"
+    let mouseDownOnChart = false;
+    const onMouseDown = () => { mouseDownOnChart = true; };
+    const onMouseUp = () => {
+      if (mouseDownOnChart) {
+        hasDragged.current = true;
+        mouseDownOnChart = false;
+      }
+    };
+    containerRef.current.addEventListener('mousedown', onMouseDown);
+    containerRef.current.addEventListener('mouseup', onMouseUp);
 
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#22c55e',
