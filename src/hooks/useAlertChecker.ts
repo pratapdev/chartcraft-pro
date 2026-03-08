@@ -161,6 +161,9 @@ export function useAlertChecker() {
         // Send browser notification
         sendBrowserNotification(`⚠️ ${alert.symbol} Alert`, message);
 
+        // Send Telegram notification
+        sendTelegramMessage(`⚠️ <b>${alert.symbol} Alert</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
+
         // Log the alert
         addAlertLog({
           id: crypto.randomUUID(),
