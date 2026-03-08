@@ -269,12 +269,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
-      // Update cursor
+      // Update cursor and hover state
       if (eventLayerRef.current) {
         if (activeTool === 'trendline') {
           eventLayerRef.current.style.cursor = 'crosshair';
         } else {
-          eventLayerRef.current.style.cursor = hitTest(mx, my) ? 'pointer' : '';
+          const isHit = !!hitTest(mx, my);
+          setHoveringLine(isHit);
+          eventLayerRef.current.style.cursor = isHit ? 'pointer' : '';
         }
       }
     },
