@@ -313,6 +313,10 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   addStochRSICrossAlert: (alert) => set((s) => ({ stochRSICrossAlerts: [...s.stochRSICrossAlerts, alert] })),
   removeStochRSICrossAlert: (id) => set((s) => ({ stochRSICrossAlerts: s.stochRSICrossAlerts.filter((a) => a.id !== id) })),
 
+  pctDiffDonCrossAlerts: [],
+  addPctDiffDonCrossAlert: (alert) => set((s) => ({ pctDiffDonCrossAlerts: [...s.pctDiffDonCrossAlerts, alert] })),
+  removePctDiffDonCrossAlert: (id) => set((s) => ({ pctDiffDonCrossAlerts: s.pctDiffDonCrossAlerts.filter((a) => a.id !== id) })),
+
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
   indicators: [
