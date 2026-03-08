@@ -590,6 +590,10 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       // Update cursor and hover state
+      // Check ⊕ button hover
+      const alertHover = hitAlertButton(mx, my);
+      setHoveredAlertBtn(alertHover);
+
       if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
@@ -600,11 +604,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         } else {
           const isHit = !!hitTest(mx, my);
           setHoveringLine(isHit);
-          eventLayerRef.current.style.cursor = isHit ? 'pointer' : '';
+          eventLayerRef.current.style.cursor = alertHover ? 'pointer' : isHit ? 'pointer' : '';
         }
       }
     },
-    [activeTool, hitTest, pixelToCoords, updateTrendline]
+    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton]
   );
 
   const handleMouseUp = useCallback(
