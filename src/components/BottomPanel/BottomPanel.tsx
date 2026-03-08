@@ -19,14 +19,21 @@ export const BottomPanel: React.FC = () => {
   return (
     <div className="h-24 border-t border-border bg-card overflow-y-auto">
       <div className="px-3 py-1 border-b border-border sticky top-0 bg-card">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Alert Log</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Alert Log
+        </span>
       </div>
       {alertLogs.map((log) => (
-        <div key={log.id} className="flex items-center gap-2 px-3 py-1 text-xs border-b border-border/50">
-          <AlertTriangle size={12} className="text-yellow-500 flex-shrink-0" />
+        <div
+          key={log.id}
+          className="flex items-center gap-2 px-3 py-1 text-xs border-b border-border/50"
+        >
+          <AlertTriangle size={12} className="text-destructive flex-shrink-0" />
           <span className="text-foreground flex-1">{log.message}</span>
           <span className="text-muted-foreground font-mono">{log.price.toFixed(2)}</span>
-          <span className="text-muted-foreground font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+          <span className="text-muted-foreground font-mono">
+            {new Date(log.timestamp).toLocaleTimeString()}
+          </span>
         </div>
       ))}
     </div>
