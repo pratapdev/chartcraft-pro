@@ -11,6 +11,7 @@ const SHORTCUTS: { key: string; label: string; description: string; action?: () 
   { key: 'M', label: 'M', description: 'Measure Tool' },
   { key: 'Delete', label: 'Del', description: 'Delete selected drawing' },
   { key: 'Escape', label: 'Esc', description: 'Cancel drawing / Deselect' },
+  { key: 'Ctrl+Z', label: 'Ctrl+Z', description: 'Undo last deletion' },
   { key: 'A', label: 'A', description: 'Open Alerts panel' },
   { key: 'I', label: 'I', description: 'Open Indicators panel' },
   { key: 'S', label: 'S', description: 'Open Settings panel' },
