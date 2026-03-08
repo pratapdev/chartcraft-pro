@@ -179,7 +179,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       if (adx.length > 0) {
         const adxSeries = chart.addLineSeries({
           color: indicator.color,
-          lineWidth: 2,
+          lineWidth: (indicator.lineWidth ?? 2) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
