@@ -13,6 +13,7 @@ import { useChartStore } from '@/stores/chartStore';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
+import { CrosshairLegend } from './CrosshairLegend';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +135,27 @@ export const CandlestickChart: React.FC = () => {
       store.setSelectedTrendlineId(hitId);
     });
 
+    // Subscribe to crosshair move for data legend
+    chart.subscribeCrosshairMove((param: MouseEventParams) => {
+      if (!param.time || !param.seriesData) {
+        useChartStore.getState().setCrosshairData(null);
+        return;
+      }
+      const candleData = param.seriesData.get(candleSeries) as any;
+      if (candleData && candleData.open !== undefined) {
+        useChartStore.getState().setCrosshairData({
+          time: param.time as unknown as number,
+          open: candleData.open,
+          high: candleData.high,
+          low: candleData.low,
+          close: candleData.close,
+          volume: (param.seriesData.get(volumeSeries) as any)?.value ?? 0,
+        });
+      } else {
+        useChartStore.getState().setCrosshairData(null);
+      }
+    });
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
@@ -251,6 +273,7 @@ export const CandlestickChart: React.FC = () => {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
+      <CrosshairLegend />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
     </div>

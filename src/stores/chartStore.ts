@@ -4,6 +4,15 @@ import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorCo
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 
+interface CrosshairData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 interface ChartStore {
   // Market type & Symbol & timeframe
   marketType: MarketType;
@@ -46,6 +55,10 @@ interface ChartStore {
   removeIndicator: (id: string) => void;
   toggleIndicator: (id: string) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
+
+  // Crosshair
+  crosshairData: CrosshairData | null;
+  setCrosshairData: (data: CrosshairData | null) => void;
 
   // Right sidebar
   rightPanelOpen: boolean;
@@ -169,6 +182,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     set((s) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     })),
+
+  crosshairData: null,
+  setCrosshairData: (crosshairData) => set({ crosshairData }),
 
   rightPanelOpen: false,
   rightPanelTab: 'alerts',
