@@ -692,6 +692,7 @@ function drawFibLines(
   endPrice: number,
   w: number,
   series: ISeriesApi<'Candlestick'>,
+  selected?: boolean,
 ) {
   const diff = endPrice - startPrice;
 
