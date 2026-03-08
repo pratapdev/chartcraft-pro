@@ -397,7 +397,6 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         ref={eventLayerRef}
         className="absolute top-0 left-0 z-20"
         style={{ right: 65, bottom: 28, pointerEvents: shouldCapture ? 'auto' : 'none' }}
-        style={{ pointerEvents: shouldCapture ? 'auto' : 'none' }}
         onMouseDown={(e) => {
           const { mx, my } = getPos(e.nativeEvent);
           // In cursor mode, only capture if clicking on a trendline
