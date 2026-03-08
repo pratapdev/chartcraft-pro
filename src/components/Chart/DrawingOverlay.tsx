@@ -538,6 +538,28 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (fibRef.current.phase === 'drawing') {
+        const fs = fibRef.current;
+        const dist = Math.hypot(mx - fs.startX, my - fs.startY);
+        if (dist > 10) {
+          addFibonacci({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            startTime: fs.startTime,
+            startPrice: fs.startPrice,
+            endTime: fs.currentTime,
+            endPrice: fs.currentPrice,
+            createdAt: Date.now(),
+          });
+        }
+        fibRef.current = EMPTY_FIB;
+        setActiveTool('cursor');
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
+
       if (dragRef.current) {
         dragRef.current = null;
         setIsInteracting(false);
