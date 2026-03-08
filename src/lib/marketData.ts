@@ -14,6 +14,12 @@ const SYMBOL_MAP: Record<string, string> = {
   'AVAX/USD': 'AVAXUSDT',
 };
 
+// Dynamically resolve any symbol to Binance format
+function toBinanceSymbol(symbol: string): string {
+  if (SYMBOL_MAP[symbol]) return SYMBOL_MAP[symbol];
+  // Convert "XXX/USD" → "XXXUSDT"
+  return symbol.replace('/', '').replace('USD', 'USDT');
+}
 const INTERVAL_MAP: Record<Timeframe, string> = {
   '1m': '1m',
   '5m': '5m',
