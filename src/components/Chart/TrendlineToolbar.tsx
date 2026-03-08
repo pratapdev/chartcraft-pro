@@ -278,7 +278,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
         />
         {showThickness && (
           <div
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 flex flex-col gap-1 p-2 rounded-md border shadow-xl"
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 flex flex-col gap-1 p-2 rounded-md border shadow-xl"
             style={{
               background: 'hsl(var(--popover))',
               borderColor: 'hsl(var(--border))',
