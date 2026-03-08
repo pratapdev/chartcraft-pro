@@ -162,4 +162,8 @@ export interface IndicatorConfig {
   donchianLength?: number;
   /** PCT_DIFF_DON: Donchian line diff multiplier */
   donLineDiff?: number;
+  /** MSB_OB: ZigZag length */
+  zigzagLength?: number;
+  /** MSB_OB: Fib factor for breakout confirmation */
+  fibFactor?: number;
 }
