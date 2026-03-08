@@ -3,10 +3,53 @@ import { useChartStore } from '@/stores/chartStore';
 import { checkAllCrossings } from '@/lib/crossingDetection';
 import { toast } from 'sonner';
 
+// Shared AudioContext, unlocked on first user gesture
+let sharedCtx: AudioContext | null = null;
+let unlocked = false;
+
+function getAudioContext(): AudioContext {
+  if (!sharedCtx || sharedCtx.state === 'closed') {
+    sharedCtx = new AudioContext();
+  }
+  return sharedCtx;
+}
+
+// Unlock audio on first user interaction
+function unlockAudio() {
+  if (unlocked) return;
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    // Create a silent buffer to unlock
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    unlocked = true;
+  } catch {
+    // ignore
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const events = ['click', 'touchstart', 'keydown'];
+  const handler = () => {
+    unlockAudio();
+    events.forEach((e) => document.removeEventListener(e, handler));
+  };
+  events.forEach((e) => document.addEventListener(e, handler, { once: false }));
+}
+
 // Generate alert beep sound using Web Audio API
 function playAlertSound(direction: 'above' | 'below' | 'any') {
   try {
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
@@ -15,10 +58,10 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
 
     // Different tones for different directions
     if (direction === 'above') {
-      oscillator.frequency.setValueAtTime(880, ctx.currentTime); // High A
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime);
       oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
     } else if (direction === 'below') {
-      oscillator.frequency.setValueAtTime(440, ctx.currentTime); // Low A
+      oscillator.frequency.setValueAtTime(440, ctx.currentTime);
       oscillator.frequency.setValueAtTime(330, ctx.currentTime + 0.1);
     } else {
       oscillator.frequency.setValueAtTime(660, ctx.currentTime);
@@ -28,12 +71,10 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
 
     oscillator.type = 'sine';
     gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
 
     oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.4);
-
-    oscillator.onended = () => ctx.close();
+    oscillator.stop(ctx.currentTime + 0.5);
   } catch {
     // Audio not available
   }
