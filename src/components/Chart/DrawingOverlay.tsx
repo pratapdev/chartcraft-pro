@@ -268,7 +268,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setSelectedTrendlineId(null);
       }
     },
-    [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId]
+    [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
   );
 
   const handleMouseMove = useCallback(
