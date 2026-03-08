@@ -170,18 +170,27 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
     const ds = drawRef.current;
     if (ds.phase === 'drawing') {
+      const isHoriz = activeTool === 'horizontal';
       ctx.beginPath();
-      ctx.moveTo(ds.startX, ds.startY);
-      ctx.lineTo(ds.currentX, ds.currentY);
-      ctx.strokeStyle = '#2563eb';
+      ctx.moveTo(0, ds.startY);
+      if (isHoriz) {
+        ctx.lineTo(w, ds.startY);
+        ctx.strokeStyle = '#eab308';
+      } else {
+        ctx.moveTo(ds.startX, ds.startY);
+        ctx.lineTo(ds.currentX, ds.currentY);
+        ctx.strokeStyle = '#2563eb';
+      }
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#2563eb';
-      ctx.fill();
+      if (!isHoriz) {
+        ctx.beginPath();
+        ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#2563eb';
+        ctx.fill();
+      }
     }
   }, [trendlines, selectedTrendlineId, lineToPixels]);
 
