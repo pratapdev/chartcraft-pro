@@ -169,31 +169,34 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
     }
 
-    const ds = drawRef.current;
-    if (ds.phase === 'drawing') {
-      const isHoriz = activeTool === 'horizontal';
+    // Horizontal tool hover preview
+    if (activeTool === 'horizontal' && hoverY !== null) {
       ctx.beginPath();
-      ctx.moveTo(0, ds.startY);
-      if (isHoriz) {
-        ctx.lineTo(w, ds.startY);
-        ctx.strokeStyle = '#eab308';
-      } else {
-        ctx.moveTo(ds.startX, ds.startY);
-        ctx.lineTo(ds.currentX, ds.currentY);
-        ctx.strokeStyle = '#2563eb';
-      }
+      ctx.moveTo(0, hoverY);
+      ctx.lineTo(w, hoverY);
+      ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
-      if (!isHoriz) {
-        ctx.beginPath();
-        ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#2563eb';
-        ctx.fill();
-      }
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels]);
+
+    const ds = drawRef.current;
+    if (ds.phase === 'drawing') {
+      ctx.beginPath();
+      ctx.moveTo(ds.startX, ds.startY);
+      ctx.lineTo(ds.currentX, ds.currentY);
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(ds.startX, ds.startY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#2563eb';
+      ctx.fill();
+    }
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY]);
 
   useEffect(() => {
     let raf: number;
