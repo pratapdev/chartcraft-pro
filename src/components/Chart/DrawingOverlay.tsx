@@ -76,6 +76,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     fibonacciDrawings,
     addFibonacci,
     removeFibonacci,
+    addAlert,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
