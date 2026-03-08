@@ -181,12 +181,23 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     set((s) => ({
       trendlines: s.trendlines.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     })),
-  removeTrendline: (id) =>
-    set((s) => ({
+  removeTrendline: (id) => {
+    const s = get();
+    const line = s.trendlines.find((t) => t.id === id);
+    const relatedAlerts = s.alerts.filter((a) => a.trendlineId === id);
+    if (line) {
+      undoStack.push({ type: 'trendline+alerts', trendline: line, alerts: relatedAlerts });
+      toast('Deleted', {
+        action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
+        duration: 5000,
+      });
+    }
+    set({
       trendlines: s.trendlines.filter((t) => t.id !== id),
       alerts: s.alerts.filter((a) => a.trendlineId !== id),
       selectedTrendlineId: s.selectedTrendlineId === id ? null : s.selectedTrendlineId,
-    })),
+    });
+  },
   clearAllTrendlines: () => set({ trendlines: [], selectedTrendlineId: null }),
   clearAllDrawings: () => set({ trendlines: [], fibonacciDrawings: [], selectedTrendlineId: null, alerts: [] }),
   selectedTrendlineId: null,
