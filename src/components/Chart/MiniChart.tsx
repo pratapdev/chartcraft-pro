@@ -144,8 +144,6 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     // We don't programmatically move the crosshair in v4.1.3
     // The visual sync happens via the time range sync below
   }, [syncTime]);
-  const change = last && prev ? last.close - prev.close : 0;
-  const isUp = change >= 0;
 
   return (
     <div className="flex flex-col h-full border-r border-border last:border-r-0">
