@@ -55,6 +55,7 @@ interface ChartStore {
   indicators: IndicatorConfig[];
   addIndicator: (ind: IndicatorConfig) => void;
   removeIndicator: (id: string) => void;
+  clearAllIndicators: () => void;
   toggleIndicator: (id: string) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
 
