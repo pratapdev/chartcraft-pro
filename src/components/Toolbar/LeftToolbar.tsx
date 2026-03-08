@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { DrawingTool } from '@/types/trading';
 import {
@@ -12,6 +12,7 @@ import {
   Ruler,
   GitFork,
   Activity,
+  Eraser,
 } from 'lucide-react';
 
 interface ToolButton {
@@ -30,7 +31,14 @@ export const LeftToolbar: React.FC = () => {
     setRightPanelTab,
     indicators,
     addIndicator,
+    trendlines,
+    fibonacciDrawings,
+    clearAllDrawings,
+    clearAllIndicators,
   } = useChartStore();
+
+  const [confirmDrawings, setConfirmDrawings] = useState(false);
+  const [confirmIndicators, setConfirmIndicators] = useState(false);
 
   const tools: ToolButton[] = [
     { id: 'cursor', icon: <MousePointer2 size={18} />, label: 'Cursor' },
@@ -59,6 +67,8 @@ export const LeftToolbar: React.FC = () => {
   };
 
   const hasBBands = indicators.some((i) => i.type === 'BBANDS' && i.visible);
+  const hasDrawings = trendlines.length > 0 || fibonacciDrawings.length > 0;
+  const hasIndicators = indicators.length > 0;
 
   const actions: ToolButton[] = [
     { id: 'bbands', icon: <Activity size={18} />, label: 'Bollinger Bands', action: handleToggleBBands },
@@ -104,6 +114,69 @@ export const LeftToolbar: React.FC = () => {
       ))}
 
       <div className="flex-1" />
+
+      {/* Clear all drawings */}
+      {hasDrawings && (
+        <div className="relative">
+          <button
+            onClick={() => {
+              if (confirmDrawings) {
+                clearAllDrawings();
+                setConfirmDrawings(false);
+              } else {
+                setConfirmDrawings(true);
+                setConfirmIndicators(false);
+                setTimeout(() => setConfirmDrawings(false), 3000);
+              }
+            }}
+            className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+              confirmDrawings
+                ? 'bg-destructive/15 text-destructive'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+            title={confirmDrawings ? 'Click again to confirm' : 'Delete all drawings'}
+          >
+            <Eraser size={16} />
+          </button>
+          {confirmDrawings && (
+            <div className="absolute left-10 top-0 bg-popover border border-border rounded px-2 py-1 text-[10px] text-destructive whitespace-nowrap shadow-lg z-50">
+              Click again to delete all drawings
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Clear all indicators */}
+      {hasIndicators && (
+        <div className="relative">
+          <button
+            onClick={() => {
+              if (confirmIndicators) {
+                clearAllIndicators();
+                setConfirmIndicators(false);
+              } else {
+                setConfirmIndicators(true);
+                setConfirmDrawings(false);
+                setTimeout(() => setConfirmIndicators(false), 3000);
+              }
+            }}
+            className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+              confirmIndicators
+                ? 'bg-destructive/15 text-destructive'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+            title={confirmIndicators ? 'Click again to confirm' : 'Delete all indicators'}
+          >
+            <BarChart3 size={16} className={confirmIndicators ? '' : 'opacity-60'} />
+            <Trash2 size={8} className="absolute bottom-1 right-1" />
+          </button>
+          {confirmIndicators && (
+            <div className="absolute left-10 top-0 bg-popover border border-border rounded px-2 py-1 text-[10px] text-destructive whitespace-nowrap shadow-lg z-50">
+              Click again to delete all indicators
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Delete selected */}
       {selectedTrendlineId && (

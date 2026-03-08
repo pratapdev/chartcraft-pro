@@ -11,6 +11,7 @@ const SHORTCUTS: { key: string; label: string; description: string; action?: () 
   { key: 'M', label: 'M', description: 'Measure Tool' },
   { key: 'Delete', label: 'Del', description: 'Delete selected drawing' },
   { key: 'Escape', label: 'Esc', description: 'Cancel drawing / Deselect' },
+  { key: 'Ctrl+Z', label: 'Ctrl+Z', description: 'Undo last deletion' },
   { key: 'A', label: 'A', description: 'Open Alerts panel' },
   { key: 'I', label: 'I', description: 'Open Indicators panel' },
   { key: 'S', label: 'S', description: 'Open Settings panel' },
@@ -63,7 +64,14 @@ export const KeyboardShortcuts: React.FC = () => {
       if (key === 'i') { store.setRightPanelTab('indicators'); return; }
       if (key === 's') { store.setRightPanelTab('settings'); return; }
 
-      // Delete
+      // Undo
+      if (key === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        store.undoLastDeletion();
+        return;
+      }
+
+      // Escape
       if (e.key === 'Escape') {
         store.setActiveTool('cursor');
         store.setSelectedTrendlineId(null);

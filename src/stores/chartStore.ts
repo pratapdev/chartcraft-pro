@@ -3,6 +3,17 @@ import { persist } from 'zustand/middleware';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
+import { toast } from 'sonner';
+
+interface UndoEntry {
+  type: 'trendline' | 'alert' | 'trendline+alerts';
+  trendline?: Trendline;
+  alert?: Alert;
+  trendlines?: Trendline[];
+  alerts?: Alert[];
+}
+
+const undoStack: UndoEntry[] = [];
 
 interface CrosshairData {
   time: number;
@@ -75,6 +86,9 @@ interface ChartStore {
   rightPanelTab: 'alerts' | 'indicators' | 'settings';
   setRightPanelOpen: (open: boolean) => void;
   setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings') => void;
+
+  // Undo
+  undoLastDeletion: () => void;
 
   // Multi-timeframe
   multiTfMode: boolean;
@@ -167,12 +181,23 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     set((s) => ({
       trendlines: s.trendlines.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     })),
-  removeTrendline: (id) =>
-    set((s) => ({
+  removeTrendline: (id) => {
+    const s = get();
+    const line = s.trendlines.find((t) => t.id === id);
+    const relatedAlerts = s.alerts.filter((a) => a.trendlineId === id);
+    if (line) {
+      undoStack.push({ type: 'trendline+alerts', trendline: line, alerts: relatedAlerts });
+      toast('Deleted', {
+        action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
+        duration: 5000,
+      });
+    }
+    set({
       trendlines: s.trendlines.filter((t) => t.id !== id),
       alerts: s.alerts.filter((a) => a.trendlineId !== id),
       selectedTrendlineId: s.selectedTrendlineId === id ? null : s.selectedTrendlineId,
-    })),
+    });
+  },
   clearAllTrendlines: () => set({ trendlines: [], selectedTrendlineId: null }),
   clearAllDrawings: () => set({ trendlines: [], fibonacciDrawings: [], selectedTrendlineId: null, alerts: [] }),
   selectedTrendlineId: null,
@@ -181,7 +206,17 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   alerts: [],
   alertLogs: [],
   addAlert: (alert) => set((s) => ({ alerts: [...s.alerts, alert] })),
-  removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
+  removeAlert: (id) => {
+    const alert = get().alerts.find((a) => a.id === id);
+    if (alert) {
+      undoStack.push({ type: 'alert', alert });
+      toast('Alert deleted', {
+        action: { label: 'Undo', onClick: () => get().undoLastDeletion() },
+        duration: 5000,
+      });
+    }
+    set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
+  },
   clearAllAlerts: () => set({ alerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
@@ -212,6 +247,21 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   rightPanelTab: 'alerts',
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
   setRightPanelTab: (rightPanelTab) => set({ rightPanelTab, rightPanelOpen: true }),
+
+  undoLastDeletion: () => {
+    const entry = undoStack.pop();
+    if (!entry) return;
+    if (entry.type === 'trendline+alerts' && entry.trendline) {
+      set((s) => ({
+        trendlines: [...s.trendlines, entry.trendline!],
+        alerts: [...s.alerts, ...(entry.alerts ?? [])],
+      }));
+      toast.success('Restored');
+    } else if (entry.type === 'alert' && entry.alert) {
+      set((s) => ({ alerts: [...s.alerts, entry.alert!] }));
+      toast.success('Alert restored');
+    }
+  },
 
   multiTfMode: false,
   setMultiTfMode: (multiTfMode) => set({ multiTfMode }),

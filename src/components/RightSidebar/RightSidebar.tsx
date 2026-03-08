@@ -39,7 +39,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
           <button onClick={() => toggleIndicator(ind.id)} className="text-muted-foreground hover:text-foreground">
             {ind.visible ? <Eye size={12} /> : <EyeOff size={12} />}
           </button>
-          <button onClick={() => removeIndicator(ind.id)} className="text-muted-foreground hover:text-destructive">
+          <button onClick={() => { if (window.confirm(`Remove ${ind.type}(${ind.period})?`)) removeIndicator(ind.id); }} className="text-muted-foreground hover:text-destructive">
             <Trash2 size={12} />
           </button>
         </div>
