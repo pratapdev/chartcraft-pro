@@ -866,6 +866,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           if (dragRef.current) { dragRef.current = null; setIsInteracting(false); }
           setHoveringLine(false);
           setHoverY(null);
+          crosshairMouseY.current = null;
+          crosshairPrice.current = null;
+          setHoveredCrosshairBtn(false);
         }}
       />
 
