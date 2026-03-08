@@ -284,8 +284,16 @@ const SettingsPanel: React.FC = () => {
   return (
     <div className="space-y-3 text-xs text-muted-foreground p-1">
       <div>
-        <p className="font-semibold text-foreground mb-1">Trendlines</p>
-        <p>{trendlines.length} line(s) drawn</p>
+        <p className="font-semibold text-foreground mb-1">Drawings</p>
+        <p>{trendlines.length} line(s), {fibonacciDrawings.length} fibonacci</p>
+        {(trendlines.length > 0 || fibonacciDrawings.length > 0) && (
+          <button
+            onClick={clearAllDrawings}
+            className="mt-1 text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+          >
+            Delete All Drawings
+          </button>
+        )}
       </div>
       <div>
         <p className="font-semibold text-foreground mb-1">Shortcuts</p>
