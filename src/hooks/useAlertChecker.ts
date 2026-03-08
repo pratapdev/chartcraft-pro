@@ -86,6 +86,10 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
 function getIndicatorValues(ind: IndicatorConfig, candles: { time: number; open: number; high: number; low: number; close: number; volume: number }[]): { time: number; value: number }[] {
   if (ind.type === 'EMA') return computeEMA(candles, ind.period);
   if (ind.type === 'SMA') return computeSMA(candles, ind.period);
+  if (ind.type === 'RSI') return computeRSI(candles, ind.period);
+  if (ind.type === 'ATR') return computeATR(candles, ind.period);
+  if (ind.type === 'OBV') return computeOBV(candles);
+  if (ind.type === 'ADX') return computeADX(candles, ind.period).adx;
   return [];
 }
 
@@ -95,9 +99,13 @@ function getIndicatorLabel(ind: IndicatorConfig): string {
 
 export function useAlertChecker() {
   const { candles, alerts, trendlines, addAlertLog, indicators, indicatorCrossAlerts } = useChartStore();
+  const indicatorThresholdAlerts = useChartStore((s) => s.indicatorThresholdAlerts);
+  const stochRSICrossAlerts = useChartStore((s) => s.stochRSICrossAlerts);
   const prevCloseRef = useRef<number | null>(null);
   const triggeredSetRef = useRef<Set<string>>(new Set());
   const crossTriggeredRef = useRef<Set<string>>(new Set());
+  const thresholdTriggeredRef = useRef<Set<string>>(new Set());
+  const stochTriggeredRef = useRef<Set<string>>(new Set());
 
   // Trendline alerts
   useEffect(() => {
