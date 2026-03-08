@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 
@@ -49,7 +50,7 @@ interface ChartStore {
   setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings') => void;
 }
 
-export const useChartStore = create<ChartStore>((set, get) => ({
+export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   symbol: 'BTC/USD',
   timeframe: '1h',
   setSymbol: (symbol) => {
@@ -142,4 +143,14 @@ export const useChartStore = create<ChartStore>((set, get) => ({
   rightPanelTab: 'alerts',
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
   setRightPanelTab: (rightPanelTab) => set({ rightPanelTab, rightPanelOpen: true }),
+}), {
+  name: 'chart-store',
+  partialize: (state) => ({
+    trendlines: state.trendlines,
+    alerts: state.alerts,
+    alertLogs: state.alertLogs,
+    indicators: state.indicators,
+    symbol: state.symbol,
+    timeframe: state.timeframe,
+  }),
 }));
