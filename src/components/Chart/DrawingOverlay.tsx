@@ -271,7 +271,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
       // Update cursor and hover state
       if (eventLayerRef.current) {
-        if (activeTool === 'trendline') {
+        if (activeTool === 'trendline' || activeTool === 'horizontal') {
           eventLayerRef.current.style.cursor = 'crosshair';
         } else {
           const isHit = !!hitTest(mx, my);
