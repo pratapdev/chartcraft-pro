@@ -252,6 +252,7 @@ export const CandlestickChart: React.FC = () => {
           color: ind.color,
           lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           lineStyle: toLWLineStyle(ind.lineStyle),
+          priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
