@@ -113,6 +113,11 @@ interface ChartStore {
   // Multi-timeframe
   multiTfMode: boolean;
   setMultiTfMode: (v: boolean) => void;
+
+  // Background alert candle data (keyed by "symbol:timeframe")
+  alertCandles: Record<string, Candle[]>;
+  setAlertCandles: (key: string, candles: Candle[]) => void;
+  updateAlertCandle: (key: string, candle: Candle) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
