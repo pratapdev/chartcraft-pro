@@ -12,6 +12,9 @@ import {
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend } from '@/lib/marketData';
+import { LineStyleType } from '@/types/trading';
+
+const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
