@@ -187,6 +187,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         const adxSeries = chart.addLineSeries({
           color: indicator.color,
           lineWidth: (indicator.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+          lineStyle: toLWLineStyle(indicator.lineStyle),
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
