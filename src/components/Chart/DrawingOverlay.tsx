@@ -304,7 +304,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         ctx.fill();
       }
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY]);
+
+    // Render persisted Fibonacci drawings
+    const series = seriesRef.current;
+    if (series) {
+      for (const fib of fibonacciDrawings) {
+        renderFibLevels(ctx, fib, w, series);
+      }
+    }
+
+    // Render in-progress Fibonacci drawing
+    const fs = fibRef.current;
+    if (fs.phase === 'drawing' && series) {
+      const tempFib: FibDrawState = fs;
+      renderFibPreview(ctx, tempFib, w, series);
+    }
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings]);
 
   useEffect(() => {
     let raf: number;
