@@ -884,9 +884,12 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
+            <CompoundAlertForm />
             <IndicatorCrossAlertForm />
             <StochRSICrossAlertForm />
             <IndicatorThresholdAlertForm />
+            <CompoundAlertsList />
+            <AlertTemplatesSection />
             <div className="flex items-center justify-between px-1">
               <p className="text-xs text-muted-foreground">
                 {(() => {
