@@ -10,6 +10,7 @@ import {
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD } from '@/lib/marketData';
+import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
 interface IndicatorPaneProps {
