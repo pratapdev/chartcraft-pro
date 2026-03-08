@@ -360,6 +360,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
     indicator.type === 'ADX' ? `ADX(${indicator.period})` :
+    indicator.type === 'PCT_DIFF_DON' ? `%Diff Don(${indicator.period},${indicator.lookbackWindow ?? 10})` :
     `${indicator.type}(${indicator.period})`;
 
   const [height, setHeight] = useState(120);
