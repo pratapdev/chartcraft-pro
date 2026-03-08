@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline } from '@/types/trading';
+import { Trendline, FibonacciDrawing } from '@/types/trading';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
