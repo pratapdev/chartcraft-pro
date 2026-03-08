@@ -173,6 +173,8 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       alerts: s.alerts.filter((a) => a.trendlineId !== id),
       selectedTrendlineId: s.selectedTrendlineId === id ? null : s.selectedTrendlineId,
     })),
+  clearAllTrendlines: () => set({ trendlines: [], selectedTrendlineId: null }),
+  clearAllDrawings: () => set({ trendlines: [], fibonacciDrawings: [], selectedTrendlineId: null, alerts: [] }),
   selectedTrendlineId: null,
   setSelectedTrendlineId: (id) => set({ selectedTrendlineId: id }),
 
