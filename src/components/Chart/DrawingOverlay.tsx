@@ -57,6 +57,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [, bump] = useState(0);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
+  const fibRef = useRef<FibDrawState>(EMPTY_FIB);
 
   const {
     activeTool,
