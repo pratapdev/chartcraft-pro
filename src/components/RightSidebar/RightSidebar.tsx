@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft } from 'lucide-react';
-import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType } from '@/types/trading';
+import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 
 const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial<IndicatorConfig> }[] = [
