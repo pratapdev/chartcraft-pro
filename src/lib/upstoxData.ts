@@ -12,6 +12,8 @@ export function saveUpstoxCredentials(apiKey: string, accessToken: string) {
   localStorage.setItem('upstox-api-key', apiKey.trim());
   localStorage.setItem('upstox-access-token', accessToken.trim());
 }
+
+export interface IndianStock {
   name: string;
   label: string;
   instrumentKey: string;
