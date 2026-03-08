@@ -85,12 +85,20 @@ export const KeyboardShortcuts: React.FC = () => {
           store.removeTrendline(store.selectedTrendlineId);
           return;
         }
+        if (store.selectedIndicatorId) {
+          const ind = store.indicators.find((i) => i.id === store.selectedIndicatorId);
+          if (ind && window.confirm(`Remove ${ind.type}(${ind.period})?`)) {
+            store.removeIndicator(store.selectedIndicatorId);
+          }
+          return;
+        }
       }
 
       // Escape
       if (e.key === 'Escape') {
         store.setActiveTool('cursor');
         store.setSelectedTrendlineId(null);
+        store.setSelectedIndicatorId(null);
       }
     };
 
