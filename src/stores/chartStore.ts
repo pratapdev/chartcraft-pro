@@ -66,10 +66,15 @@ interface ChartStore {
   setCrosshairData: (data: CrosshairData | null) => void;
 
   // Right sidebar
+  // Right sidebar
   rightPanelOpen: boolean;
   rightPanelTab: 'alerts' | 'indicators' | 'settings';
   setRightPanelOpen: (open: boolean) => void;
   setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings') => void;
+
+  // Multi-timeframe
+  multiTfMode: boolean;
+  setMultiTfMode: (v: boolean) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
