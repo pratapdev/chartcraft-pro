@@ -247,6 +247,7 @@ export const RightSidebar: React.FC = () => {
       dPeriod: preset.defaults.dPeriod,
       color2: preset.defaults.color2,
       stdDev: preset.defaults.stdDev,
+      multiplier: preset.defaults.multiplier,
     });
     setShowAdd(false);
   };
