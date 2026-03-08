@@ -22,6 +22,7 @@ export const CandlestickChart: React.FC = () => {
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  const chartSync = useChartSync();
 
   const { candles, indicators, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
