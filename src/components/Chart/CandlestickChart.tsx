@@ -21,7 +21,6 @@ export const CandlestickChart: React.FC = () => {
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
   const chartSync = useChartSync();
   const hasDragged = useRef(false);
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
