@@ -363,6 +363,18 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     }
     return { alertCandles: { ...s.alertCandles, [key]: copy } };
   }),
+
+  drawingDefaults: {
+    trendline: { color: '#2563eb', thickness: 2, lineStyle: 'solid' as LineStyleType },
+    horizontal: { color: '#eab308', thickness: 2, lineStyle: 'solid' as LineStyleType },
+    alertLine: { color: '#eab308', thickness: 2, lineStyle: 'solid' as LineStyleType },
+  },
+  setDrawingDefault: (type, updates) => set((s) => ({
+    drawingDefaults: {
+      ...s.drawingDefaults,
+      [type]: { ...s.drawingDefaults[type], ...updates },
+    },
+  })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
@@ -378,5 +390,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     timeframe: state.timeframe,
     marketType: state.marketType,
     chartFontSize: state.chartFontSize,
+    drawingDefaults: state.drawingDefaults,
   }),
 }));
