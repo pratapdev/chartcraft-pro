@@ -917,8 +917,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
               startPrice: price,
               endTime,
               endPrice: price,
-              color: '#eab308',
-              thickness: 2,
+              color: useChartStore.getState().drawingDefaults.alertLine.color,
+              thickness: useChartStore.getState().drawingDefaults.alertLine.thickness,
+              lineStyle: useChartStore.getState().drawingDefaults.alertLine.lineStyle,
               createdAt: Date.now(),
             });
             addAlert({
