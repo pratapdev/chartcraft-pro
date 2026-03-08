@@ -410,10 +410,12 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
-      // Cursor: check hit
+      // Cursor: check trendline hit first
       const hitId = hitTest(mx, my);
       if (hitId) {
         setSelectedTrendlineId(hitId);
+        setSelectedFibId(null);
+        setFibDeletePos(null);
         const line = trendlines.find((t) => t.id === hitId)!;
         const px = lineToPixels(line);
         if (px) {
@@ -425,9 +427,34 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setIsInteracting(true);
         e.preventDefault();
         e.stopPropagation();
-      } else {
-        setSelectedTrendlineId(null);
+        return;
       }
+
+      // Check fibonacci hit
+      const series = seriesRef.current;
+      if (series && fibonacciDrawings.length > 0) {
+        for (const fib of fibonacciDrawings) {
+          const diff = fib.endPrice - fib.startPrice;
+          for (const level of FIB_LEVELS) {
+            const price = fib.endPrice - diff * level;
+            const y = series.priceToCoordinate(price);
+            if (y !== null && Math.abs(my - (y as number)) < 8) {
+              setSelectedFibId(fib.id);
+              setSelectedTrendlineId(null);
+              // Position delete button near click
+              const midY = series.priceToCoordinate(fib.endPrice - diff * 0.5);
+              setFibDeletePos({ x: mx, y: midY !== null ? (midY as number) : my });
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          }
+        }
+      }
+
+      setSelectedTrendlineId(null);
+      setSelectedFibId(null);
+      setFibDeletePos(null);
     },
     [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
   );
