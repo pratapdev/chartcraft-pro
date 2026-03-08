@@ -1,6 +1,6 @@
 import React from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands } from '@/lib/marketData';
 
 export const CrosshairLegend: React.FC = () => {
   const { crosshairData, candles, indicators } = useChartStore();
