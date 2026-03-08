@@ -63,6 +63,7 @@ interface ChartStore {
   fibonacciDrawings: FibonacciDrawing[];
   addFibonacci: (fib: FibonacciDrawing) => void;
   removeFibonacci: (id: string) => void;
+  clearAllDrawings: () => void;
 
   // Crosshair
   crosshairData: CrosshairData | null;
