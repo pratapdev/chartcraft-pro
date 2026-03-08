@@ -114,6 +114,10 @@ interface ChartStore {
   multiTfMode: boolean;
   setMultiTfMode: (v: boolean) => void;
 
+  // Chart font size
+  chartFontSize: number;
+  setChartFontSize: (size: number) => void;
+
   // Background alert candle data (keyed by "symbol:timeframe")
   alertCandles: Record<string, Candle[]>;
   setAlertCandles: (key: string, candles: Candle[]) => void;
