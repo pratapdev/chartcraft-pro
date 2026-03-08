@@ -50,7 +50,7 @@ interface ChartStore {
   setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings') => void;
 }
 
-export const useChartStore = create<ChartStore>((set, get) => ({
+export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   symbol: 'BTC/USD',
   timeframe: '1h',
   setSymbol: (symbol) => {
