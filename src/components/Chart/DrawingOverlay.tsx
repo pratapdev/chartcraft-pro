@@ -668,10 +668,19 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      // Update crosshair position for "+" button
+      crosshairMouseY.current = my;
+      const coords = pixelToCoords(mx, my);
+      crosshairPrice.current = coords ? coords.price : null;
+
       // Update cursor and hover state
       // Check ⊕ button hover
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
+
+      // Check crosshair alert button hover
+      const crosshairBtnHover = hitCrosshairAlertBtn(mx, my);
+      setHoveredCrosshairBtn(crosshairBtnHover);
 
       if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
@@ -683,11 +692,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         } else {
           const isHit = !!hitTest(mx, my);
           setHoveringLine(isHit);
-          eventLayerRef.current.style.cursor = alertHover ? 'pointer' : isHit ? 'pointer' : '';
+          eventLayerRef.current.style.cursor = (alertHover || crosshairBtnHover) ? 'pointer' : isHit ? 'pointer' : '';
         }
       }
     },
-    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton]
+    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton, hitCrosshairAlertBtn]
   );
 
   const handleMouseUp = useCallback(
