@@ -199,6 +199,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     return { mx: e.clientX - rect.left, my: e.clientY - rect.top };
   };
 
+  const [hoveringLine, setHoveringLine] = useState(false);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
