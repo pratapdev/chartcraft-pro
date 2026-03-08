@@ -75,7 +75,7 @@ const UpstoxCredentialsForm: React.FC = () => {
 };
 
 export const TopBar: React.FC = () => {
-  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType } = useChartStore();
+  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore();
   const [showSymbols, setShowSymbols] = useState(false);
   const [showMarketDropdown, setShowMarketDropdown] = useState(false);
   const [search, setSearch] = useState('');
