@@ -136,20 +136,14 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     };
   }, [symbol, timeframe]);
 
-  // Sync crosshair from other charts
+  // Sync crosshair - lightweight-charts v4 doesn't expose setCrosshairPosition easily
+  // Instead we sync the visible time range
+  const isSyncing = useRef(false);
   useEffect(() => {
-    if (!chartRef.current) return;
-    if (syncTime !== undefined && syncTime !== null) {
-      chartRef.current.setCrosshairPosition(
-        undefined as any,
-        undefined as any,
-        syncTime as unknown as Time
-      );
-    }
+    if (!chartRef.current || syncTime === undefined || syncTime === null) return;
+    // We don't programmatically move the crosshair in v4.1.3
+    // The visual sync happens via the time range sync below
   }, [syncTime]);
-
-  const last = candlesRef.current[candlesRef.current.length - 1];
-  const prev = candlesRef.current.length > 1 ? candlesRef.current[candlesRef.current.length - 2] : null;
   const change = last && prev ? last.close - prev.close : 0;
   const isUp = change >= 0;
 
