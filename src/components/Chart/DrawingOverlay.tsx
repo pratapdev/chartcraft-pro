@@ -46,12 +46,51 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const chart = chartRef.current;
       const series = seriesRef.current;
       if (!chart || !series) return null;
-      const time = chart.timeScale().coordinateToTime(x);
       const price = series.coordinateToPrice(y);
-      if (time === null || price === null) return null;
+      if (price === null) return null;
+
+      let time = chart.timeScale().coordinateToTime(x);
+      if (time === null) {
+        // Extrapolate into the future using the last two candles' spacing
+        const { candles: c } = useChartStore.getState();
+        if (c.length < 2) return null;
+        const lastTime = c[c.length - 1].time;
+        const interval = c[c.length - 1].time - c[c.length - 2].time;
+        const lastX = chart.timeScale().timeToCoordinate(lastTime as unknown as Time);
+        if (lastX === null) return null;
+        const pxPerBar = (() => {
+          const prevX = chart.timeScale().timeToCoordinate(c[c.length - 2].time as unknown as Time);
+          if (prevX === null) return 10;
+          return lastX - prevX;
+        })();
+        if (pxPerBar <= 0) return null;
+        const barsAhead = (x - lastX) / pxPerBar;
+        time = (lastTime + Math.round(barsAhead) * interval) as unknown as Time;
+      }
       return { time: time as unknown as number, price: price as number };
     },
     [chartRef, seriesRef]
+  );
+
+  const timeToPixel = useCallback(
+    (t: number) => {
+      const chart = chartRef.current;
+      if (!chart) return null;
+      const px = chart.timeScale().timeToCoordinate(t as unknown as Time);
+      if (px !== null) return px;
+      // Extrapolate for future times
+      const { candles: c } = useChartStore.getState();
+      if (c.length < 2) return null;
+      const lastTime = c[c.length - 1].time;
+      const interval = c[c.length - 1].time - c[c.length - 2].time;
+      const lastX = chart.timeScale().timeToCoordinate(lastTime as unknown as Time);
+      const prevX = chart.timeScale().timeToCoordinate(c[c.length - 2].time as unknown as Time);
+      if (lastX === null || prevX === null) return null;
+      const pxPerBar = lastX - prevX;
+      if (pxPerBar <= 0) return null;
+      return lastX + ((t - lastTime) / interval) * pxPerBar;
+    },
+    [chartRef]
   );
 
   const lineToPixels = useCallback(
@@ -59,14 +98,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const chart = chartRef.current;
       const series = seriesRef.current;
       if (!chart || !series) return null;
-      const x1 = chart.timeScale().timeToCoordinate(line.startTime as unknown as Time);
-      const x2 = chart.timeScale().timeToCoordinate(line.endTime as unknown as Time);
+      const x1 = timeToPixel(line.startTime);
+      const x2 = timeToPixel(line.endTime);
       const y1 = series.priceToCoordinate(line.startPrice);
       const y2 = series.priceToCoordinate(line.endPrice);
       if (x1 === null || x2 === null || y1 === null || y2 === null) return null;
       return { x1, y1: y1 as number, x2, y2: y2 as number };
     },
-    [chartRef, seriesRef]
+    [chartRef, seriesRef, timeToPixel]
   );
 
   const hitTest = useCallback(
