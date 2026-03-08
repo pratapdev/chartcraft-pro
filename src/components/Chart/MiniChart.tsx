@@ -12,14 +12,17 @@ import { Candle, Timeframe } from '@/types/trading';
 import { fetchCandles } from '@/lib/marketData';
 import { computeEMA } from '@/lib/marketData';
 
+const ALL_TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1D', '1W'];
+
 interface MiniChartProps {
   symbol: string;
   timeframe: Timeframe;
   onCrosshairMove?: (time: number | null) => void;
   syncTime?: number | null;
+  onTimeframeChange?: (tf: Timeframe) => void;
 }
 
-export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime }) => {
+export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<Candle[]>([]);
@@ -155,7 +158,19 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
   return (
     <div className="flex flex-col h-full border-r border-border last:border-r-0">
       <div className="flex items-center gap-2 px-2 py-1 border-b border-border bg-card text-xs">
-        <span className="font-semibold text-foreground">{timeframe}</span>
+        {onTimeframeChange ? (
+          <select
+            value={timeframe}
+            onChange={(e) => onTimeframeChange(e.target.value as Timeframe)}
+            className="bg-accent text-foreground text-xs font-semibold rounded px-1 py-0.5 outline-none cursor-pointer border-none"
+          >
+            {ALL_TIMEFRAMES.map((tf) => (
+              <option key={tf} value={tf}>{tf}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="font-semibold text-foreground">{timeframe}</span>
+        )}
         <span className="text-muted-foreground">{symbol}</span>
       </div>
       <div ref={containerRef} className="flex-1" />
