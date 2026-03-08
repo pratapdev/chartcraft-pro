@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig } from '@/types/trading';
-import { generateCandleData } from '@/lib/sampleData';
+import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 
 interface ChartStore {
   // Symbol & timeframe
@@ -11,7 +11,13 @@ interface ChartStore {
 
   // Candle data
   candles: Candle[];
-  loadCandles: () => void;
+  loading: boolean;
+  connected: boolean;
+  loadCandles: () => Promise<void>;
+  updateLastCandle: (candle: Candle) => void;
+  unsubscribe: (() => void) | null;
+  startLiveUpdates: () => void;
+  stopLiveUpdates: () => void;
 
   // Drawing
   activeTool: DrawingTool;
@@ -48,17 +54,54 @@ export const useChartStore = create<ChartStore>((set, get) => ({
   timeframe: '1h',
   setSymbol: (symbol) => {
     set({ symbol });
-    get().loadCandles();
+    get().stopLiveUpdates();
+    get().loadCandles().then(() => get().startLiveUpdates());
   },
   setTimeframe: (timeframe) => {
     set({ timeframe });
-    get().loadCandles();
+    get().stopLiveUpdates();
+    get().loadCandles().then(() => get().startLiveUpdates());
   },
 
   candles: [],
-  loadCandles: () => {
-    const candles = generateCandleData(500);
-    set({ candles });
+  loading: false,
+  connected: false,
+  unsubscribe: null,
+
+  loadCandles: async () => {
+    const { symbol, timeframe } = get();
+    set({ loading: true });
+    const candles = await fetchCandles(symbol, timeframe, 500);
+    set({ candles, loading: false });
+  },
+
+  updateLastCandle: (candle: Candle) => {
+    set((s) => {
+      const candles = [...s.candles];
+      const lastIdx = candles.length - 1;
+      if (lastIdx >= 0 && candles[lastIdx].time === candle.time) {
+        // Update existing candle
+        candles[lastIdx] = candle;
+      } else {
+        // New candle
+        candles.push(candle);
+      }
+      return { candles };
+    });
+  },
+
+  startLiveUpdates: () => {
+    const { symbol, timeframe, updateLastCandle } = get();
+    const unsub = subscribeToCandles(symbol, timeframe, (candle) => {
+      updateLastCandle(candle);
+    });
+    set({ unsubscribe: unsub, connected: true });
+  },
+
+  stopLiveUpdates: () => {
+    const { unsubscribe } = get();
+    if (unsubscribe) unsubscribe();
+    set({ unsubscribe: null, connected: false });
   },
 
   activeTool: 'cursor',

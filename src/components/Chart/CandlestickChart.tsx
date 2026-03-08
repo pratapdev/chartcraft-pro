@@ -1,7 +1,15 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, LineData, Time } from 'lightweight-charts';
+import {
+  createChart,
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+  HistogramData,
+  LineData,
+  Time,
+} from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { computeEMA, computeSMA } from '@/lib/sampleData';
+import { computeEMA, computeSMA } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 
 export const CandlestickChart: React.FC = () => {
@@ -11,16 +19,18 @@ export const CandlestickChart: React.FC = () => {
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
 
-  const { candles, indicators, loadCandles } = useChartStore();
+  const { candles, indicators, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
+  // Load data and start live feed
   useEffect(() => {
-    loadCandles();
-  }, [loadCandles]);
+    loadCandles().then(() => startLiveUpdates());
+    return () => stopLiveUpdates();
+  }, []);
 
-  const initChart = useCallback(() => {
+  // Initialize chart
+  useEffect(() => {
     if (!containerRef.current) return;
 
-    // Clean up existing
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
@@ -80,7 +90,6 @@ export const CandlestickChart: React.FC = () => {
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
 
-    // Resize observer
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
@@ -90,13 +99,11 @@ export const CandlestickChart: React.FC = () => {
     return () => {
       ro.disconnect();
       chart.remove();
+      chartRef.current = null;
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    const cleanup = initChart();
-    return cleanup;
-  }, [initChart]);
 
   // Update candle data
   useEffect(() => {
@@ -124,9 +131,10 @@ export const CandlestickChart: React.FC = () => {
   useEffect(() => {
     if (!chartRef.current || candles.length === 0) return;
 
-    // Remove old line series
     lineSeriesRefs.current.forEach((series) => {
-      try { chartRef.current?.removeSeries(series); } catch {}
+      try {
+        chartRef.current?.removeSeries(series);
+      } catch {}
     });
     lineSeriesRefs.current.clear();
 
@@ -136,7 +144,6 @@ export const CandlestickChart: React.FC = () => {
       let data: { time: number; value: number }[] = [];
       if (ind.type === 'EMA') data = computeEMA(candles, ind.period);
       if (ind.type === 'SMA') data = computeSMA(candles, ind.period);
-
       if (data.length === 0) continue;
 
       const series = chartRef.current.addLineSeries({
@@ -147,7 +154,9 @@ export const CandlestickChart: React.FC = () => {
         crosshairMarkerVisible: false,
       });
 
-      series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+      series.setData(
+        data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]
+      );
       lineSeriesRefs.current.set(ind.id, series);
     }
   }, [candles, indicators]);
@@ -155,7 +164,7 @@ export const CandlestickChart: React.FC = () => {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      <DrawingOverlay chartRef={chartRef} />
+      <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
     </div>
   );
 };
