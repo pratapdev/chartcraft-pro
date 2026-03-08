@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send } from 'lucide-react';
+import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft } from 'lucide-react';
 import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 
