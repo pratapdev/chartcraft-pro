@@ -866,6 +866,10 @@ export const RightSidebar: React.FC = () => {
       color2: preset.defaults.color2,
       stdDev: preset.defaults.stdDev,
       multiplier: preset.defaults.multiplier,
+      lookbackWindow: (preset.defaults as any).lookbackWindow,
+      emaSmoothing: (preset.defaults as any).emaSmoothing,
+      donchianLength: (preset.defaults as any).donchianLength,
+      donLineDiff: (preset.defaults as any).donLineDiff,
     });
     setShowAdd(false);
   };

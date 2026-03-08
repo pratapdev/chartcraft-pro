@@ -585,3 +585,96 @@ export function computePivotHighLow(
 
   return { highs, lows };
 }
+
+// Compute Percentage Diff with Donchian Channels
+export function computePctDiffDonchian(
+  candles: Candle[],
+  emaPeriod: number,
+  lookbackWindow: number,
+  emaSmoothing: number,
+  donchianLength: number,
+  donLineDiff: number,
+): {
+  pctDiff: { time: number; value: number; color: string }[];
+  emaLine: { time: number; value: number }[];
+  basis: { time: number; value: number }[];
+  upper: { time: number; value: number }[];
+  lower: { time: number; value: number }[];
+  upperNew: { time: number; value: number }[];
+  lowerNew: { time: number; value: number }[];
+} {
+  const empty = { pctDiff: [], emaLine: [], basis: [], upper: [], lower: [], upperNew: [], lowerNew: [] };
+  if (candles.length < emaPeriod + lookbackWindow) return empty;
+
+  // Step 1: Compute EMA of close
+  const emaValues: number[] = [];
+  const k = 2 / (emaPeriod + 1);
+  let emaVal = candles[0].close;
+  emaValues.push(emaVal);
+  for (let i = 1; i < candles.length; i++) {
+    emaVal = candles[i].close * k + emaVal * (1 - k);
+    emaValues.push(emaVal);
+  }
+
+  // Step 2: Compute lookback average of EMA and percentage diff
+  const pctDiffValues: number[] = new Array(candles.length).fill(NaN);
+  for (let i = lookbackWindow - 1; i < candles.length; i++) {
+    let sum = 0;
+    for (let j = i - lookbackWindow + 1; j <= i; j++) {
+      sum += emaValues[j];
+    }
+    const avg = sum / lookbackWindow;
+    pctDiffValues[i] = avg === 0 ? 0 : ((emaValues[i] - avg) / avg) * 100;
+  }
+
+  // Step 3: Build pctDiff output with colors
+  const pctDiff: { time: number; value: number; color: string }[] = [];
+  const validPctDiff: { time: number; value: number }[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (!isNaN(pctDiffValues[i])) {
+      const v = Math.round(pctDiffValues[i] * 1000) / 1000;
+      pctDiff.push({
+        time: candles[i].time,
+        value: v,
+        color: v > 0 ? '#22c55e' : '#ef4444',
+      });
+      validPctDiff.push({ time: candles[i].time, value: v });
+    }
+  }
+
+  // Step 4: EMA of percentage diff (smoothing line)
+  const emaLine: { time: number; value: number }[] = [];
+  if (validPctDiff.length > emaSmoothing) {
+    const k2 = 2 / (emaSmoothing + 1);
+    let smoothEma = validPctDiff[0].value;
+    emaLine.push({ time: validPctDiff[0].time, value: Math.round(smoothEma * 1000) / 1000 });
+    for (let i = 1; i < validPctDiff.length; i++) {
+      smoothEma = validPctDiff[i].value * k2 + smoothEma * (1 - k2);
+      emaLine.push({ time: validPctDiff[i].time, value: Math.round(smoothEma * 1000) / 1000 });
+    }
+  }
+
+  // Step 5: Donchian channels on pctDiff
+  const basis: { time: number; value: number }[] = [];
+  const upper: { time: number; value: number }[] = [];
+  const lower: { time: number; value: number }[] = [];
+  const upperNew: { time: number; value: number }[] = [];
+  const lowerNew: { time: number; value: number }[] = [];
+
+  for (let i = donchianLength - 1; i < validPctDiff.length; i++) {
+    let hi = -Infinity, lo = Infinity;
+    for (let j = i - donchianLength + 1; j <= i; j++) {
+      hi = Math.max(hi, validPctDiff[j].value);
+      lo = Math.min(lo, validPctDiff[j].value);
+    }
+    const t = validPctDiff[i].time;
+    const mid = (hi + lo) / 2;
+    basis.push({ time: t, value: Math.round(mid * 1000) / 1000 });
+    upper.push({ time: t, value: Math.round(hi * 1000) / 1000 });
+    lower.push({ time: t, value: Math.round(lo * 1000) / 1000 });
+    upperNew.push({ time: t, value: Math.round((hi - hi * donLineDiff) * 1000) / 1000 });
+    lowerNew.push({ time: t, value: Math.round((lo - lo * donLineDiff) * 1000) / 1000 });
+  }
+
+  return { pctDiff, emaLine, basis, upper, lower, upperNew, lowerNew };
+}
