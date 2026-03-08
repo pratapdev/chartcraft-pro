@@ -324,25 +324,20 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
       if (drawRef.current.phase === 'drawing') {
         const ds = drawRef.current;
-        const isHorizontal = activeTool === 'horizontal';
         const dist = Math.hypot(mx - ds.startX, my - ds.startY);
-        if (isHorizontal || dist > 10) {
+        if (dist > 10) {
           const start = pixelToCoords(ds.startX, ds.startY);
-          const end = isHorizontal ? null : pixelToCoords(mx, my);
-          if (start && (isHorizontal || end)) {
-            const { candles: c } = useChartStore.getState();
-            const endTime = isHorizontal
-              ? (c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : start.time + 86400)
-              : end!.time;
+          const end = pixelToCoords(mx, my);
+          if (start && end) {
             addTrendline({
               id: crypto.randomUUID(),
               symbol,
               timeframe,
-              startTime: isHorizontal ? (c.length > 0 ? c[0].time : start.time) : start.time,
+              startTime: start.time,
               startPrice: start.price,
-              endTime,
-              endPrice: isHorizontal ? start.price : end!.price,
-              color: isHorizontal ? '#eab308' : '#2563eb',
+              endTime: end.time,
+              endPrice: end.price,
+              color: '#2563eb',
               thickness: 2,
               createdAt: Date.now(),
             });
