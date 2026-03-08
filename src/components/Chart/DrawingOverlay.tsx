@@ -338,7 +338,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively interacting
-  const shouldCapture = activeTool === 'trendline' || isInteracting;
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'cursor' || isInteracting;
 
   return (
     <>
