@@ -14,6 +14,12 @@ const SYMBOL_MAP: Record<string, string> = {
   'AVAX/USD': 'AVAXUSDT',
 };
 
+// Dynamically resolve any symbol to Binance format
+function toBinanceSymbol(symbol: string): string {
+  if (SYMBOL_MAP[symbol]) return SYMBOL_MAP[symbol];
+  // Convert "XXX/USD" → "XXXUSDT"
+  return symbol.replace('/', '').replace('USD', 'USDT');
+}
 const INTERVAL_MAP: Record<Timeframe, string> = {
   '1m': '1m',
   '5m': '5m',
@@ -29,7 +35,7 @@ export async function fetchCandles(
   timeframe: Timeframe,
   limit: number = 500
 ): Promise<Candle[]> {
-  const binanceSymbol = SYMBOL_MAP[symbol] || 'BTCUSDT';
+  const binanceSymbol = toBinanceSymbol(symbol);
   const interval = INTERVAL_MAP[timeframe];
 
   try {
@@ -59,7 +65,7 @@ export function subscribeToCandles(
   timeframe: Timeframe,
   onUpdate: (candle: Candle) => void
 ): () => void {
-  const binanceSymbol = (SYMBOL_MAP[symbol] || 'BTCUSDT').toLowerCase();
+  const binanceSymbol = toBinanceSymbol(symbol).toLowerCase();
   const interval = INTERVAL_MAP[timeframe];
   const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@kline_${interval}`;
 
