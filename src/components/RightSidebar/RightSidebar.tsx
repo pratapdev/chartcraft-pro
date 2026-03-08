@@ -465,6 +465,8 @@ export const RightSidebar: React.FC = () => {
     trendlines,
     fibonacciDrawings,
     clearAllDrawings,
+    indicatorCrossAlerts,
+    removeIndicatorCrossAlert,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
