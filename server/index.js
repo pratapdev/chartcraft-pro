@@ -125,6 +125,9 @@ app.get('/api/prices', (req, res) => {
   res.json(getLatestPrices());
 });
 
+// ─── Sync Routes ─────────────────────────────────────────────
+setupSyncRoutes(app);
+
 // ─── Start Server ────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`
@@ -142,6 +145,8 @@ app.listen(PORT, () => {
 ║    POST /api/indicator-alerts                ║
 ║    GET  /api/logs                            ║
 ║    GET  /api/prices                          ║
+║    GET  /api/sync/state                      ║
+║    PUT  /api/sync/state                      ║
 ╚══════════════════════════════════════════════╝
   `);
 });
