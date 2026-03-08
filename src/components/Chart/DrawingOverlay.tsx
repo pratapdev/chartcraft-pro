@@ -208,8 +208,36 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1.5;
           ctx.stroke();
-        }
       }
+
+      // ⊕ Alert button for horizontal lines (startPrice === endPrice)
+      const isHorizontal = Math.abs(line.startPrice - line.endPrice) < 0.0001;
+      if (isHorizontal) {
+        const btnX = w - 80; // Position near the right price scale
+        const btnY = px.y1;
+        const btnR = 10;
+        const isHovered = hoveredAlertBtn === line.id;
+
+        // Circle background
+        ctx.beginPath();
+        ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
+        ctx.fillStyle = isHovered ? '#2563eb' : 'rgba(37, 99, 235, 0.7)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Plus icon
+        ctx.beginPath();
+        ctx.moveTo(btnX - 5, btnY);
+        ctx.lineTo(btnX + 5, btnY);
+        ctx.moveTo(btnX, btnY - 5);
+        ctx.lineTo(btnX, btnY + 5);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
     }
 
     // Horizontal tool hover preview
