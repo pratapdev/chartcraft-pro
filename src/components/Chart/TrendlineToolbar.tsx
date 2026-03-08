@@ -22,6 +22,11 @@ interface Props {
 
 const COLORS = ['#2563eb', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 const THICKNESSES = [1, 2, 3, 4];
+const LINE_STYLES: { value: LineStyleType; label: string; dash: number[] }[] = [
+  { value: 'solid', label: 'Solid', dash: [] },
+  { value: 'dashed', label: 'Dashed', dash: [6, 4] },
+  { value: 'dotted', label: 'Dotted', dash: [2, 2] },
+];
 
 export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const {
