@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 
@@ -55,6 +55,11 @@ interface ChartStore {
   removeIndicator: (id: string) => void;
   toggleIndicator: (id: string) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
+
+  // Fibonacci
+  fibonacciDrawings: FibonacciDrawing[];
+  addFibonacci: (fib: FibonacciDrawing) => void;
+  removeFibonacci: (id: string) => void;
 
   // Crosshair
   crosshairData: CrosshairData | null;
@@ -183,6 +188,10 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     })),
 
+  fibonacciDrawings: [],
+  addFibonacci: (fib) => set((s) => ({ fibonacciDrawings: [...s.fibonacciDrawings, fib] })),
+  removeFibonacci: (id) => set((s) => ({ fibonacciDrawings: s.fibonacciDrawings.filter((f) => f.id !== id) })),
+
   crosshairData: null,
   setCrosshairData: (crosshairData) => set({ crosshairData }),
 
@@ -197,6 +206,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     alerts: state.alerts,
     alertLogs: state.alertLogs,
     indicators: state.indicators,
+    fibonacciDrawings: state.fibonacciDrawings,
     symbol: state.symbol,
     timeframe: state.timeframe,
     marketType: state.marketType,

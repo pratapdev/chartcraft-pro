@@ -24,7 +24,18 @@ export interface Trendline {
   createdAt: number;
 }
 
-export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'ray' | 'measure';
+export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'ray' | 'measure' | 'fibonacci';
+
+export interface FibonacciDrawing {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  startTime: number;
+  startPrice: number;
+  endTime: number;
+  endPrice: number;
+  createdAt: number;
+}
 
 export type AlertCondition = 'cross_above' | 'cross_below' | 'cross_any';
 

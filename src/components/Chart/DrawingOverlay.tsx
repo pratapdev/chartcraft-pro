@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline } from '@/types/trading';
+import { Trendline, FibonacciDrawing } from '@/types/trading';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -21,6 +21,26 @@ interface MeasureState {
 }
 const EMPTY_MEASURE: MeasureState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
 
+interface FibDrawState {
+  phase: 'idle' | 'drawing';
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+  startPrice: number; currentPrice: number;
+  startTime: number; currentTime: number;
+}
+const EMPTY_FIB: FibDrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIB_COLORS: Record<number, string> = {
+  0: '#787b86',
+  0.236: '#f44336',
+  0.382: '#ff9800',
+  0.5: '#4caf50',
+  0.618: '#089981',
+  0.786: '#00bcd4',
+  1: '#787b86',
+};
+
 export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventLayerRef = useRef<HTMLDivElement>(null);
@@ -37,6 +57,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [, bump] = useState(0);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
+  const fibRef = useRef<FibDrawState>(EMPTY_FIB);
 
   const {
     activeTool,
@@ -49,6 +70,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     setSelectedTrendlineId,
     symbol,
     timeframe,
+    fibonacciDrawings,
+    addFibonacci,
+    removeFibonacci,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
@@ -280,7 +304,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         ctx.fill();
       }
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY]);
+
+    // Render persisted Fibonacci drawings
+    const series = seriesRef.current;
+    if (series) {
+      for (const fib of fibonacciDrawings) {
+        renderFibLevels(ctx, fib, w, series);
+      }
+    }
+
+    // Render in-progress Fibonacci drawing
+    const fs = fibRef.current;
+    if (fs.phase === 'drawing' && series) {
+      const tempFib: FibDrawState = fs;
+      renderFibPreview(ctx, tempFib, w, series);
+    }
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings]);
 
   useEffect(() => {
     let raf: number;
@@ -332,6 +371,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
         bump((n) => n + 1);
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (activeTool === 'fibonacci') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          fibRef.current = {
+            phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my,
+            startPrice: coords.price, currentPrice: coords.price,
+            startTime: coords.time, currentTime: coords.time,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -393,6 +448,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (fibRef.current.phase === 'drawing') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          fibRef.current = { ...fibRef.current, currentX: mx, currentY: my, currentPrice: coords.price, currentTime: coords.time };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
       if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
@@ -418,7 +482,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       // Update cursor and hover state
-      if (activeTool === 'horizontal' || activeTool === 'measure') {
+      if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
@@ -474,6 +538,28 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (fibRef.current.phase === 'drawing') {
+        const fs = fibRef.current;
+        const dist = Math.hypot(mx - fs.startX, my - fs.startY);
+        if (dist > 10) {
+          addFibonacci({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            startTime: fs.startTime,
+            startPrice: fs.startPrice,
+            endTime: fs.currentTime,
+            endPrice: fs.currentPrice,
+            createdAt: Date.now(),
+          });
+        }
+        fibRef.current = EMPTY_FIB;
+        setActiveTool('cursor');
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
+
       if (dragRef.current) {
         dragRef.current = null;
         setIsInteracting(false);
@@ -492,6 +578,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         setSelectedTrendlineId(null);
         drawRef.current = EMPTY_DRAW;
         measureRef.current = EMPTY_MEASURE;
+        fibRef.current = EMPTY_FIB;
         setActiveTool('cursor');
         setIsInteracting(false);
         bump((n) => n + 1);
@@ -502,7 +589,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || (activeTool === 'cursor' && (trendlines.length > 0 || fibonacciDrawings.length > 0));
 
   return (
     <>
@@ -563,4 +650,84 @@ function ptLineDist(px: number, py: number, x1: number, y1: number, x2: number, 
   else if (param > 1) { xx = x2; yy = y2; }
   else { xx = x1 + param * C; yy = y1 + param * D; }
   return Math.hypot(px - xx, py - yy);
+}
+
+function drawFibLines(
+  ctx: CanvasRenderingContext2D,
+  startPrice: number,
+  endPrice: number,
+  w: number,
+  series: ISeriesApi<'Candlestick'>,
+) {
+  const diff = endPrice - startPrice;
+
+  for (const level of FIB_LEVELS) {
+    const price = endPrice - diff * level;
+    const y = series.priceToCoordinate(price);
+    if (y === null) continue;
+
+    const color = FIB_COLORS[level] ?? '#787b86';
+
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(0, y as number);
+    ctx.lineTo(w, y as number);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.7;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Fill between levels
+    const nextIdx = FIB_LEVELS.indexOf(level) + 1;
+    if (nextIdx < FIB_LEVELS.length) {
+      const nextPrice = endPrice - diff * FIB_LEVELS[nextIdx];
+      const nextY = series.priceToCoordinate(nextPrice);
+      if (nextY !== null) {
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.04;
+        ctx.fillRect(0, Math.min(y as number, nextY as number), w, Math.abs((y as number) - (nextY as number)));
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Label
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(`${(level * 100).toFixed(1)}%  ${price.toFixed(2)}`, 8, (y as number) - 4);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function renderFibLevels(
+  ctx: CanvasRenderingContext2D,
+  fib: FibonacciDrawing,
+  w: number,
+  series: ISeriesApi<'Candlestick'>,
+) {
+  drawFibLines(ctx, fib.startPrice, fib.endPrice, w, series);
+}
+
+function renderFibPreview(
+  ctx: CanvasRenderingContext2D,
+  fs: FibDrawState,
+  w: number,
+  series: ISeriesApi<'Candlestick'>,
+) {
+  drawFibLines(ctx, fs.startPrice, fs.currentPrice, w, series);
+
+  // Draw the diagonal reference line
+  const y1 = series.priceToCoordinate(fs.startPrice);
+  const y2 = series.priceToCoordinate(fs.currentPrice);
+  if (y1 !== null && y2 !== null) {
+    ctx.beginPath();
+    ctx.moveTo(fs.startX, y1 as number);
+    ctx.lineTo(fs.currentX, y2 as number);
+    ctx.strokeStyle = '#787b86';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
