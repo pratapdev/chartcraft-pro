@@ -370,9 +370,22 @@ export const RightSidebar: React.FC = () => {
               <div key={alert.id} className="panel-section rounded p-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
-                  <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 size={12} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) };
+                        removeAlert(alert.id);
+                        useChartStore.getState().addAlert(updated);
+                      }}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    >
+                      <Send size={10} />
+                    </button>
+                    <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · ${alert.message ?? ''}</div>
               </div>

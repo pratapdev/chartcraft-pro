@@ -161,8 +161,10 @@ export function useAlertChecker() {
         // Send browser notification
         sendBrowserNotification(`⚠️ ${alert.symbol} Alert`, message);
 
-        // Send Telegram notification
-        sendTelegramMessage(`⚠️ <b>${alert.symbol} Alert</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
+        // Send Telegram notification (if enabled for this alert)
+        if (alert.telegramEnabled !== false) {
+          sendTelegramMessage(`⚠️ <b>${alert.symbol} Alert</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
+        }
 
         // Log the alert
         addAlertLog({
