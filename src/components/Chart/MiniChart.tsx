@@ -175,7 +175,19 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
         ) : (
           <span className="font-semibold text-foreground">{timeframe}</span>
         )}
-        <span className="text-muted-foreground">{symbol}</span>
+        {onSymbolChange ? (
+          <select
+            value={symbol}
+            onChange={(e) => onSymbolChange(e.target.value)}
+            className="bg-accent text-muted-foreground text-[10px] rounded px-1 py-0.5 outline-none cursor-pointer border-none max-w-[90px]"
+          >
+            {(availableSymbols || CRYPTO_SYMBOLS).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-muted-foreground">{symbol}</span>
+        )}
       </div>
       <div ref={containerRef} className="flex-1" />
     </div>
