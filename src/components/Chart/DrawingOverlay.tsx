@@ -199,6 +199,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     return { mx: e.clientX - rect.left, my: e.clientY - rect.top };
   };
 
+  const [hoveringLine, setHoveringLine] = useState(false);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
@@ -267,12 +269,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
-      // Update cursor
+      // Update cursor and hover state
       if (eventLayerRef.current) {
         if (activeTool === 'trendline') {
           eventLayerRef.current.style.cursor = 'crosshair';
         } else {
-          eventLayerRef.current.style.cursor = hitTest(mx, my) ? 'pointer' : '';
+          const isHit = !!hitTest(mx, my);
+          setHoveringLine(isHit);
+          eventLayerRef.current.style.cursor = isHit ? 'pointer' : '';
         }
       }
     },
@@ -337,24 +341,51 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
 
-  // Event layer should capture when: drawing tool active, or actively interacting
-  const shouldCapture = activeTool === 'trendline' || isInteracting;
+  // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
+  const shouldCapture = activeTool === 'trendline' || isInteracting || (activeTool === 'cursor' && trendlines.length > 0);
 
   return (
     <>
       {/* Render-only canvas - never captures events */}
       <canvas ref={canvasRef} className="absolute inset-0 z-10 pointer-events-none" />
 
-      {/* Event capture layer - only active during drawing/dragging */}
+      {/* Event capture layer */}
       <div
         ref={eventLayerRef}
         className="absolute inset-0 z-20"
         style={{ pointerEvents: shouldCapture ? 'auto' : 'none' }}
-        onMouseDown={handleMouseDown}
+        onMouseDown={(e) => {
+          const { mx, my } = getPos(e.nativeEvent);
+          // In cursor mode, only capture if clicking on a trendline
+          if (activeTool === 'cursor' && !hitTest(mx, my)) {
+            // Temporarily disable pointer events so the chart gets this click
+            if (eventLayerRef.current) {
+              eventLayerRef.current.style.pointerEvents = 'none';
+              // Re-dispatch the event so the chart element underneath receives it
+              const el = document.elementFromPoint(e.clientX, e.clientY);
+              if (el) {
+                el.dispatchEvent(new MouseEvent('mousedown', {
+                  clientX: e.clientX, clientY: e.clientY,
+                  bubbles: true, cancelable: true,
+                }));
+              }
+              // Re-enable on next frame
+              requestAnimationFrame(() => {
+                if (eventLayerRef.current) {
+                  eventLayerRef.current.style.pointerEvents = shouldCapture ? 'auto' : 'none';
+                }
+              });
+            }
+            setSelectedTrendlineId(null);
+            return;
+          }
+          handleMouseDown(e);
+        }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => {
           if (dragRef.current) { dragRef.current = null; setIsInteracting(false); }
+          setHoveringLine(false);
         }}
       />
     </>
