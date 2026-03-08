@@ -248,6 +248,21 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
   setRightPanelTab: (rightPanelTab) => set({ rightPanelTab, rightPanelOpen: true }),
 
+  undoLastDeletion: () => {
+    const entry = undoStack.pop();
+    if (!entry) return;
+    if (entry.type === 'trendline+alerts' && entry.trendline) {
+      set((s) => ({
+        trendlines: [...s.trendlines, entry.trendline!],
+        alerts: [...s.alerts, ...(entry.alerts ?? [])],
+      }));
+      toast.success('Restored');
+    } else if (entry.type === 'alert' && entry.alert) {
+      set((s) => ({ alerts: [...s.alerts, entry.alert!] }));
+      toast.success('Alert restored');
+    }
+  },
+
   multiTfMode: false,
   setMultiTfMode: (multiTfMode) => set({ multiTfMode }),
 }), {
