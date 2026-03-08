@@ -9,7 +9,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD, computeADX } from '@/lib/marketData';
+import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR } from '@/lib/marketData';
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
