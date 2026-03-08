@@ -61,7 +61,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX';
 
 export interface IndicatorConfig {
   id: string;

@@ -9,7 +9,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD } from '@/lib/marketData';
+import { computeRSI, computeStochRSI, computeMACD, computeADX } from '@/lib/marketData';
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
@@ -174,6 +174,44 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
+    if (indicator.type === 'ADX') {
+      const { adx, plusDI, minusDI } = computeADX(candles, indicator.period);
+      if (adx.length > 0) {
+        const adxSeries = chart.addLineSeries({
+          color: indicator.color,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        adxSeries.setData(adx.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+
+        const plusSeries = chart.addLineSeries({
+          color: '#22c55e',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        plusSeries.setData(plusDI.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+
+        const minusSeries = chart.addLineSeries({
+          color: '#ef4444',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        minusSeries.setData(minusDI.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+
+        // Reference lines at 20 and 40
+        const ref20 = chart.addLineSeries({ color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        ref20.setData(adx.map((d) => ({ time: d.time as Time, value: 20 })) as LineData[]);
+        const ref40 = chart.addLineSeries({ color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        ref40.setData(adx.map((d) => ({ time: d.time as Time, value: 40 })) as LineData[]);
+      }
+    }
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
@@ -207,6 +245,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
+    indicator.type === 'ADX' ? `ADX(${indicator.period})` :
     `${indicator.type}(${indicator.period})`;
 
   const [height, setHeight] = useState(120);
