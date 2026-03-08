@@ -81,6 +81,11 @@ interface ChartStore {
   addStochRSICrossAlert: (alert: StochRSICrossAlert) => void;
   removeStochRSICrossAlert: (id: string) => void;
 
+  // PctDiffDon cross alerts
+  pctDiffDonCrossAlerts: PctDiffDonCrossAlert[];
+  addPctDiffDonCrossAlert: (alert: PctDiffDonCrossAlert) => void;
+  removePctDiffDonCrossAlert: (id: string) => void;
+
   // Indicators
   selectedIndicatorId: string | null;
   setSelectedIndicatorId: (id: string | null) => void;
