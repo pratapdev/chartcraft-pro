@@ -123,7 +123,7 @@ export const LeftToolbar: React.FC = () => {
           key={action.id}
           onClick={action.action}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            action.id === 'bbands' && hasBBands
+            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL)
               ? 'bg-primary/15 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}
