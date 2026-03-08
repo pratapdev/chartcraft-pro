@@ -114,7 +114,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON';
 
 export interface IndicatorConfig {
   id: string;
@@ -136,4 +136,12 @@ export interface IndicatorConfig {
   stdDev?: number;
   /** ATR multiplier for Supertrend */
   multiplier?: number;
+  /** PCT_DIFF_DON: lookback window for EMA average */
+  lookbackWindow?: number;
+  /** PCT_DIFF_DON: EMA smoothing period for the percentage diff line */
+  emaSmoothing?: number;
+  /** PCT_DIFF_DON: Donchian channel length */
+  donchianLength?: number;
+  /** PCT_DIFF_DON: Donchian line diff multiplier */
+  donLineDiff?: number;
 }
