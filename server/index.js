@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { startBot, sendMessage } = require('./telegramBot');
 const { startMonitoring, setAlertCallback, getLatestPrices } = require('./priceMonitor');
+const { setupSyncRoutes } = require('./syncRoutes');
 const {
   getAllAlerts,
   getActiveIndicatorAlerts,
