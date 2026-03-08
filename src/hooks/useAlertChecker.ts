@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { checkAllCrossings } from '@/lib/crossingDetection';
 import { toast } from 'sonner';
+import { sendTelegramMessage } from '@/lib/telegram';
 
 // Shared AudioContext, unlocked on first user gesture
 let sharedCtx: AudioContext | null = null;
