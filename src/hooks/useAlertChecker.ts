@@ -144,11 +144,13 @@ export function useAlertChecker() {
   const indicatorCrossAlerts = useChartStore((s) => s.indicatorCrossAlerts);
   const indicatorThresholdAlerts = useChartStore((s) => s.indicatorThresholdAlerts);
   const stochRSICrossAlerts = useChartStore((s) => s.stochRSICrossAlerts);
+  const pctDiffDonCrossAlerts = useChartStore((s) => s.pctDiffDonCrossAlerts);
 
   const triggeredSetRef = useRef<Set<string>>(new Set());
   const crossTriggeredRef = useRef<Set<string>>(new Set());
   const thresholdTriggeredRef = useRef<Set<string>>(new Set());
   const stochTriggeredRef = useRef<Set<string>>(new Set());
+  const pctDiffTriggeredRef = useRef<Set<string>>(new Set());
 
   // Trendline alerts — check per-symbol candles
   useEffect(() => {
