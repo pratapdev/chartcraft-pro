@@ -258,6 +258,8 @@ const QuickPriceAlert: React.FC = () => {
 
 const SettingsPanel: React.FC = () => {
   const trendlines = useChartStore((s) => s.trendlines);
+  const fibonacciDrawings = useChartStore((s) => s.fibonacciDrawings);
+  const clearAllDrawings = useChartStore((s) => s.clearAllDrawings);
   const stored = getTelegramCredentials();
   const [botToken, setBotToken] = useState(stored.botToken);
   const [chatId, setChatId] = useState(stored.chatId);
