@@ -41,7 +41,7 @@ export const CandlestickChart: React.FC = () => {
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
-      lineSeriesRefs.current.clear();
+      clearLineSeries();
     }
 
     const chart = createChart(containerRef.current, {
