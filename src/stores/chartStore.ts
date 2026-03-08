@@ -39,6 +39,7 @@ interface ChartStore {
   addTrendline: (line: Trendline) => void;
   updateTrendline: (id: string, updates: Partial<Trendline>) => void;
   removeTrendline: (id: string) => void;
+  clearAllTrendlines: () => void;
   selectedTrendlineId: string | null;
   setSelectedTrendlineId: (id: string | null) => void;
 
