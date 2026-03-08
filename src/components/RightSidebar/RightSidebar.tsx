@@ -968,6 +968,7 @@ export const RightSidebar: React.FC = () => {
             <IndicatorCrossAlertForm />
             <StochRSICrossAlertForm />
             <IndicatorThresholdAlertForm />
+            <PctDiffDonCrossAlertForm />
             <CompoundAlertsList />
             <AlertTemplatesSection />
             <div className="flex items-center justify-between px-1">
