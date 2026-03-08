@@ -251,8 +251,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.beginPath();
       ctx.moveTo(0, hoverY);
       ctx.lineTo(w, hoverY);
-      ctx.strokeStyle = '#eab308';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = useChartStore.getState().drawingDefaults.horizontal.color;
+      ctx.lineWidth = useChartStore.getState().drawingDefaults.horizontal.thickness;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
@@ -445,8 +445,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
             startPrice: coords.price,
             endTime,
             endPrice: coords.price,
-            color: '#eab308',
-            thickness: 2,
+            color: useChartStore.getState().drawingDefaults.horizontal.color,
+            thickness: useChartStore.getState().drawingDefaults.horizontal.thickness,
+            lineStyle: useChartStore.getState().drawingDefaults.horizontal.lineStyle,
             createdAt: Date.now(),
           });
         }
@@ -648,8 +649,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
               startPrice: start.price,
               endTime: end.time,
               endPrice: end.price,
-              color: '#2563eb',
-              thickness: 2,
+              color: useChartStore.getState().drawingDefaults.trendline.color,
+              thickness: useChartStore.getState().drawingDefaults.trendline.thickness,
+              lineStyle: useChartStore.getState().drawingDefaults.trendline.lineStyle,
               createdAt: Date.now(),
             });
           }
@@ -719,8 +721,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         startPrice: price,
         endTime,
         endPrice: price,
-        color: '#eab308',
-        thickness: 2,
+        color: useChartStore.getState().drawingDefaults.alertLine.color,
+        thickness: useChartStore.getState().drawingDefaults.alertLine.thickness,
+        lineStyle: useChartStore.getState().drawingDefaults.alertLine.lineStyle,
         createdAt: Date.now(),
       });
       addAlert({
@@ -914,8 +917,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
               startPrice: price,
               endTime,
               endPrice: price,
-              color: '#eab308',
-              thickness: 2,
+              color: useChartStore.getState().drawingDefaults.alertLine.color,
+              thickness: useChartStore.getState().drawingDefaults.alertLine.thickness,
+              lineStyle: useChartStore.getState().drawingDefaults.alertLine.lineStyle,
               createdAt: Date.now(),
             });
             addAlert({

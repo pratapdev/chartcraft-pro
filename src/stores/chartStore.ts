@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, LineStyleType } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
@@ -123,6 +123,14 @@ interface ChartStore {
   alertCandles: Record<string, Candle[]>;
   setAlertCandles: (key: string, candles: Candle[]) => void;
   updateAlertCandle: (key: string, candle: Candle) => void;
+
+  // Drawing defaults
+  drawingDefaults: {
+    trendline: { color: string; thickness: number; lineStyle: LineStyleType };
+    horizontal: { color: string; thickness: number; lineStyle: LineStyleType };
+    alertLine: { color: string; thickness: number; lineStyle: LineStyleType };
+  };
+  setDrawingDefault: (type: 'trendline' | 'horizontal' | 'alertLine', updates: Partial<{ color: string; thickness: number; lineStyle: LineStyleType }>) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
@@ -355,6 +363,18 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     }
     return { alertCandles: { ...s.alertCandles, [key]: copy } };
   }),
+
+  drawingDefaults: {
+    trendline: { color: '#2563eb', thickness: 2, lineStyle: 'solid' as LineStyleType },
+    horizontal: { color: '#eab308', thickness: 2, lineStyle: 'solid' as LineStyleType },
+    alertLine: { color: '#eab308', thickness: 2, lineStyle: 'solid' as LineStyleType },
+  },
+  setDrawingDefault: (type, updates) => set((s) => ({
+    drawingDefaults: {
+      ...s.drawingDefaults,
+      [type]: { ...s.drawingDefaults[type], ...updates },
+    },
+  })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
@@ -370,5 +390,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     timeframe: state.timeframe,
     marketType: state.marketType,
     chartFontSize: state.chartFontSize,
+    drawingDefaults: state.drawingDefaults,
   }),
 }));

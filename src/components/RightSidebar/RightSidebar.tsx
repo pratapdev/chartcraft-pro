@@ -457,6 +457,69 @@ const IndicatorThresholdAlertForm: React.FC = () => {
   );
 };
 
+const LINE_STYLE_OPTIONS: { value: LineStyleType; label: string }[] = [
+  { value: 'solid', label: '━━━' },
+  { value: 'dashed', label: '╌╌╌' },
+  { value: 'dotted', label: '···' },
+];
+
+const COLOR_PALETTE = ['#2563eb', '#eab308', '#22c55e', '#ef4444', '#a855f7', '#f97316', '#06b6d4', '#ec4899', '#ffffff', '#6b7280'];
+
+const DrawingDefaultRow: React.FC<{
+  label: string;
+  type: 'trendline' | 'horizontal' | 'alertLine';
+}> = ({ label, type }) => {
+  const defaults = useChartStore((s) => s.drawingDefaults[type]);
+  const setDefault = useChartStore((s) => s.setDrawingDefault);
+
+  return (
+    <div className="space-y-1.5 panel-section rounded p-2">
+      <div className="text-[10px] font-medium text-foreground uppercase tracking-wide">{label}</div>
+      <div className="flex items-center justify-between">
+        <label className="text-muted-foreground">Color</label>
+        <div className="flex items-center gap-1">
+          {COLOR_PALETTE.map((c) => (
+            <button
+              key={c}
+              onClick={() => setDefault(type, { color: c })}
+              className={`w-4 h-4 rounded-full border transition-transform ${defaults.color === c ? 'border-foreground scale-125' : 'border-transparent hover:scale-110'}`}
+              style={{ background: c }}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <label className="text-muted-foreground">Width</label>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4].map((w) => (
+            <button
+              key={w}
+              onClick={() => setDefault(type, { thickness: w })}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${defaults.thickness === w ? 'bg-accent' : 'hover:bg-accent/50'}`}
+            >
+              <div className="rounded-full" style={{ width: 14, height: w, background: defaults.color }} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <label className="text-muted-foreground">Style</label>
+        <div className="flex items-center gap-1">
+          {LINE_STYLE_OPTIONS.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setDefault(type, { lineStyle: s.value })}
+              className={`px-2 py-0.5 rounded text-[10px] transition-colors ${defaults.lineStyle === s.value ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50'}`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SettingsPanel: React.FC = () => {
   const trendlines = useChartStore((s) => s.trendlines);
   const fibonacciDrawings = useChartStore((s) => s.fibonacciDrawings);
@@ -526,6 +589,16 @@ const SettingsPanel: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <div className="border-t border-border pt-3">
+        <p className="font-semibold text-foreground mb-2">Drawing Defaults</p>
+        <div className="space-y-2">
+          <DrawingDefaultRow label="Trendline" type="trendline" />
+          <DrawingDefaultRow label="Horizontal Line" type="horizontal" />
+          <DrawingDefaultRow label="Alert Line (from crosshair +)" type="alertLine" />
+        </div>
+      </div>
+
       <div className="border-t border-border pt-3">
         <p className="font-semibold text-foreground mb-1">Drawings</p>
         <p>{trendlines.length} line(s), {fibonacciDrawings.length} fibonacci</p>
@@ -600,7 +673,6 @@ const SettingsPanel: React.FC = () => {
     </div>
   );
 };
-
 export const RightSidebar: React.FC = () => {
   const {
     rightPanelOpen,
