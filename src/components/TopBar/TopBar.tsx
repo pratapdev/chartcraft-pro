@@ -351,6 +351,24 @@ export const TopBar: React.FC = () => {
       </button>
 
       <button
+        onClick={() => setRightPanelTab('watchlist')}
+        className="trading-btn flex items-center gap-1"
+        title="Watchlist"
+      >
+        <List size={14} />
+        <span className="hidden sm:inline">Watch</span>
+      </button>
+
+      <button
+        onClick={() => setRightPanelTab('heatmap')}
+        className="trading-btn flex items-center gap-1"
+        title="Heatmap"
+      >
+        <Grid3X3 size={14} />
+        <span className="hidden sm:inline">Heat</span>
+      </button>
+
+      <button
         onClick={() => setRightPanelTab('indicators')}
         className="trading-btn flex items-center gap-1"
       >
