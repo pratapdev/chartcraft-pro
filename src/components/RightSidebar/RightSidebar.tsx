@@ -1047,6 +1047,18 @@ export const RightSidebar: React.FC = () => {
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
               </div>
             ))}
+            {(pctDiffDonCrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">%Diff {alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <button onClick={() => removePctDiffDonCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
             {alertLogs.length > 0 && (
               <>
                 <div className="flex items-center justify-between mt-4 px-1">
