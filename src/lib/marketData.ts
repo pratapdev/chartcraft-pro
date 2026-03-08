@@ -35,7 +35,7 @@ export async function fetchCandles(
   timeframe: Timeframe,
   limit: number = 500
 ): Promise<Candle[]> {
-  const binanceSymbol = SYMBOL_MAP[symbol] || 'BTCUSDT';
+  const binanceSymbol = toBinanceSymbol(symbol);
   const interval = INTERVAL_MAP[timeframe];
 
   try {
