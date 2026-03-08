@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   IChartApi,
@@ -14,15 +14,19 @@ import { computeEMA } from '@/lib/marketData';
 
 const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
+const CRYPTO_SYMBOLS = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD', 'ADA/USD', 'DOGE/USD', 'AVAX/USD'];
+
 interface MiniChartProps {
   symbol: string;
   timeframe: Timeframe;
   onCrosshairMove?: (time: number | null) => void;
   syncTime?: number | null;
   onTimeframeChange?: (tf: Timeframe) => void;
+  onSymbolChange?: (symbol: string) => void;
+  availableSymbols?: string[];
 }
 
-export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange }) => {
+export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<Candle[]>([]);
@@ -171,7 +175,19 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
         ) : (
           <span className="font-semibold text-foreground">{timeframe}</span>
         )}
-        <span className="text-muted-foreground">{symbol}</span>
+        {onSymbolChange ? (
+          <select
+            value={symbol}
+            onChange={(e) => onSymbolChange(e.target.value)}
+            className="bg-accent text-muted-foreground text-[10px] rounded px-1 py-0.5 outline-none cursor-pointer border-none max-w-[90px]"
+          >
+            {(availableSymbols || CRYPTO_SYMBOLS).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-muted-foreground">{symbol}</span>
+        )}
       </div>
       <div ref={containerRef} className="flex-1" />
     </div>
