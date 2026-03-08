@@ -241,7 +241,30 @@ export const CandlestickChart: React.FC = () => {
     } else if (prevRange) {
       timeScale.setVisibleLogicalRange(prevRange);
     }
+
+    // Store initial range on first load
+    if (!initialRangeRef.current) {
+      const r = timeScale.getVisibleLogicalRange();
+      if (r) initialRangeRef.current = { from: r.from, to: r.to };
+    }
   }, [candles]);
+
+  const resetChart = useCallback(() => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+    if (initialRangeRef.current) {
+      ts.setVisibleLogicalRange(initialRangeRef.current);
+    } else {
+      ts.scrollToRealTime();
+    }
+    hasDragged.current = false;
+    setContextMenu(null);
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
 
   // Update indicators
   useEffect(() => {
