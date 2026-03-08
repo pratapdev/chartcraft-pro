@@ -22,7 +22,7 @@ interface IndicatorPaneProps {
 export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const { candles, removeIndicator } = useChartStore();
+  const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartSync = useChartSync();
   const chartId = `indicator-${indicator.id}`;
   const savedRangeRef = useRef<{ from: number; to: number } | null>(null);
