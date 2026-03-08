@@ -9,7 +9,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD, computeADX } from '@/lib/marketData';
+import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR } from '@/lib/marketData';
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
@@ -209,6 +209,20 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         ref20.setData(adx.map((d) => ({ time: d.time as Time, value: 20 })) as LineData[]);
         const ref40 = chart.addLineSeries({ color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
         ref40.setData(adx.map((d) => ({ time: d.time as Time, value: 40 })) as LineData[]);
+      }
+    }
+
+    if (indicator.type === 'ATR') {
+      const data = computeATR(candles, indicator.period);
+      if (data.length > 0) {
+        const series = chart.addLineSeries({
+          color: indicator.color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
       }
     }
 

@@ -506,3 +506,27 @@ export function computeADX(
 
   return { adx, plusDI, minusDI };
 }
+
+// Compute ATR (Average True Range)
+export function computeATR(candles: Candle[], period: number = 14): { time: number; value: number }[] {
+  if (candles.length < period + 1) return [];
+  const result: { time: number; value: number }[] = [];
+
+  const tr: number[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) tr.push(candles[i].high - candles[i].low);
+    else tr.push(Math.max(candles[i].high - candles[i].low, Math.abs(candles[i].high - candles[i - 1].close), Math.abs(candles[i].low - candles[i - 1].close)));
+  }
+
+  let atr = 0;
+  for (let i = 0; i < period; i++) atr += tr[i];
+  atr /= period;
+  result.push({ time: candles[period - 1].time, value: Math.round(atr * 100) / 100 });
+
+  for (let i = period; i < candles.length; i++) {
+    atr = (atr * (period - 1) + tr[i]) / period;
+    result.push({ time: candles[i].time, value: Math.round(atr * 100) / 100 });
+  }
+
+  return result;
+}
