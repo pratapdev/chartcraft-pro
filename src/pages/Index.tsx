@@ -4,8 +4,10 @@ import { LeftToolbar } from '@/components/Toolbar/LeftToolbar';
 import { ChartContainer } from '@/components/Chart/ChartContainer';
 import { RightSidebar } from '@/components/RightSidebar/RightSidebar';
 import { BottomPanel } from '@/components/BottomPanel/BottomPanel';
+import { useAlertChecker } from '@/hooks/useAlertChecker';
 
 const Index: React.FC = () => {
+  useAlertChecker();
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <TopBar />
