@@ -456,6 +456,16 @@ export const RightSidebar: React.FC = () => {
 
         {rightPanelTab === 'indicators' && (
           <div className="space-y-2">
+            {indicators.length > 0 && (
+              <div className="flex justify-end px-1">
+                <button
+                  onClick={clearAllIndicators}
+                  className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+                >
+                  Delete All
+                </button>
+              </div>
+            )}
             {indicators.map((ind) => (
               <IndicatorRow key={ind.id} ind={ind} />
             ))}
