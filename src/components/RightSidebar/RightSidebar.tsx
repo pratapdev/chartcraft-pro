@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft, RefreshCw, CloudOff, Cloud, List, Grid3X3 } from 'lucide-react';
-import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition } from '@/types/trading';
+import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition, PctDiffDonLine } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 import { pushState, pullState, checkSyncHealth, extractSyncPayload, getSyncServerUrl, setSyncServerUrl } from '@/lib/syncService';
 import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/components/Alerts/CompoundAlerts';
