@@ -415,8 +415,3 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     compoundAlerts: state.compoundAlerts,
     alertTemplates: state.alertTemplates,
   }),
-}));
-    chartFontSize: state.chartFontSize,
-    drawingDefaults: state.drawingDefaults,
-  }),
-}));
