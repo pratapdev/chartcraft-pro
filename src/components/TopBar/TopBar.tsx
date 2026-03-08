@@ -271,7 +271,7 @@ export const TopBar: React.FC = () => {
       <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
         {marketType === 'crypto' ? (
           multiTfMode ? (
-            <Wifi size={13} className="text-muted-foreground" />
+            <Wifi size={13} className="text-bull" />
           ) : connected ? (
             <Wifi size={13} className="text-bull" />
           ) : (
