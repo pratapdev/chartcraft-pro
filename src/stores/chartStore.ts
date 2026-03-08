@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, LineStyleType } from '@/types/trading';
+import { CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
@@ -103,9 +104,9 @@ interface ChartStore {
   // Right sidebar
   // Right sidebar
   rightPanelOpen: boolean;
-  rightPanelTab: 'alerts' | 'indicators' | 'settings';
+  rightPanelTab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap';
   setRightPanelOpen: (open: boolean) => void;
-  setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings') => void;
+  setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap') => void;
 
   // Undo
   undoLastDeletion: () => void;
@@ -131,6 +132,17 @@ interface ChartStore {
     alertLine: { color: string; thickness: number; lineStyle: LineStyleType };
   };
   setDrawingDefault: (type: 'trendline' | 'horizontal' | 'alertLine', updates: Partial<{ color: string; thickness: number; lineStyle: LineStyleType }>) => void;
+
+  // Compound alerts
+  compoundAlerts: CompoundAlert[];
+  addCompoundAlert: (alert: CompoundAlert) => void;
+  removeCompoundAlert: (id: string) => void;
+  clearCompoundAlerts: () => void;
+
+  // Alert templates
+  alertTemplates: AlertTemplate[];
+  addAlertTemplate: (template: AlertTemplate) => void;
+  removeAlertTemplate: (id: string) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
@@ -375,6 +387,15 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       [type]: { ...s.drawingDefaults[type], ...updates },
     },
   })),
+
+  compoundAlerts: [],
+  addCompoundAlert: (alert) => set((s) => ({ compoundAlerts: [...s.compoundAlerts, alert] })),
+  removeCompoundAlert: (id) => set((s) => ({ compoundAlerts: s.compoundAlerts.filter((a) => a.id !== id) })),
+  clearCompoundAlerts: () => set({ compoundAlerts: [] }),
+
+  alertTemplates: [],
+  addAlertTemplate: (template) => set((s) => ({ alertTemplates: [...s.alertTemplates, template] })),
+  removeAlertTemplate: (id) => set((s) => ({ alertTemplates: s.alertTemplates.filter((t) => t.id !== id) })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
@@ -391,5 +412,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     marketType: state.marketType,
     chartFontSize: state.chartFontSize,
     drawingDefaults: state.drawingDefaults,
+    compoundAlerts: state.compoundAlerts,
+    alertTemplates: state.alertTemplates,
   }),
 }));

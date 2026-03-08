@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft } from 'lucide-react';
+import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft, RefreshCw, CloudOff, Cloud, List, Grid3X3 } from 'lucide-react';
 import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
+import { pushState, pullState, checkSyncHealth, extractSyncPayload, getSyncServerUrl, setSyncServerUrl } from '@/lib/syncService';
+import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/components/Alerts/CompoundAlerts';
+import { WatchlistPanel } from '@/components/Watchlist/WatchlistPanel';
+import { HeatmapView } from '@/components/Heatmap/HeatmapView';
 
 const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial<IndicatorConfig> }[] = [
   { type: 'EMA', label: 'EMA', defaults: { period: 20, color: '#2962FF' } },
@@ -670,6 +674,154 @@ const SettingsPanel: React.FC = () => {
           </p>
         </div>
       </div>
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <RefreshCw size={12} className="text-primary" />
+          <p className="font-semibold text-foreground">Server Sync</p>
+        </div>
+        <SyncControls />
+      </div>
+    </div>
+  );
+};
+
+const SyncControls: React.FC = () => {
+  const [serverUrl, setServerUrlLocal] = useState(getSyncServerUrl());
+  const [status, setStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
+  const [syncing, setSyncing] = useState(false);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [autoSync, setAutoSync] = useState(() => localStorage.getItem('auto-sync') === 'true');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('auto-sync', String(autoSync));
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    if (autoSync) {
+      const doSync = async () => {
+        const ok = await checkSyncHealth();
+        if (ok) {
+          const payload = extractSyncPayload(useChartStore.getState());
+          const pushed = await pushState(payload);
+          setStatus('online');
+          if (pushed) {
+            const now = new Date().toLocaleTimeString();
+            localStorage.setItem('last-sync-time', now);
+            setLastResult(`Auto-synced ✓ ${now}`);
+          } else {
+            setLastResult('Auto-sync failed ✗');
+          }
+        } else {
+          setStatus('offline');
+        }
+      };
+      doSync();
+      intervalRef.current = setInterval(doSync, 30_000);
+    }
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [autoSync]);
+
+  const handleCheckHealth = async () => {
+    setStatus('checking');
+    const ok = await checkSyncHealth();
+    setStatus(ok ? 'online' : 'offline');
+  };
+
+  const handlePush = async () => {
+    setSyncing(true);
+    setLastResult(null);
+    const payload = extractSyncPayload(useChartStore.getState());
+    const ok = await pushState(payload);
+    setLastResult(ok ? 'Pushed to server ✓' : 'Push failed ✗');
+    setSyncing(false);
+  };
+
+  const handlePull = async () => {
+    setSyncing(true);
+    setLastResult(null);
+    const data = await pullState();
+    if (data) {
+      const store = useChartStore.getState();
+      if (data.state) {
+        store.setSymbol(data.state.symbol);
+        store.setTimeframe(data.state.timeframe as any);
+        store.setMarketType(data.state.marketType as any);
+        store.setChartFontSize(data.state.chartFontSize);
+        if (data.state.drawingDefaults) {
+          for (const [key, val] of Object.entries(data.state.drawingDefaults)) {
+            store.setDrawingDefault(key as any, val as any);
+          }
+        }
+      }
+      // Replace collections via direct set
+      useChartStore.setState({
+        trendlines: data.trendlines || [],
+        indicators: data.indicators || [],
+        alerts: data.alerts || [],
+        alertLogs: data.alertLogs || [],
+        fibonacciDrawings: data.fibonacciDrawings || [],
+        indicatorCrossAlerts: data.indicatorCrossAlerts || [],
+        indicatorThresholdAlerts: data.indicatorThresholdAlerts || [],
+        stochRSICrossAlerts: data.stochRSICrossAlerts || [],
+      });
+      setLastResult('Pulled from server ✓');
+    } else {
+      setLastResult('Pull failed ✗');
+    }
+    setSyncing(false);
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div>
+        <label className="text-muted-foreground block mb-0.5">Server URL</label>
+        <input
+          type="text"
+          value={serverUrl}
+          onChange={(e) => setServerUrlLocal(e.target.value)}
+          onBlur={() => setSyncServerUrl(serverUrl.trim())}
+          className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+          placeholder="http://localhost:3001"
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <button onClick={handleCheckHealth} className="flex items-center gap-1 text-xs text-primary hover:opacity-80 transition-opacity">
+          {status === 'checking' ? <RefreshCw size={10} className="animate-spin" /> : status === 'online' ? <Cloud size={10} /> : <CloudOff size={10} />}
+          {status === 'idle' ? 'Check' : status === 'checking' ? 'Checking...' : status === 'online' ? 'Online' : 'Offline'}
+        </button>
+        <div className="flex items-center gap-1.5">
+          <label className="text-muted-foreground text-[10px]">Auto-sync</label>
+          <button
+            onClick={() => setAutoSync(!autoSync)}
+            className={`w-8 h-4 rounded-full transition-colors relative ${autoSync ? 'bg-primary' : 'bg-accent'}`}
+          >
+            <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${autoSync ? 'left-4' : 'left-0.5'}`} />
+          </button>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handlePush}
+          disabled={syncing}
+          className="flex-1 text-xs py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          {syncing ? '...' : '↑ Push to Server'}
+        </button>
+        <button
+          onClick={handlePull}
+          disabled={syncing}
+          className="flex-1 text-xs py-1.5 rounded bg-accent text-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          {syncing ? '...' : '↓ Pull from Server'}
+        </button>
+      </div>
+      {lastResult && (
+        <p className={`text-[10px] ${lastResult.includes('✓') ? 'text-bull' : 'text-bear'}`}>{lastResult}</p>
+      )}
+      <p className="text-[10px] text-muted-foreground leading-relaxed">
+        Sync trendlines, alerts, indicators & settings to your local server for cross-device access.
+      </p>
     </div>
   );
 };
@@ -732,9 +884,12 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
+            <CompoundAlertForm />
             <IndicatorCrossAlertForm />
             <StochRSICrossAlertForm />
             <IndicatorThresholdAlertForm />
+            <CompoundAlertsList />
+            <AlertTemplatesSection />
             <div className="flex items-center justify-between px-1">
               <p className="text-xs text-muted-foreground">
                 {(() => {
@@ -811,7 +966,10 @@ export const RightSidebar: React.FC = () => {
             ))}
             {alertLogs.length > 0 && (
               <>
-                <div className="text-xs font-semibold text-muted-foreground mt-4 px-1">Recent Alerts</div>
+                <div className="flex items-center justify-between mt-4 px-1">
+                  <span className="text-xs font-semibold text-muted-foreground">Recent Alerts</span>
+                  <button onClick={() => useChartStore.getState().clearAlertLogs()} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">Clear All</button>
+                </div>
                 {alertLogs.slice(0, 10).map((log) => (
                   <div key={log.id} className="panel-section rounded p-2 text-xs">
                     <div className="text-foreground">{log.message}</div>
@@ -874,6 +1032,14 @@ export const RightSidebar: React.FC = () => {
 
         {rightPanelTab === 'settings' && (
           <SettingsPanel />
+        )}
+
+        {rightPanelTab === 'watchlist' && (
+          <WatchlistPanel />
+        )}
+
+        {rightPanelTab === 'heatmap' && (
+          <HeatmapView />
         )}
       </div>
     </div>

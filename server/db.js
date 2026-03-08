@@ -50,7 +50,129 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  -- Chart state sync tables
+  CREATE TABLE IF NOT EXISTS chart_state (
+    id TEXT PRIMARY KEY DEFAULT 'default',
+    symbol TEXT DEFAULT 'BTC/USD',
+    timeframe TEXT DEFAULT '1h',
+    market_type TEXT DEFAULT 'crypto',
+    chart_font_size INTEGER DEFAULT 12,
+    drawing_defaults TEXT DEFAULT '{}',
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS trendlines (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    start_time INTEGER NOT NULL,
+    start_price REAL NOT NULL,
+    end_time INTEGER NOT NULL,
+    end_price REAL NOT NULL,
+    color TEXT DEFAULT '#2962FF',
+    thickness INTEGER DEFAULT 1,
+    line_style TEXT DEFAULT 'solid',
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS chart_alerts (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    trendline_id TEXT,
+    condition TEXT NOT NULL,
+    active INTEGER DEFAULT 1,
+    triggered INTEGER DEFAULT 0,
+    triggered_at INTEGER,
+    message TEXT,
+    created_at INTEGER NOT NULL,
+    telegram_enabled INTEGER DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS chart_alert_logs (
+    id TEXT PRIMARY KEY,
+    alert_id TEXT,
+    symbol TEXT NOT NULL,
+    message TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    price REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS chart_indicators (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    period INTEGER DEFAULT 20,
+    color TEXT DEFAULT '#2962FF',
+    visible INTEGER DEFAULT 1,
+    line_width INTEGER DEFAULT 1,
+    line_style TEXT DEFAULT 'solid',
+    k_period INTEGER,
+    d_period INTEGER,
+    color2 TEXT,
+    std_dev REAL,
+    multiplier REAL
+  );
+
+  CREATE TABLE IF NOT EXISTS fibonacci_drawings (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    start_time INTEGER NOT NULL,
+    start_price REAL NOT NULL,
+    end_time INTEGER NOT NULL,
+    end_price REAL NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS indicator_cross_alerts (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    indicator_id1 TEXT NOT NULL,
+    indicator_id2 TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    active INTEGER DEFAULT 1,
+    triggered INTEGER DEFAULT 0,
+    triggered_at INTEGER,
+    message TEXT,
+    created_at INTEGER NOT NULL,
+    telegram_enabled INTEGER DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS indicator_threshold_alerts (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    indicator_id TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    threshold REAL NOT NULL,
+    active INTEGER DEFAULT 1,
+    triggered INTEGER DEFAULT 0,
+    triggered_at INTEGER,
+    message TEXT,
+    created_at INTEGER NOT NULL,
+    telegram_enabled INTEGER DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS stoch_rsi_cross_alerts (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    indicator_id TEXT NOT NULL,
+    condition TEXT NOT NULL,
+    active INTEGER DEFAULT 1,
+    triggered INTEGER DEFAULT 0,
+    triggered_at INTEGER,
+    message TEXT,
+    created_at INTEGER NOT NULL,
+    telegram_enabled INTEGER DEFAULT 1
+  );
 `);
+
+// Ensure default chart_state row exists
+const ensureChartState = db.prepare(`INSERT OR IGNORE INTO chart_state (id) VALUES ('default')`);
+ensureChartState.run();
 
 // --- Price Alerts ---
 const insertAlert = db.prepare(
