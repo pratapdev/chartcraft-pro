@@ -269,6 +269,8 @@ export const TopBar: React.FC = () => {
 
       <div className="flex-1" />
 
+      <SyncStatusIndicator />
+
       <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
         {marketType === 'crypto' ? (
           multiTfMode ? (
