@@ -59,7 +59,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [selectedFibId, setSelectedFibId] = useState<string | null>(null);
   const [fibDeletePos, setFibDeletePos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredAlertBtn, setHoveredAlertBtn] = useState<string | null>(null);
-  const [hoveredCrosshairBtn, setHoveredCrosshairBtn] = useState(false);
+  const [crosshairBtnY, setCrosshairBtnY] = useState<number | null>(null);
+  const [crosshairBtnPrice, setCrosshairBtnPrice] = useState<number | null>(null);
   const crosshairMouseY = useRef<number | null>(null);
   const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
@@ -255,31 +256,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       ctx.setLineDash([]);
     }
 
-    // Crosshair "+" alert button (only in cursor mode, when not drawing/dragging)
-    if (activeTool === 'cursor' && crosshairMouseY.current !== null && !dragRef.current && !isInteracting) {
-      const btnX = w - 28;
-      const btnY = crosshairMouseY.current;
-      const btnR = 10;
-      const isHover = hoveredCrosshairBtn;
-
-      ctx.beginPath();
-      ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
-      ctx.fillStyle = isHover ? '#2563eb' : 'rgba(37, 99, 235, 0.75)';
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Plus icon
-      ctx.beginPath();
-      ctx.moveTo(btnX - 5, btnY);
-      ctx.lineTo(btnX + 5, btnY);
-      ctx.moveTo(btnX, btnY - 5);
-      ctx.lineTo(btnX, btnY + 5);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    // (Crosshair "+" button is rendered as HTML element, not on canvas)
 
     const ds = drawRef.current;
     if (ds.phase === 'drawing') {
@@ -386,7 +363,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, hoveredCrosshairBtn, isInteracting]);
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting]);
 
   useEffect(() => {
     let raf: number;
@@ -425,59 +402,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     [trendlines, lineToPixels]
   );
 
-  // Check if mouse hits the crosshair "+" alert button
-  const hitCrosshairAlertBtn = useCallback(
-    (mx: number, my: number): boolean => {
-      const canvas = canvasRef.current;
-      if (!canvas || activeTool !== 'cursor' || crosshairMouseY.current === null) return false;
-      const w = canvas.parentElement?.clientWidth ?? canvas.width;
-      const btnX = w - 28;
-      const btnY = crosshairMouseY.current;
-      return Math.hypot(mx - btnX, my - btnY) <= 12;
-    },
-    [activeTool]
-  );
-
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
-
-      // Check crosshair "+" alert button click
-      if (hitCrosshairAlertBtn(mx, my) && crosshairPrice.current !== null) {
-        const price = crosshairPrice.current;
-        const { candles: c } = useChartStore.getState();
-        const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
-        const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
-        // Create a horizontal line at this price
-        const lineId = crypto.randomUUID();
-        addTrendline({
-          id: lineId,
-          symbol,
-          timeframe,
-          startTime,
-          startPrice: price,
-          endTime,
-          endPrice: price,
-          color: '#eab308',
-          thickness: 2,
-          createdAt: Date.now(),
-        });
-        // Create an alert on that line
-        addAlert({
-          id: crypto.randomUUID(),
-          symbol,
-          timeframe,
-          trendlineId: lineId,
-          condition: 'cross_any' as AlertCondition,
-          active: true,
-          triggered: false,
-          message: `Price crosses ${price.toFixed(2)}`,
-          createdAt: Date.now(),
-        });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
 
       // Check ⊕ alert button click on horizontal lines
       const alertBtnHit = hitAlertButton(mx, my);
@@ -614,7 +541,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       setSelectedFibId(null);
       setFibDeletePos(null);
     },
-    [activeTool, hitTest, hitAlertButton, hitCrosshairAlertBtn, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
+    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
   );
 
   const handleMouseMove = useCallback(
@@ -672,15 +599,16 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       crosshairMouseY.current = my;
       const coords = pixelToCoords(mx, my);
       crosshairPrice.current = coords ? coords.price : null;
+      // Update the HTML button Y position
+      if (activeTool === 'cursor' && !dragRef.current) {
+        setCrosshairBtnY(my);
+        setCrosshairBtnPrice(coords ? coords.price : null);
+      }
 
       // Update cursor and hover state
       // Check ⊕ button hover
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
-
-      // Check crosshair alert button hover
-      const crosshairBtnHover = hitCrosshairAlertBtn(mx, my);
-      setHoveredCrosshairBtn(crosshairBtnHover);
 
       if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
@@ -692,11 +620,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         } else {
           const isHit = !!hitTest(mx, my);
           setHoveringLine(isHit);
-          eventLayerRef.current.style.cursor = (alertHover || crosshairBtnHover) ? 'pointer' : isHit ? 'pointer' : '';
+          eventLayerRef.current.style.cursor = alertHover ? 'pointer' : isHit ? 'pointer' : '';
         }
       }
     },
-    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton, hitCrosshairAlertBtn]
+    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton]
   );
 
   const handleMouseUp = useCallback(
@@ -815,7 +743,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         onMouseDown={(e) => {
           const { mx, my } = getPos(e.nativeEvent);
           // In cursor mode, check crosshair btn, trendline and fib hits
-          if (activeTool === 'cursor' && !hitTest(mx, my) && !hitCrosshairAlertBtn(mx, my)) {
+          if (activeTool === 'cursor' && !hitTest(mx, my)) {
             // Check if clicking on a fib level
             const series = seriesRef.current;
             let fibHit = false;
@@ -868,7 +796,8 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
           setHoverY(null);
           crosshairMouseY.current = null;
           crosshairPrice.current = null;
-          setHoveredCrosshairBtn(false);
+          setCrosshairBtnY(null);
+          setCrosshairBtnPrice(null);
         }}
       />
 
@@ -899,6 +828,59 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
           </button>
         </div>
+      )}
+
+      {/* Crosshair "+" alert button - rendered as HTML so it's independently clickable */}
+      {activeTool === 'cursor' && crosshairBtnY !== null && crosshairBtnPrice !== null && !isInteracting && (
+        <button
+          className="absolute z-30 flex items-center justify-center w-5 h-5 rounded-full transition-colors"
+          style={{
+            right: 68,
+            top: crosshairBtnY - 10,
+            background: 'rgba(37, 99, 235, 0.8)',
+            border: '1.5px solid #fff',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(37, 99, 235, 0.8)'; }}
+          title={`Add alert at ${crosshairBtnPrice.toFixed(2)}`}
+          onClick={() => {
+            const price = crosshairBtnPrice;
+            const { candles: c } = useChartStore.getState();
+            const startTime = c.length > 0 ? c[0].time : Date.now() / 1000 - 86400;
+            const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Date.now() / 1000 + 86400;
+            const lineId = crypto.randomUUID();
+            addTrendline({
+              id: lineId,
+              symbol,
+              timeframe,
+              startTime,
+              startPrice: price,
+              endTime,
+              endPrice: price,
+              color: '#eab308',
+              thickness: 2,
+              createdAt: Date.now(),
+            });
+            addAlert({
+              id: crypto.randomUUID(),
+              symbol,
+              timeframe,
+              trendlineId: lineId,
+              condition: 'cross_any' as AlertCondition,
+              active: true,
+              triggered: false,
+              message: `Price crosses ${price.toFixed(2)}`,
+              createdAt: Date.now(),
+            });
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+            <line x1="5" y1="1" x2="5" y2="9" />
+            <line x1="1" y1="5" x2="9" y2="5" />
+          </svg>
+        </button>
       )}
     </>
   );
