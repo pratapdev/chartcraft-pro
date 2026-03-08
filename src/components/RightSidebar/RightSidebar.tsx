@@ -401,9 +401,19 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
-            <p className="text-xs text-muted-foreground px-1">
-              {alerts.length === 0 ? 'No alerts set.' : `${alerts.length} active alert(s)`}
-            </p>
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs text-muted-foreground">
+                {alerts.length === 0 ? 'No alerts set.' : `${alerts.length} active alert(s)`}
+              </p>
+              {alerts.length > 0 && (
+                <button
+                  onClick={clearAllAlerts}
+                  className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+                >
+                  Delete All
+                </button>
+              )}
+            </div>
             {alerts.map((alert) => (
               <div key={alert.id} className="panel-section rounded p-2 text-xs">
                 <div className="flex items-center justify-between">
