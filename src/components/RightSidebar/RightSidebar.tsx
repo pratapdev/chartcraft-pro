@@ -701,7 +701,13 @@ const SyncControls: React.FC = () => {
           const payload = extractSyncPayload(useChartStore.getState());
           const pushed = await pushState(payload);
           setStatus('online');
-          setLastResult(pushed ? `Auto-synced ✓ ${new Date().toLocaleTimeString()}` : 'Auto-sync failed ✗');
+          if (pushed) {
+            const now = new Date().toLocaleTimeString();
+            localStorage.setItem('last-sync-time', now);
+            setLastResult(`Auto-synced ✓ ${now}`);
+          } else {
+            setLastResult('Auto-sync failed ✗');
+          }
         } else {
           setStatus('offline');
         }
