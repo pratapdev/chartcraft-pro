@@ -222,6 +222,98 @@ const QuickPriceAlert: React.FC = () => {
   );
 };
 
+const SettingsPanel: React.FC = () => {
+  const trendlines = useChartStore((s) => s.trendlines);
+  const stored = getTelegramCredentials();
+  const [botToken, setBotToken] = useState(stored.botToken);
+  const [chatId, setChatId] = useState(stored.chatId);
+  const [enabled, setEnabled] = useState(stored.enabled);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
+
+  const handleSave = () => {
+    saveTelegramCredentials({ botToken: botToken.trim(), chatId: chatId.trim(), enabled });
+    setTestResult(null);
+  };
+
+  const handleTest = async () => {
+    handleSave();
+    setTesting(true);
+    setTestResult(null);
+    const ok = await testTelegramNotification();
+    setTestResult(ok ? 'success' : 'fail');
+    setTesting(false);
+  };
+
+  return (
+    <div className="space-y-3 text-xs text-muted-foreground p-1">
+      <div>
+        <p className="font-semibold text-foreground mb-1">Trendlines</p>
+        <p>{trendlines.length} line(s) drawn</p>
+      </div>
+      <div>
+        <p className="font-semibold text-foreground mb-1">Shortcuts</p>
+        <div className="space-y-1">
+          <p><kbd className="bg-accent px-1 rounded text-foreground">Delete</kbd> Remove selected line</p>
+          <p><kbd className="bg-accent px-1 rounded text-foreground">Esc</kbd> Cancel drawing</p>
+        </div>
+      </div>
+      <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Send size={12} className="text-primary" />
+          <p className="font-semibold text-foreground">Telegram Notifications</p>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-muted-foreground">Enabled</label>
+            <button
+              onClick={() => { setEnabled(!enabled); saveTelegramCredentials({ botToken: botToken.trim(), chatId: chatId.trim(), enabled: !enabled }); }}
+              className={`w-8 h-4 rounded-full transition-colors relative ${enabled ? 'bg-primary' : 'bg-accent'}`}
+            >
+              <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${enabled ? 'left-4' : 'left-0.5'}`} />
+            </button>
+          </div>
+          <div>
+            <label className="text-muted-foreground block mb-0.5">Bot Token</label>
+            <input
+              type="password"
+              placeholder="123456:ABC-DEF..."
+              value={botToken}
+              onChange={(e) => setBotToken(e.target.value)}
+              onBlur={handleSave}
+              className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div>
+            <label className="text-muted-foreground block mb-0.5">Chat ID</label>
+            <input
+              type="text"
+              placeholder="Your chat or group ID"
+              value={chatId}
+              onChange={(e) => setChatId(e.target.value)}
+              onBlur={handleSave}
+              className="w-full bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <button
+            onClick={handleTest}
+            disabled={testing || !botToken || !chatId}
+            className="w-full text-xs py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {testing ? 'Sending...' : 'Send Test Message'}
+          </button>
+          {testResult === 'success' && <p className="text-bull text-[10px]">✓ Test message sent!</p>}
+          {testResult === 'fail' && <p className="text-bear text-[10px]">✗ Failed. Check token & chat ID.</p>}
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            Create a bot via <a href="https://t.me/BotFather" target="_blank" rel="noopener" className="text-primary hover:underline">@BotFather</a>.
+            Get your Chat ID from <a href="https://t.me/userinfobot" target="_blank" rel="noopener" className="text-primary hover:underline">@userinfobot</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const RightSidebar: React.FC = () => {
   const {
     rightPanelOpen,
