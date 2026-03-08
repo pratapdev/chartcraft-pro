@@ -14,15 +14,19 @@ import { computeEMA } from '@/lib/marketData';
 
 const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
+const CRYPTO_SYMBOLS = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD', 'ADA/USD', 'DOGE/USD', 'AVAX/USD'];
+
 interface MiniChartProps {
   symbol: string;
   timeframe: Timeframe;
   onCrosshairMove?: (time: number | null) => void;
   syncTime?: number | null;
   onTimeframeChange?: (tf: Timeframe) => void;
+  onSymbolChange?: (symbol: string) => void;
+  availableSymbols?: string[];
 }
 
-export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange }) => {
+export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlesRef = useRef<Candle[]>([]);
