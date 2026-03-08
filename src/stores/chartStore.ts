@@ -14,6 +14,7 @@ interface UndoEntry {
 }
 
 const undoStack: UndoEntry[] = [];
+const redoStack: UndoEntry[] = [];
 
 interface CrosshairData {
   time: number;
