@@ -535,7 +535,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       setSelectedFibId(null);
       setFibDeletePos(null);
     },
-    [activeTool, hitTest, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
+    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
   );
 
   const handleMouseMove = useCallback(
