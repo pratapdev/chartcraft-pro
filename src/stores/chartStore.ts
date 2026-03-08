@@ -191,6 +191,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   ],
   addIndicator: (ind) => set((s) => ({ indicators: [...s.indicators, ind] })),
   removeIndicator: (id) => set((s) => ({ indicators: s.indicators.filter((i) => i.id !== id) })),
+  clearAllIndicators: () => set({ indicators: [] }),
   toggleIndicator: (id) =>
     set((s) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, visible: !i.visible } : i)),
