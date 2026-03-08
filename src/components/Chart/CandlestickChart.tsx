@@ -191,9 +191,12 @@ export const CandlestickChart: React.FC = () => {
       });
     }
 
+    const containerEl = containerRef.current;
     return () => {
       ro.disconnect();
       if (chartSync) chartSync.unregisterChart('main');
+      containerEl?.removeEventListener('mousedown', onMouseDown);
+      containerEl?.removeEventListener('mouseup', onMouseUp);
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
