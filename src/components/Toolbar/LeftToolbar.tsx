@@ -40,7 +40,28 @@ export const LeftToolbar: React.FC = () => {
     { id: 'measure', icon: <Ruler size={18} />, label: 'Measure' },
   ];
 
+  const handleToggleBBands = () => {
+    const existing = indicators.find((i) => i.type === 'BBANDS');
+    if (existing) {
+      setRightPanelTab('indicators');
+    } else {
+      addIndicator({
+        id: `bbands-${Date.now()}`,
+        type: 'BBANDS',
+        period: 20,
+        color: '#2196F3',
+        color2: 'rgba(33,150,243,0.08)',
+        visible: true,
+        stdDev: 2,
+      });
+      setRightPanelTab('indicators');
+    }
+  };
+
+  const hasBBands = indicators.some((i) => i.type === 'BBANDS' && i.visible);
+
   const actions: ToolButton[] = [
+    { id: 'bbands', icon: <Activity size={18} />, label: 'Bollinger Bands', action: handleToggleBBands },
     { id: 'alerts', icon: <Bell size={18} />, label: 'Alerts', action: () => setRightPanelTab('alerts') },
     { id: 'indicators', icon: <BarChart3 size={18} />, label: 'Indicators', action: () => setRightPanelTab('indicators') },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings', action: () => setRightPanelTab('settings') },
