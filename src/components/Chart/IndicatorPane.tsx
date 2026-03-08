@@ -9,7 +9,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig, LineStyleType } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV } from '@/lib/marketData';
+import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
 
 const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 import { useChartSync } from './ChartSyncContext';
