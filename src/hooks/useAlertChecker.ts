@@ -84,13 +84,18 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
 }
 
 function getIndicatorValues(ind: IndicatorConfig, candles: Candle[]): { time: number; value: number }[] {
-  if (ind.type === 'EMA') return computeEMA(candles, ind.period);
-  if (ind.type === 'SMA') return computeSMA(candles, ind.period);
-  if (ind.type === 'RSI') return computeRSI(candles, ind.period);
-  if (ind.type === 'ATR') return computeATR(candles, ind.period);
-  if (ind.type === 'OBV') return computeOBV(candles);
-  if (ind.type === 'ADX') return computeADX(candles, ind.period).adx;
-  return [];
+  try {
+    if (ind.type === 'EMA') return computeEMA(candles, ind.period);
+    if (ind.type === 'SMA') return computeSMA(candles, ind.period);
+    if (ind.type === 'RSI') return computeRSI(candles, ind.period);
+    if (ind.type === 'ATR') return computeATR(candles, ind.period);
+    if (ind.type === 'OBV') return computeOBV(candles);
+    if (ind.type === 'ADX') return computeADX(candles, ind.period).adx;
+    return [];
+  } catch (err) {
+    console.error(`[AlertChecker] Failed to compute ${ind.type}(${ind.period}):`, err);
+    return [];
+  }
 }
 
 function getIndicatorLabel(ind: IndicatorConfig): string {
@@ -284,7 +289,14 @@ export function useAlertChecker() {
 
       const ind = indicators.find((i) => i.id === alert.indicatorId && i.type === 'STOCH_RSI');
       if (!ind) continue;
-      const { k, d } = computeStochRSI(candles, ind.period, ind.period, ind.kPeriod ?? 3, ind.dPeriod ?? 3);
+      let stochData: { k: { time: number; value: number }[]; d: { time: number; value: number }[] };
+      try {
+        stochData = computeStochRSI(candles, ind.period, ind.period, ind.kPeriod ?? 3, ind.dPeriod ?? 3);
+      } catch (err) {
+        console.error(`[AlertChecker] Failed to compute StochRSI:`, err);
+        continue;
+      }
+      const { k, d } = stochData;
       if (k.length < 2 || d.length < 2) continue;
 
       const prevDiff = k[k.length - 2].value - d[d.length - 2].value;

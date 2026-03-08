@@ -34,9 +34,13 @@ export function useAlertPriceTracker() {
     for (const key of activeKeysRef.current) {
       if (key === currentKey) continue;
       const [symbol, timeframe] = key.split(':') as [string, Timeframe];
-      fetchCandles(symbol, timeframe, 200).then((candles) => {
-        useChartStore.getState().setAlertCandles(key, candles);
-      });
+      fetchCandles(symbol, timeframe, 200)
+        .then((candles) => {
+          useChartStore.getState().setAlertCandles(key, candles);
+        })
+        .catch((err) => {
+          console.error(`[AlertTracker] Refetch failed for ${key}:`, err);
+        });
     }
   }, []);
 
@@ -127,27 +131,31 @@ export function useAlertPriceTracker() {
 
       if (marketType !== 'crypto') continue;
 
-      // Fetch initial candles then subscribe
-      fetchCandles(symbol, timeframe, 200).then((candles) => {
-        useChartStore.getState().setAlertCandles(key, candles);
-
-        const unsub = subscribeToCandles(symbol, timeframe, (candle) => {
-          useChartStore.getState().updateAlertCandle(key, candle);
-        });
-
-        // Check if key was removed while fetching
-        const currentUnsub = subsRef.current.get(key);
-        if (currentUnsub && currentUnsub !== placeholderUnsub) {
-          // Already replaced, clean up new one
-          unsub();
-        } else {
-          subsRef.current.set(key, unsub);
-        }
-      });
-
       // Placeholder to mark as "pending"
       const placeholderUnsub = () => {};
       subsRef.current.set(key, placeholderUnsub);
+
+      // Fetch initial candles then subscribe
+      fetchCandles(symbol, timeframe, 200)
+        .then((candles) => {
+          // If key was removed while fetching, don't subscribe
+          if (!subsRef.current.has(key) || subsRef.current.get(key) !== placeholderUnsub) {
+            return;
+          }
+          useChartStore.getState().setAlertCandles(key, candles);
+
+          const unsub = subscribeToCandles(symbol, timeframe, (candle) => {
+            useChartStore.getState().updateAlertCandle(key, candle);
+          });
+          subsRef.current.set(key, unsub);
+        })
+        .catch((err) => {
+          console.error(`[AlertTracker] Failed to fetch candles for ${key}:`, err);
+          // Remove placeholder so it can retry on next effect run
+          if (subsRef.current.get(key) === placeholderUnsub) {
+            subsRef.current.delete(key);
+          }
+        });
     }
   }, [alerts, indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts, currentSymbol, currentTimeframe, marketType]);
 
