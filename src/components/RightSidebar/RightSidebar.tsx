@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft } from 'lucide-react';
-import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType } from '@/types/trading';
+import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 
 const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial<IndicatorConfig> }[] = [
@@ -348,6 +348,114 @@ const IndicatorCrossAlertForm: React.FC = () => {
   );
 };
 
+const StochRSICrossAlertForm: React.FC = () => {
+  const { symbol, timeframe, indicators, addStochRSICrossAlert } = useChartStore();
+  const stochIndicators = indicators.filter((i) => i.visible && i.type === 'STOCH_RSI');
+  const [selectedInd, setSelectedInd] = useState('');
+  const [condition, setCondition] = useState<AlertCondition>('cross_above');
+
+  if (stochIndicators.length === 0) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const indId = selectedInd || stochIndicators[0]?.id;
+    if (!indId) return;
+    const ind = stochIndicators.find((i) => i.id === indId);
+    addStochRSICrossAlert({
+      id: crypto.randomUUID(),
+      symbol, timeframe, indicatorId: indId, condition,
+      active: true, triggered: false,
+      message: `StochRSI(${ind?.period}) K ${condition.replace('_', ' ')} D`,
+      createdAt: Date.now(),
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="panel-section rounded p-2 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <ArrowRightLeft size={12} className="text-accent-foreground" />
+        StochRSI K/D Crossover
+      </div>
+      {stochIndicators.length > 1 && (
+        <select value={selectedInd || stochIndicators[0]?.id} onChange={(e) => setSelectedInd(e.target.value)}
+          className="w-full bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+          {stochIndicators.map((ind) => (
+            <option key={ind.id} value={ind.id}>StochRSI({ind.period})</option>
+          ))}
+        </select>
+      )}
+      <select value={condition} onChange={(e) => setCondition(e.target.value as AlertCondition)}
+        className="w-full bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+        <option value="cross_above">K Cross Above D (Bullish)</option>
+        <option value="cross_below">K Cross Below D (Bearish)</option>
+        <option value="cross_any">Any K/D Cross</option>
+      </select>
+      <button type="submit" className="w-full text-xs py-1.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors font-medium">
+        Set StochRSI Alert
+      </button>
+    </form>
+  );
+};
+
+const IndicatorThresholdAlertForm: React.FC = () => {
+  const { symbol, timeframe, indicators, addIndicatorThresholdAlert } = useChartStore();
+  const thresholdIndicators = indicators.filter((i) => i.visible && (i.type === 'RSI' || i.type === 'ADX' || i.type === 'ATR'));
+  const [selectedInd, setSelectedInd] = useState('');
+  const [condition, setCondition] = useState<ThresholdCondition>('above');
+  const [threshold, setThreshold] = useState('');
+
+  if (thresholdIndicators.length === 0) return null;
+
+  const current = thresholdIndicators.find((i) => i.id === (selectedInd || thresholdIndicators[0]?.id));
+  const defaultThreshold = current?.type === 'RSI' ? (condition === 'above' ? '70' : '30')
+    : current?.type === 'ADX' ? (condition === 'above' ? '25' : '20')
+    : '14';
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const indId = selectedInd || thresholdIndicators[0]?.id;
+    const val = parseFloat(threshold) || parseFloat(defaultThreshold);
+    if (!indId || !val) return;
+    const ind = thresholdIndicators.find((i) => i.id === indId);
+    addIndicatorThresholdAlert({
+      id: crypto.randomUUID(),
+      symbol, timeframe, indicatorId: indId, condition, threshold: val,
+      active: true, triggered: false,
+      message: `${ind?.type}(${ind?.period}) ${condition} ${val}`,
+      createdAt: Date.now(),
+    });
+    setThreshold('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="panel-section rounded p-2 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <Bell size={12} className="text-accent-foreground" />
+        RSI / ADX Threshold Alert
+      </div>
+      <select value={selectedInd || thresholdIndicators[0]?.id} onChange={(e) => setSelectedInd(e.target.value)}
+        className="w-full bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+        {thresholdIndicators.map((ind) => (
+          <option key={ind.id} value={ind.id}>{ind.type}({ind.period})</option>
+        ))}
+      </select>
+      <div className="flex gap-1.5">
+        <select value={condition} onChange={(e) => setCondition(e.target.value as ThresholdCondition)}
+          className="flex-1 bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none">
+          <option value="above">Crosses Above</option>
+          <option value="below">Crosses Below</option>
+        </select>
+        <input type="number" step="any" placeholder={defaultThreshold} value={threshold}
+          onChange={(e) => setThreshold(e.target.value)}
+          className="w-16 bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground text-right" />
+      </div>
+      <button type="submit" className="w-full text-xs py-1.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors font-medium">
+        Set Threshold Alert
+      </button>
+    </form>
+  );
+};
+
 const SettingsPanel: React.FC = () => {
   const trendlines = useChartStore((s) => s.trendlines);
   const fibonacciDrawings = useChartStore((s) => s.fibonacciDrawings);
@@ -467,6 +575,10 @@ export const RightSidebar: React.FC = () => {
     clearAllDrawings,
     indicatorCrossAlerts,
     removeIndicatorCrossAlert,
+    indicatorThresholdAlerts,
+    removeIndicatorThresholdAlert,
+    stochRSICrossAlerts,
+    removeStochRSICrossAlert,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -506,17 +618,20 @@ export const RightSidebar: React.FC = () => {
           <div className="space-y-2">
             <QuickPriceAlert />
             <IndicatorCrossAlertForm />
+            <StochRSICrossAlertForm />
+            <IndicatorThresholdAlertForm />
             <div className="flex items-center justify-between px-1">
               <p className="text-xs text-muted-foreground">
-                {alerts.length + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length === 0
-                  ? 'No alerts set.'
-                  : `${alerts.length + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length} active alert(s)`}
+                {(() => {
+                  const total = alerts.length
+                    + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length
+                    + (indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).length
+                    + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length;
+                  return total === 0 ? 'No alerts set.' : `${total} active alert(s)`;
+                })()}
               </p>
-              {(alerts.length > 0 || indicatorCrossAlerts.length > 0) && (
-                <button
-                  onClick={clearAllAlerts}
-                  className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
-                >
+              {(alerts.length > 0 || indicatorCrossAlerts.length > 0 || (indicatorThresholdAlerts ?? []).length > 0 || (stochRSICrossAlerts ?? []).length > 0) && (
+                <button onClick={clearAllAlerts} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">
                   Delete All
                 </button>
               )}
@@ -527,19 +642,11 @@ export const RightSidebar: React.FC = () => {
                   <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) };
-                        removeAlert(alert.id);
-                        useChartStore.getState().addAlert(updated);
-                      }}
+                      onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeAlert(alert.id); useChartStore.getState().addAlert(updated); }}
                       className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
                       title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
-                    >
-                      <Send size={10} />
-                    </button>
-                    <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 size={12} />
-                    </button>
+                    ><Send size={10} /></button>
+                    <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                   </div>
                 </div>
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
@@ -553,21 +660,36 @@ export const RightSidebar: React.FC = () => {
                     <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) };
-                        removeIndicatorCrossAlert(alert.id);
-                        useChartStore.getState().addIndicatorCrossAlert(updated);
-                      }}
+                    <button onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeIndicatorCrossAlert(alert.id); useChartStore.getState().addIndicatorCrossAlert(updated); }}
                       className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
                       title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
-                    >
-                      <Send size={10} />
-                    </button>
-                    <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 size={12} />
-                    </button>
+                    ><Send size={10} /></button>
+                    <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                   </div>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">StochRSI {alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <button onClick={() => removeStochRSICrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Bell size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">{alert.condition} {alert.threshold}</span>
+                  </div>
+                  <button onClick={() => removeIndicatorThresholdAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                 </div>
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
               </div>

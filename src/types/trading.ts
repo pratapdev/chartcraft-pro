@@ -41,6 +41,7 @@ export interface FibonacciDrawing {
 }
 
 export type AlertCondition = 'cross_above' | 'cross_below' | 'cross_any';
+export type ThresholdCondition = 'above' | 'below';
 
 export interface Alert {
   id: string;
@@ -62,6 +63,39 @@ export interface IndicatorCrossAlert {
   timeframe: Timeframe;
   indicatorId1: string;
   indicatorId2: string;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export interface IndicatorThresholdAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  /** Which indicator (by id) to watch */
+  indicatorId: string;
+  /** 'above' or 'below' */
+  condition: ThresholdCondition;
+  /** The threshold value (e.g. RSI 70, ADX 25) */
+  threshold: number;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export interface StochRSICrossAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  /** The StochRSI indicator id */
+  indicatorId: string;
   condition: AlertCondition;
   active: boolean;
   triggered: boolean;

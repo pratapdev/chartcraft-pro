@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
@@ -68,6 +68,16 @@ interface ChartStore {
   addIndicatorCrossAlert: (alert: IndicatorCrossAlert) => void;
   removeIndicatorCrossAlert: (id: string) => void;
   clearAllIndicatorCrossAlerts: () => void;
+
+  // Indicator threshold alerts (RSI above/below, ADX above/below)
+  indicatorThresholdAlerts: IndicatorThresholdAlert[];
+  addIndicatorThresholdAlert: (alert: IndicatorThresholdAlert) => void;
+  removeIndicatorThresholdAlert: (id: string) => void;
+
+  // StochRSI K/D cross alerts
+  stochRSICrossAlerts: StochRSICrossAlert[];
+  addStochRSICrossAlert: (alert: StochRSICrossAlert) => void;
+  removeStochRSICrossAlert: (id: string) => void;
 
   // Indicators
   selectedIndicatorId: string | null;
@@ -229,13 +239,21 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     }
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [] }),
+  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [], indicatorThresholdAlerts: [], stochRSICrossAlerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
   indicatorCrossAlerts: [],
   addIndicatorCrossAlert: (alert) => set((s) => ({ indicatorCrossAlerts: [...s.indicatorCrossAlerts, alert] })),
   removeIndicatorCrossAlert: (id) => set((s) => ({ indicatorCrossAlerts: s.indicatorCrossAlerts.filter((a) => a.id !== id) })),
   clearAllIndicatorCrossAlerts: () => set({ indicatorCrossAlerts: [] }),
+
+  indicatorThresholdAlerts: [],
+  addIndicatorThresholdAlert: (alert) => set((s) => ({ indicatorThresholdAlerts: [...s.indicatorThresholdAlerts, alert] })),
+  removeIndicatorThresholdAlert: (id) => set((s) => ({ indicatorThresholdAlerts: s.indicatorThresholdAlerts.filter((a) => a.id !== id) })),
+
+  stochRSICrossAlerts: [],
+  addStochRSICrossAlert: (alert) => set((s) => ({ stochRSICrossAlerts: [...s.stochRSICrossAlerts, alert] })),
+  removeStochRSICrossAlert: (id) => set((s) => ({ stochRSICrossAlerts: s.stochRSICrossAlerts.filter((a) => a.id !== id) })),
 
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
@@ -315,6 +333,8 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     alertLogs: state.alertLogs,
     indicators: state.indicators,
     indicatorCrossAlerts: state.indicatorCrossAlerts,
+    indicatorThresholdAlerts: state.indicatorThresholdAlerts,
+    stochRSICrossAlerts: state.stochRSICrossAlerts,
     fibonacciDrawings: state.fibonacciDrawings,
     symbol: state.symbol,
     timeframe: state.timeframe,
