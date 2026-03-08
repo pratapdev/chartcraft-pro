@@ -429,6 +429,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         onMouseLeave={() => {
           if (dragRef.current) { dragRef.current = null; setIsInteracting(false); }
           setHoveringLine(false);
+          setHoverY(null);
         }}
       />
     </>
