@@ -605,11 +605,18 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   // Keyboard
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTrendlineId) {
-        removeTrendline(selectedTrendlineId);
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedTrendlineId) removeTrendline(selectedTrendlineId);
+        if (selectedFibId) {
+          removeFibonacci(selectedFibId);
+          setSelectedFibId(null);
+          setFibDeletePos(null);
+        }
       }
       if (e.key === 'Escape') {
         setSelectedTrendlineId(null);
+        setSelectedFibId(null);
+        setFibDeletePos(null);
         drawRef.current = EMPTY_DRAW;
         measureRef.current = EMPTY_MEASURE;
         fibRef.current = EMPTY_FIB;
@@ -620,7 +627,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedTrendlineId, removeTrendline, setSelectedTrendlineId, setActiveTool]);
+  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or trendlines exist in cursor mode
   const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || (activeTool === 'cursor' && (trendlines.length > 0 || fibonacciDrawings.length > 0));
