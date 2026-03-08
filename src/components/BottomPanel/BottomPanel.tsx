@@ -1,6 +1,6 @@
 import React from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { Bell, AlertTriangle } from 'lucide-react';
+import { Bell, AlertTriangle, Trash2 } from 'lucide-react';
 
 export const BottomPanel: React.FC = () => {
   const { alertLogs } = useChartStore();
@@ -18,10 +18,18 @@ export const BottomPanel: React.FC = () => {
 
   return (
     <div className="h-24 border-t border-border bg-card overflow-y-auto">
-      <div className="px-3 py-1 border-b border-border sticky top-0 bg-card">
+      <div className="px-3 py-1 border-b border-border sticky top-0 bg-card flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Alert Log
+          Alert Log ({alertLogs.length})
         </span>
+        <button
+          onClick={() => useChartStore.getState().clearAlertLogs()}
+          className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+          title="Clear all alert logs"
+        >
+          <Trash2 size={10} />
+          Clear
+        </button>
       </div>
       {alertLogs.map((log) => (
         <div
