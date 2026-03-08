@@ -90,6 +90,7 @@ interface ChartStore {
 
   // Undo
   undoLastDeletion: () => void;
+  redoLastDeletion: () => void;
 
   // Multi-timeframe
   multiTfMode: boolean;
