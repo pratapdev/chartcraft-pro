@@ -678,3 +678,190 @@ export function computePctDiffDonchian(
 
   return { pctDiff, emaLine, basis, upper, lower, upperNew, lowerNew };
 }
+
+// ============= Market Structure Break & Order Block (MSB-OB) =============
+
+export interface MsbObZone {
+  type: 'Bu-OB' | 'Be-OB' | 'Bu-BB' | 'Bu-MB' | 'Be-BB' | 'Be-MB';
+  top: number;
+  bottom: number;
+  startTime: number;
+  broken: boolean;
+}
+
+export interface MsbObResult {
+  zigzag: { time: number; price: number }[];
+  msbMarkers: { time: number; price: number; direction: 'bull' | 'bear'; label: string }[];
+  msbLines: { time1: number; time2: number; price: number; direction: 'bull' | 'bear' }[];
+  zones: MsbObZone[];
+}
+
+export function computeMsbOb(candles: Candle[], zigzagLen: number, fibFactor: number): MsbObResult {
+  const result: MsbObResult = { zigzag: [], msbMarkers: [], msbLines: [], zones: [] };
+  if (candles.length < zigzagLen * 3) return result;
+
+  // Compute highest/lowest over zigzagLen
+  const highestArr: number[] = new Array(candles.length).fill(0);
+  const lowestArr: number[] = new Array(candles.length).fill(Infinity);
+  for (let i = 0; i < candles.length; i++) {
+    let hi = -Infinity, lo = Infinity;
+    for (let j = Math.max(0, i - zigzagLen + 1); j <= i; j++) {
+      hi = Math.max(hi, candles[j].high);
+      lo = Math.min(lo, candles[j].low);
+    }
+    highestArr[i] = hi;
+    lowestArr[i] = lo;
+  }
+
+  // ZigZag trend detection
+  const trend: number[] = new Array(candles.length).fill(0);
+  trend[0] = 1;
+  
+  const highPoints: { price: number; index: number }[] = [];
+  const lowPoints: { price: number; index: number }[] = [];
+
+  for (let i = 1; i < candles.length; i++) {
+    const toUp = candles[i].high >= highestArr[i];
+    const toDown = candles[i].low <= lowestArr[i];
+    
+    const prevTrend = trend[i - 1] || 1;
+    if (prevTrend === 1 && toDown) trend[i] = -1;
+    else if (prevTrend === -1 && toUp) trend[i] = 1;
+    else trend[i] = prevTrend;
+
+    // On trend change, find swing point
+    if (trend[i] !== trend[i - 1]) {
+      if (trend[i] === 1) {
+        // Trend changed to up - find the lowest low since last up
+        let minLow = Infinity, minIdx = i;
+        for (let j = i; j >= Math.max(0, i - 50); j--) {
+          if (candles[j].low < minLow) { minLow = candles[j].low; minIdx = j; }
+          if (j < i && trend[j] !== trend[j + 1]) break;
+        }
+        lowPoints.push({ price: minLow, index: minIdx });
+      }
+      if (trend[i] === -1) {
+        // Trend changed to down - find the highest high since last down
+        let maxHigh = -Infinity, maxIdx = i;
+        for (let j = i; j >= Math.max(0, i - 50); j--) {
+          if (candles[j].high > maxHigh) { maxHigh = candles[j].high; maxIdx = j; }
+          if (j < i && trend[j] !== trend[j + 1]) break;
+        }
+        highPoints.push({ price: maxHigh, index: maxIdx });
+      }
+    }
+  }
+
+  // Build zigzag from interleaved high/low points
+  const allPoints: { price: number; index: number; type: 'high' | 'low' }[] = [];
+  for (const p of highPoints) allPoints.push({ ...p, type: 'high' });
+  for (const p of lowPoints) allPoints.push({ ...p, type: 'low' });
+  allPoints.sort((a, b) => a.index - b.index);
+  
+  // Remove consecutive same-type points (keep extremes)
+  const zigzag: { price: number; index: number; type: 'high' | 'low' }[] = [];
+  for (const p of allPoints) {
+    if (zigzag.length === 0) { zigzag.push(p); continue; }
+    const last = zigzag[zigzag.length - 1];
+    if (last.type === p.type) {
+      if (p.type === 'high' && p.price > last.price) zigzag[zigzag.length - 1] = p;
+      if (p.type === 'low' && p.price < last.price) zigzag[zigzag.length - 1] = p;
+    } else {
+      zigzag.push(p);
+    }
+  }
+
+  result.zigzag = zigzag.map(p => ({ time: candles[p.index].time, price: p.price }));
+
+  // Market structure detection
+  let market = 1;
+  const zones: MsbObZone[] = [];
+
+  for (let zi = 3; zi < zigzag.length; zi++) {
+    const curr = zigzag[zi];
+    const prev = zigzag[zi - 1];
+    const prev2 = zigzag[zi - 2];
+    const prev3 = zigzag[zi - 3];
+
+    if (curr.type === 'low' && prev2.type === 'low') {
+      // Check for bearish MSB: lower low
+      const l0 = curr, l1 = prev2, h0 = prev;
+      const fibRange = Math.abs(h0.price - l1.price) * fibFactor;
+      if (l0.price < l1.price - fibRange && market === 1) {
+        market = -1;
+        // MSB marker and line
+        const midTime = candles[Math.floor((l1.index + h0.index) / 2)]?.time ?? candles[l0.index].time;
+        result.msbMarkers.push({ time: midTime, price: l1.price, direction: 'bear', label: 'MSB' });
+        result.msbLines.push({ time1: candles[l1.index].time, time2: candles[l0.index].time, price: l1.price, direction: 'bear' });
+
+        // Bearish Order Block: last bullish candle between l1i and h0i
+        let beObIdx = -1;
+        for (let k = l1.index; k <= h0.index; k++) {
+          if (candles[k].open < candles[k].close) beObIdx = k; // bullish candle = bearish OB
+        }
+        if (beObIdx >= 0) {
+          zones.push({ type: 'Be-OB', top: candles[beObIdx].high, bottom: candles[beObIdx].low, startTime: candles[beObIdx].time, broken: false });
+        }
+
+        // Bearish Breaker Block: last bearish candle between h1i and l1i
+        if (zi >= 3 && prev3.type === 'high') {
+          const h1 = prev3;
+          let beBbIdx = -1;
+          for (let k = h1.index; k <= l1.index; k++) {
+            if (candles[k].open > candles[k].close) beBbIdx = k; // bearish candle = Be-BB
+          }
+          if (beBbIdx >= 0) {
+            const label = h0.price > prev3.price ? 'Be-BB' : 'Be-MB';
+            zones.push({ type: label as any, top: candles[beBbIdx].high, bottom: candles[beBbIdx].low, startTime: candles[beBbIdx].time, broken: false });
+          }
+        }
+      }
+    }
+
+    if (curr.type === 'high' && prev2.type === 'high') {
+      // Check for bullish MSB: higher high
+      const h0 = curr, h1 = prev2, l0 = prev;
+      const fibRange = Math.abs(h1.price - l0.price) * fibFactor;
+      if (h0.price > h1.price + fibRange && market === -1) {
+        market = 1;
+        const midTime = candles[Math.floor((h1.index + l0.index) / 2)]?.time ?? candles[h0.index].time;
+        result.msbMarkers.push({ time: midTime, price: h1.price, direction: 'bull', label: 'MSB' });
+        result.msbLines.push({ time1: candles[h1.index].time, time2: candles[h0.index].time, price: h1.price, direction: 'bull' });
+
+        // Bullish Order Block: last bearish candle between h1i and l0i
+        let buObIdx = -1;
+        for (let k = h1.index; k <= l0.index; k++) {
+          if (candles[k].open > candles[k].close) buObIdx = k; // bearish candle = bullish OB
+        }
+        if (buObIdx >= 0) {
+          zones.push({ type: 'Bu-OB', top: candles[buObIdx].high, bottom: candles[buObIdx].low, startTime: candles[buObIdx].time, broken: false });
+        }
+
+        // Bullish Breaker Block: last bullish candle between l1i and h1i
+        if (zi >= 3 && prev3.type === 'low') {
+          const l1 = prev3;
+          let buBbIdx = -1;
+          for (let k = l1.index; k <= h1.index; k++) {
+            if (candles[k].open < candles[k].close) buBbIdx = k; // bullish candle = Bu-BB
+          }
+          if (buBbIdx >= 0) {
+            const label = l0.price < prev3.price ? 'Bu-BB' : 'Bu-MB';
+            zones.push({ type: label as any, top: candles[buBbIdx].high, bottom: candles[buBbIdx].low, startTime: candles[buBbIdx].time, broken: false });
+          }
+        }
+      }
+    }
+  }
+
+  // Check if zones are broken by current price
+  if (candles.length > 0) {
+    const lastClose = candles[candles.length - 1].close;
+    for (const zone of zones) {
+      if (zone.type.startsWith('Bu') && lastClose < zone.bottom) zone.broken = true;
+      if (zone.type.startsWith('Be') && lastClose > zone.top) zone.broken = true;
+    }
+  }
+
+  result.zones = zones.filter(z => !z.broken);
+  return result;
+}
