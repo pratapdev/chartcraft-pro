@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   createChart,
   IChartApi,
@@ -26,6 +26,9 @@ export const CandlestickChart: React.FC = () => {
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
   const chartSync = useChartSync();
+  const hasDragged = useRef(false);
+  const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const { candles, indicators, chartFontSize, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
@@ -69,9 +72,22 @@ export const CandlestickChart: React.FC = () => {
         borderColor: '#1c2333',
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 15,
       },
       handleScroll: { vertTouchDrag: false },
     });
+
+    // Track user drag to enable "Reset Chart"
+    let mouseDownOnChart = false;
+    const onMouseDown = () => { mouseDownOnChart = true; };
+    const onMouseUp = () => {
+      if (mouseDownOnChart) {
+        hasDragged.current = true;
+        mouseDownOnChart = false;
+      }
+    };
+    containerRef.current.addEventListener('mousedown', onMouseDown);
+    containerRef.current.addEventListener('mouseup', onMouseUp);
 
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#22c55e',
@@ -175,9 +191,12 @@ export const CandlestickChart: React.FC = () => {
       });
     }
 
+    const containerEl = containerRef.current;
     return () => {
       ro.disconnect();
       if (chartSync) chartSync.unregisterChart('main');
+      containerEl?.removeEventListener('mousedown', onMouseDown);
+      containerEl?.removeEventListener('mouseup', onMouseUp);
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -222,7 +241,30 @@ export const CandlestickChart: React.FC = () => {
     } else if (prevRange) {
       timeScale.setVisibleLogicalRange(prevRange);
     }
+
+    // Store initial range on first load
+    if (!initialRangeRef.current) {
+      const r = timeScale.getVisibleLogicalRange();
+      if (r) initialRangeRef.current = { from: r.from, to: r.to };
+    }
   }, [candles]);
+
+  const resetChart = useCallback(() => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+    if (initialRangeRef.current) {
+      ts.setVisibleLogicalRange(initialRangeRef.current);
+    } else {
+      ts.scrollToRealTime();
+    }
+    hasDragged.current = false;
+    setContextMenu(null);
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
 
   // Update indicators
   useEffect(() => {
@@ -502,11 +544,35 @@ export const CandlestickChart: React.FC = () => {
   }, [candles, indicators]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
       <div ref={containerRef} className="w-full h-full" />
       <CrosshairLegend />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+      {contextMenu && (
+        <div
+          className="fixed z-[100] min-w-[160px] rounded-md border border-border bg-popover p-1 shadow-md"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex w-full items-center rounded-sm px-3 py-1.5 text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            disabled={!hasDragged.current}
+            onClick={resetChart}
+          >
+            Reset Chart
+          </button>
+          <button
+            className="flex w-full items-center rounded-sm px-3 py-1.5 text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            onClick={() => {
+              chartRef.current?.timeScale().scrollToRealTime();
+              setContextMenu(null);
+            }}
+          >
+            Go to Latest
+          </button>
+        </div>
+      )}
     </div>
   );
 };
