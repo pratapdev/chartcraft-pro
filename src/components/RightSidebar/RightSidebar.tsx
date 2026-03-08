@@ -397,7 +397,7 @@ export const RightSidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-64 bg-card border-l border-border flex flex-col h-full">
+    <div className="bg-card border-l border-border flex flex-col h-full w-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-panel-header">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {rightPanelTab}
