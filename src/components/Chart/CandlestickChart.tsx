@@ -11,10 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { useChartSync } from './ChartSyncContext';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP, computeSupertrend, computePivotHighLow, computeMsbOb } from '@/lib/marketData';
-import { LineStyleType } from '@/types/trading';
-
-const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
+import { useIndicatorRenderer } from './useIndicatorRenderer';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
@@ -24,13 +21,14 @@ export const CandlestickChart: React.FC = () => {
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
   const chartSync = useChartSync();
   const hasDragged = useRef(false);
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const { candles, indicators, chartFontSize, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
+
+  const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, indicators);
 
   useEffect(() => {
     loadCandles().then(() => startLiveUpdates());
@@ -43,7 +41,7 @@ export const CandlestickChart: React.FC = () => {
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
-      lineSeriesRefs.current.clear();
+      clearLineSeries();
     }
 
     const chart = createChart(containerRef.current, {
@@ -266,282 +264,6 @@ export const CandlestickChart: React.FC = () => {
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  // Update indicators
-  useEffect(() => {
-    if (!chartRef.current || candles.length === 0) return;
-
-    lineSeriesRefs.current.forEach((series) => {
-      try { chartRef.current?.removeSeries(series); } catch {}
-    });
-    lineSeriesRefs.current.clear();
-
-    // Collect all markers to merge Supertrend + Pivot HL
-    let allMarkers: { time: Time; position: 'aboveBar' | 'belowBar'; color: string; shape: 'arrowUp' | 'arrowDown' | 'circle'; text: string }[] = [];
-
-    for (const ind of indicators) {
-      if (!ind.visible) continue;
-
-      if (ind.type === 'EMA' || ind.type === 'SMA') {
-        const data = ind.type === 'EMA' ? computeEMA(candles, ind.period) : computeSMA(candles, ind.period);
-        if (data.length === 0) continue;
-        const series = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-          lineStyle: toLWLineStyle(ind.lineStyle),
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-        lineSeriesRefs.current.set(ind.id, series);
-      }
-
-      // RSI and StochRSI are now rendered in separate IndicatorPane components
-
-      if (ind.type === 'BBANDS') {
-        const { upper, middle, lower } = computeBollingerBands(candles, ind.period, ind.stdDev ?? 2);
-        if (middle.length === 0) continue;
-
-        const middleSeries = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-          lineStyle: toLWLineStyle(ind.lineStyle),
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        middleSeries.setData(middle.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-        lineSeriesRefs.current.set(ind.id + '-mid', middleSeries);
-
-        const upperSeries = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-          lineStyle: toLWLineStyle(ind.lineStyle) || 2,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        upperSeries.setData(upper.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-        lineSeriesRefs.current.set(ind.id + '-upper', upperSeries);
-
-        const lowerSeries = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
-          lineStyle: toLWLineStyle(ind.lineStyle) || 2,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        lowerSeries.setData(lower.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-        lineSeriesRefs.current.set(ind.id + '-lower', lowerSeries);
-      }
-
-      if (ind.type === 'VWAP') {
-        const data = computeVWAP(candles);
-        if (data.length === 0) continue;
-        const series = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
-          lineStyle: toLWLineStyle(ind.lineStyle),
-          priceLineVisible: false,
-          lastValueVisible: true,
-          crosshairMarkerVisible: false,
-        });
-        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-        lineSeriesRefs.current.set(ind.id, series);
-      }
-
-      if (ind.type === 'SUPERTREND') {
-        const { line, signals } = computeSupertrend(candles, ind.period, ind.multiplier ?? 3);
-        if (line.length === 0) continue;
-
-        const greenData: (LineData | { time: Time; value: number })[] = [];
-        const redData: (LineData | { time: Time; value: number })[] = [];
-
-        for (let i = 0; i < line.length; i++) {
-          const pt = { time: line[i].time as Time, value: line[i].value };
-          if (line[i].color === '#22c55e') {
-            greenData.push(pt);
-            if (i > 0 && line[i - 1].color === '#ef4444') {
-              greenData.splice(greenData.length - 1, 0, { time: line[i - 1].time as Time, value: line[i - 1].value });
-            }
-          } else {
-            redData.push(pt);
-            if (i > 0 && line[i - 1].color === '#22c55e') {
-              redData.splice(redData.length - 1, 0, { time: line[i - 1].time as Time, value: line[i - 1].value });
-            }
-          }
-        }
-
-        if (greenData.length > 0) {
-          const greenSeries = chartRef.current.addLineSeries({
-            color: ind.color || '#22c55e',
-            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
-            lineStyle: toLWLineStyle(ind.lineStyle),
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          greenSeries.setData(greenData as LineData[]);
-          lineSeriesRefs.current.set(ind.id + '-green', greenSeries);
-        }
-
-        if (redData.length > 0) {
-          const redSeries = chartRef.current.addLineSeries({
-            color: ind.color2 || '#ef4444',
-            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
-            lineStyle: toLWLineStyle(ind.lineStyle),
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          redSeries.setData(redData as LineData[]);
-          lineSeriesRefs.current.set(ind.id + '-red', redSeries);
-        }
-
-        if (signals.length > 0) {
-          allMarkers.push(...signals.map((s) => ({
-            time: s.time as Time,
-            position: s.direction === 'buy' ? 'belowBar' as const : 'aboveBar' as const,
-            color: s.direction === 'buy' ? '#22c55e' : '#ef4444',
-            shape: s.direction === 'buy' ? 'arrowUp' as const : 'arrowDown' as const,
-            text: s.direction === 'buy' ? 'BUY' : 'SELL',
-          })));
-        }
-      }
-
-      if (ind.type === 'PIVOT_HL') {
-        const { highs, lows } = computePivotHighLow(candles, ind.period, ind.period);
-
-        // Add pivot high markers
-        allMarkers.push(...highs.map((p) => ({
-          time: p.time as Time,
-          position: 'aboveBar' as const,
-          color: ind.color || '#22c55e',
-          shape: 'circle' as const,
-          text: `H ${p.price.toFixed(2)}`,
-        })));
-
-        // Add pivot low markers
-        allMarkers.push(...lows.map((p) => ({
-          time: p.time as Time,
-          position: 'belowBar' as const,
-          color: ind.color2 || '#ef4444',
-          shape: 'circle' as const,
-          text: `L ${p.price.toFixed(2)}`,
-        })));
-      }
-
-      if (ind.type === 'MSB_OB') {
-        const msbResult = computeMsbOb(candles, ind.zigzagLength ?? 9, ind.fibFactor ?? 0.33);
-
-        // ZigZag line
-        if (msbResult.zigzag.length > 1) {
-          const zigzagSeries = chartRef.current.addLineSeries({
-            color: '#6b7280',
-            lineWidth: 1 as 1 | 2 | 3 | 4,
-            lineStyle: 2,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          zigzagSeries.setData(msbResult.zigzag.map(p => ({ time: p.time as Time, value: p.price })) as LineData[]);
-          lineSeriesRefs.current.set(ind.id + '-zigzag', zigzagSeries);
-        }
-
-        // MSB horizontal lines
-        for (let mi = 0; mi < msbResult.msbLines.length; mi++) {
-          const msb = msbResult.msbLines[mi];
-          const color = msb.direction === 'bull' ? '#22c55e' : '#ef4444';
-          const msbSeries = chartRef.current.addLineSeries({
-            color,
-            lineWidth: 2 as 1 | 2 | 3 | 4,
-            lineStyle: 0,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          msbSeries.setData([
-            { time: msb.time1 as Time, value: msb.price },
-            { time: msb.time2 as Time, value: msb.price },
-          ] as LineData[]);
-          lineSeriesRefs.current.set(ind.id + `-msb-${mi}`, msbSeries);
-        }
-
-        // MSB markers
-        allMarkers.push(...msbResult.msbMarkers.map(m => ({
-          time: m.time as Time,
-          position: (m.direction === 'bull' ? 'aboveBar' : 'belowBar') as 'aboveBar' | 'belowBar',
-          color: m.direction === 'bull' ? '#22c55e' : '#ef4444',
-          shape: (m.direction === 'bull' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
-          text: m.label,
-        })));
-
-        // Order Block & Breaker Block zones (top + bottom lines)
-        const lastTime = candles[candles.length - 1].time;
-        for (let zi = 0; zi < msbResult.zones.length; zi++) {
-          const zone = msbResult.zones[zi];
-          const isBull = zone.type.startsWith('Bu');
-          const zoneColor = isBull ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)';
-          const zoneBorderColor = isBull ? '#22c55e' : '#ef4444';
-
-          // Top line
-          const topSeries = chartRef.current.addLineSeries({
-            color: zoneBorderColor,
-            lineWidth: 1 as 1 | 2 | 3 | 4,
-            lineStyle: 0,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          topSeries.setData([
-            { time: zone.startTime as Time, value: zone.top },
-            { time: lastTime as Time, value: zone.top },
-          ] as LineData[]);
-          lineSeriesRefs.current.set(ind.id + `-zone-top-${zi}`, topSeries);
-
-          // Bottom line
-          const bottomSeries = chartRef.current.addLineSeries({
-            color: zoneBorderColor,
-            lineWidth: 1 as 1 | 2 | 3 | 4,
-            lineStyle: 0,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-          });
-          bottomSeries.setData([
-            { time: zone.startTime as Time, value: zone.bottom },
-            { time: lastTime as Time, value: zone.bottom },
-          ] as LineData[]);
-          lineSeriesRefs.current.set(ind.id + `-zone-bot-${zi}`, bottomSeries);
-
-          // Mid label line (faint, for zone fill effect)
-          const midSeries = chartRef.current.addLineSeries({
-            color: zoneColor,
-            lineWidth: 1 as 1 | 2 | 3 | 4,
-            lineStyle: 1,
-            priceLineVisible: false,
-            lastValueVisible: true,
-            crosshairMarkerVisible: false,
-          });
-          const midPrice = (zone.top + zone.bottom) / 2;
-          midSeries.setData([
-            { time: zone.startTime as Time, value: midPrice },
-            { time: lastTime as Time, value: midPrice },
-          ] as LineData[]);
-          // Set the last value label to show zone type
-          midSeries.applyOptions({ title: zone.type });
-          lineSeriesRefs.current.set(ind.id + `-zone-mid-${zi}`, midSeries);
-        }
-      }
-    }
-
-    // Sort markers by time (required by lightweight-charts) and set on candle series
-    if (candleSeriesRef.current) {
-      allMarkers.sort((a, b) => (a.time as number) - (b.time as number));
-      candleSeriesRef.current.setMarkers(allMarkers);
-    }
-  }, [candles, indicators]);
 
   return (
     <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
