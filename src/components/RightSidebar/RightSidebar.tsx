@@ -146,8 +146,9 @@ export const RightSidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-2">
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
+            <QuickPriceAlert />
             <p className="text-xs text-muted-foreground px-1">
-              {alerts.length === 0 ? 'No alerts set. Select a trendline and create an alert.' : `${alerts.length} active alert(s)`}
+              {alerts.length === 0 ? 'No alerts set.' : `${alerts.length} active alert(s)`}
             </p>
             {alerts.map((alert) => (
               <div key={alert.id} className="panel-section rounded p-2 text-xs">
@@ -157,7 +158,7 @@ export const RightSidebar: React.FC = () => {
                     <Trash2 size={12} />
                   </button>
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe}</div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · ${alert.message ?? ''}</div>
               </div>
             ))}
             {alertLogs.length > 0 && (
