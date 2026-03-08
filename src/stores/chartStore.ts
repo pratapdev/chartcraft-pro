@@ -45,6 +45,7 @@ interface ChartStore {
   addIndicator: (ind: IndicatorConfig) => void;
   removeIndicator: (id: string) => void;
   toggleIndicator: (id: string) => void;
+  updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
 
   // Right sidebar
   rightPanelOpen: boolean;
