@@ -376,6 +376,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (activeTool === 'fibonacci') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          fibRef.current = {
+            phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my,
+            startPrice: coords.price, currentPrice: coords.price,
+            startTime: coords.time, currentTime: coords.time,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       if (activeTool === 'measure') {
         const coords = pixelToCoords(mx, my);
         if (coords) {
