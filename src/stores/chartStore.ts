@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
+import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 
 interface ChartStore {
   // Symbol & timeframe
