@@ -22,6 +22,7 @@ function toBinanceSymbol(symbol: string): string {
 }
 const INTERVAL_MAP: Record<Timeframe, string> = {
   '1m': '1m',
+  '3m': '3m',
   '5m': '5m',
   '15m': '15m',
   '1h': '1h',
