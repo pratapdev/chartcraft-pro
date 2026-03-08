@@ -3,7 +3,7 @@ import { useChartStore } from '@/stores/chartStore';
 import { toast } from 'sonner';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV } from '@/lib/marketData';
-import { IndicatorConfig } from '@/types/trading';
+import { Candle, IndicatorConfig } from '@/types/trading';
 
 // Shared AudioContext, unlocked on first user gesture
 let sharedCtx: AudioContext | null = null;
@@ -83,7 +83,7 @@ function playAlertSound(direction: 'above' | 'below' | 'any') {
   } catch {}
 }
 
-function getIndicatorValues(ind: IndicatorConfig, candles: { time: number; open: number; high: number; low: number; close: number; volume: number }[]): { time: number; value: number }[] {
+function getIndicatorValues(ind: IndicatorConfig, candles: Candle[]): { time: number; value: number }[] {
   if (ind.type === 'EMA') return computeEMA(candles, ind.period);
   if (ind.type === 'SMA') return computeSMA(candles, ind.period);
   if (ind.type === 'RSI') return computeRSI(candles, ind.period);
@@ -97,76 +97,103 @@ function getIndicatorLabel(ind: IndicatorConfig): string {
   return `${ind.type}(${ind.period})`;
 }
 
+/** Helper: get candles for a specific alert's symbol:timeframe from the alertCandles map */
+function getCandlesForAlert(symbol: string, timeframe: string): Candle[] {
+  const key = `${symbol}:${timeframe}`;
+  return useChartStore.getState().alertCandles[key] ?? [];
+}
+
+function fireAlert(opts: {
+  message: string;
+  symbol: string;
+  alertId: string;
+  price: number;
+  direction: 'above' | 'below' | 'any';
+  telegramEnabled?: boolean;
+  time: number;
+}) {
+  playAlertSound(opts.direction);
+  toast.warning(opts.message, {
+    duration: 5000,
+    description: `At ${new Date(opts.time * 1000).toLocaleTimeString()}`,
+  });
+  sendBrowserNotification(`⚠️ ${opts.symbol} Alert`, opts.message);
+  if (opts.telegramEnabled !== false) {
+    sendTelegramMessage(`⚠️ <b>${opts.symbol} Alert</b>\n${opts.message}\n🕐 ${new Date(opts.time * 1000).toLocaleTimeString()}`);
+  }
+  useChartStore.getState().addAlertLog({
+    id: crypto.randomUUID(),
+    alertId: opts.alertId,
+    symbol: opts.symbol,
+    message: opts.message,
+    timestamp: Date.now(),
+    price: opts.price,
+  });
+}
+
 export function useAlertChecker() {
-  const { candles, alerts, trendlines, addAlertLog, indicators, indicatorCrossAlerts } = useChartStore();
+  const alertCandles = useChartStore((s) => s.alertCandles);
+  const alerts = useChartStore((s) => s.alerts);
+  const trendlines = useChartStore((s) => s.trendlines);
+  const indicators = useChartStore((s) => s.indicators);
+  const indicatorCrossAlerts = useChartStore((s) => s.indicatorCrossAlerts);
   const indicatorThresholdAlerts = useChartStore((s) => s.indicatorThresholdAlerts);
   const stochRSICrossAlerts = useChartStore((s) => s.stochRSICrossAlerts);
-  const prevCloseRef = useRef<number | null>(null);
+
   const triggeredSetRef = useRef<Set<string>>(new Set());
   const crossTriggeredRef = useRef<Set<string>>(new Set());
   const thresholdTriggeredRef = useRef<Set<string>>(new Set());
   const stochTriggeredRef = useRef<Set<string>>(new Set());
 
-  // Trendline alerts
+  // Trendline alerts — check per-symbol candles
   useEffect(() => {
-    if (candles.length < 2) return;
-
-    const curr = candles[candles.length - 1];
-    const prev = candles[candles.length - 2];
-
-    if (prevCloseRef.current === curr.close) return;
-    prevCloseRef.current = curr.close;
-
     const activeAlerts = alerts.filter((a) => a.active && !a.triggered);
     if (activeAlerts.length === 0) return;
 
-    const alertedTrendlines = trendlines.filter((t) =>
-      activeAlerts.some((a) => a.trendlineId === t.id)
-    );
-    if (alertedTrendlines.length === 0) return;
+    for (const alert of activeAlerts) {
+      if (triggeredSetRef.current.has(alert.id)) continue;
+      const candles = getCandlesForAlert(alert.symbol, alert.timeframe);
+      if (candles.length < 2) continue;
 
-    for (const line of alertedTrendlines) {
+      const line = trendlines.find((t) => t.id === alert.trendlineId);
+      if (!line) continue;
+
+      const prev = candles[candles.length - 2];
+      const curr = candles[candles.length - 1];
       const dir = detectCrossingDynamic(prev, curr, line);
       if (!dir) continue;
 
-      const matchingAlerts = activeAlerts.filter((a) => {
-        if (a.trendlineId !== line.id) return false;
-        if (triggeredSetRef.current.has(a.id)) return false;
-        if (a.condition === 'cross_any') return true;
-        if (a.condition === 'cross_above' && dir === 'above') return true;
-        if (a.condition === 'cross_below' && dir === 'below') return true;
-        return false;
-      });
+      const matches =
+        alert.condition === 'cross_any' ||
+        (alert.condition === 'cross_above' && dir === 'above') ||
+        (alert.condition === 'cross_below' && dir === 'below');
+      if (!matches) continue;
 
-      for (const alert of matchingAlerts) {
-        triggeredSetRef.current.add(alert.id);
-        const dirLabel = dir === 'above' ? '↑ Crossed Above' : '↓ Crossed Below';
-        const message = `${alert.symbol} ${dirLabel} trendline at ${curr.close.toFixed(2)}`;
-        const soundDir = alert.condition === 'cross_any' ? 'any' : dir;
-        playAlertSound(soundDir);
-        toast.warning(message, { duration: 5000, description: `Alert triggered at ${new Date(curr.time * 1000).toLocaleTimeString()}` });
-        sendBrowserNotification(`⚠️ ${alert.symbol} Alert`, message);
-        if (alert.telegramEnabled !== false) {
-          sendTelegramMessage(`⚠️ <b>${alert.symbol} Alert</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
-        }
-        addAlertLog({ id: crypto.randomUUID(), alertId: alert.id, symbol: alert.symbol, message, timestamp: Date.now(), price: curr.close });
-        useChartStore.getState().removeAlert(alert.id);
-        useChartStore.getState().addAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
-      }
+      triggeredSetRef.current.add(alert.id);
+      const dirLabel = dir === 'above' ? '↑ Crossed Above' : '↓ Crossed Below';
+      fireAlert({
+        message: `${alert.symbol} ${dirLabel} trendline at ${curr.close.toFixed(2)}`,
+        symbol: alert.symbol,
+        alertId: alert.id,
+        price: curr.close,
+        direction: alert.condition === 'cross_any' ? 'any' : dir,
+        telegramEnabled: alert.telegramEnabled,
+        time: curr.time,
+      });
+      useChartStore.getState().removeAlert(alert.id);
+      useChartStore.getState().addAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
     }
-  }, [candles, alerts, trendlines, addAlertLog]);
+  }, [alertCandles, alerts, trendlines]);
 
   // Indicator crossover alerts
   useEffect(() => {
-    if (candles.length < 2) return;
+    const active = indicatorCrossAlerts.filter((a) => a.active && !a.triggered);
+    if (active.length === 0) return;
 
-    const activeCrossAlerts = indicatorCrossAlerts.filter((a) => a.active && !a.triggered);
-    if (activeCrossAlerts.length === 0) return;
-
-    const curr = candles[candles.length - 1];
-
-    for (const alert of activeCrossAlerts) {
+    for (const alert of active) {
       if (crossTriggeredRef.current.has(alert.id)) continue;
+      const candles = getCandlesForAlert(alert.symbol, alert.timeframe);
+      if (candles.length < 2) continue;
 
       const ind1 = indicators.find((i) => i.id === alert.indicatorId1);
       const ind2 = indicators.find((i) => i.id === alert.indicatorId2);
@@ -176,107 +203,92 @@ export function useAlertChecker() {
       const vals2 = getIndicatorValues(ind2, candles);
       if (vals1.length < 2 || vals2.length < 2) continue;
 
-      // Get last two values for each indicator (by matching times)
-      const last1 = vals1[vals1.length - 1];
-      const prev1 = vals1[vals1.length - 2];
-      const last2 = vals2[vals2.length - 1];
-      const prev2 = vals2[vals2.length - 2];
-
-      if (!last1 || !prev1 || !last2 || !prev2) continue;
-
-      const prevDiff = prev1.value - prev2.value;
-      const currDiff = last1.value - last2.value;
+      const prevDiff = vals1[vals1.length - 2].value - vals2[vals2.length - 2].value;
+      const currDiff = vals1[vals1.length - 1].value - vals2[vals2.length - 1].value;
 
       let dir: 'above' | 'below' | null = null;
       if (prevDiff <= 0 && currDiff > 0) dir = 'above';
       if (prevDiff >= 0 && currDiff < 0) dir = 'below';
-
       if (!dir) continue;
 
-      const matches =
-        alert.condition === 'cross_any' ||
+      const matches = alert.condition === 'cross_any' ||
         (alert.condition === 'cross_above' && dir === 'above') ||
         (alert.condition === 'cross_below' && dir === 'below');
-
       if (!matches) continue;
 
       crossTriggeredRef.current.add(alert.id);
-      const label1 = getIndicatorLabel(ind1);
-      const label2 = getIndicatorLabel(ind2);
-      const dirLabel = dir === 'above' ? '↑ crossed above' : '↓ crossed below';
-      const message = `${alert.symbol} ${label1} ${dirLabel} ${label2} at ${curr.close.toFixed(2)}`;
-      const soundDir = alert.condition === 'cross_any' ? 'any' : dir;
-      playAlertSound(soundDir);
-      toast.warning(message, { duration: 5000, description: `Crossover at ${new Date(curr.time * 1000).toLocaleTimeString()}` });
-      sendBrowserNotification(`⚠️ ${alert.symbol} Crossover`, message);
-      if (alert.telegramEnabled !== false) {
-        sendTelegramMessage(`⚠️ <b>${alert.symbol} Crossover</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
-      }
-      addAlertLog({ id: crypto.randomUUID(), alertId: alert.id, symbol: alert.symbol, message, timestamp: Date.now(), price: curr.close });
+      const curr = candles[candles.length - 1];
+      fireAlert({
+        message: `${alert.symbol} ${getIndicatorLabel(ind1)} ${dir === 'above' ? '↑ crossed above' : '↓ crossed below'} ${getIndicatorLabel(ind2)} at ${curr.close.toFixed(2)}`,
+        symbol: alert.symbol,
+        alertId: alert.id,
+        price: curr.close,
+        direction: alert.condition === 'cross_any' ? 'any' : dir,
+        telegramEnabled: alert.telegramEnabled,
+        time: curr.time,
+      });
       useChartStore.getState().removeIndicatorCrossAlert(alert.id);
       useChartStore.getState().addIndicatorCrossAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
     }
-  }, [candles, indicatorCrossAlerts, indicators, addAlertLog]);
+  }, [alertCandles, indicatorCrossAlerts, indicators]);
 
   // Indicator threshold alerts (RSI above/below, ADX above/below)
   useEffect(() => {
-    if (candles.length < 2) return;
     const active = (indicatorThresholdAlerts ?? []).filter((a) => a.active && !a.triggered);
     if (active.length === 0) return;
-    const curr = candles[candles.length - 1];
 
     for (const alert of active) {
       if (thresholdTriggeredRef.current.has(alert.id)) continue;
+      const candles = getCandlesForAlert(alert.symbol, alert.timeframe);
+      if (candles.length < 2) continue;
+
       const ind = indicators.find((i) => i.id === alert.indicatorId);
       if (!ind) continue;
       const vals = getIndicatorValues(ind, candles);
       if (vals.length < 2) continue;
+
       const lastVal = vals[vals.length - 1].value;
       const prevVal = vals[vals.length - 2].value;
 
       let triggered = false;
       if (alert.condition === 'above' && prevVal <= alert.threshold && lastVal > alert.threshold) triggered = true;
       if (alert.condition === 'below' && prevVal >= alert.threshold && lastVal < alert.threshold) triggered = true;
-
       if (!triggered) continue;
 
       thresholdTriggeredRef.current.add(alert.id);
+      const curr = candles[candles.length - 1];
       const label = getIndicatorLabel(ind);
-      const dirLabel = alert.condition === 'above' ? `↑ crossed above ${alert.threshold}` : `↓ crossed below ${alert.threshold}`;
-      const message = `${alert.symbol} ${label} ${dirLabel} (value: ${lastVal.toFixed(2)}) at price ${curr.close.toFixed(2)}`;
-      playAlertSound(alert.condition === 'above' ? 'above' : 'below');
-      toast.warning(message, { duration: 5000, description: `At ${new Date(curr.time * 1000).toLocaleTimeString()}` });
-      sendBrowserNotification(`⚠️ ${alert.symbol} ${label}`, message);
-      if (alert.telegramEnabled !== false) {
-        sendTelegramMessage(`⚠️ <b>${alert.symbol} ${label}</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
-      }
-      addAlertLog({ id: crypto.randomUUID(), alertId: alert.id, symbol: alert.symbol, message, timestamp: Date.now(), price: curr.close });
+      fireAlert({
+        message: `${alert.symbol} ${label} ${alert.condition === 'above' ? `↑ above ${alert.threshold}` : `↓ below ${alert.threshold}`} (${lastVal.toFixed(2)}) at ${curr.close.toFixed(2)}`,
+        symbol: alert.symbol,
+        alertId: alert.id,
+        price: curr.close,
+        direction: alert.condition === 'above' ? 'above' : 'below',
+        telegramEnabled: alert.telegramEnabled,
+        time: curr.time,
+      });
       useChartStore.getState().removeIndicatorThresholdAlert(alert.id);
       useChartStore.getState().addIndicatorThresholdAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
     }
-  }, [candles, indicatorThresholdAlerts, indicators, addAlertLog]);
+  }, [alertCandles, indicatorThresholdAlerts, indicators]);
 
   // StochRSI K/D crossover alerts
   useEffect(() => {
-    if (candles.length < 2) return;
     const active = (stochRSICrossAlerts ?? []).filter((a) => a.active && !a.triggered);
     if (active.length === 0) return;
-    const curr = candles[candles.length - 1];
 
     for (const alert of active) {
       if (stochTriggeredRef.current.has(alert.id)) continue;
+      const candles = getCandlesForAlert(alert.symbol, alert.timeframe);
+      if (candles.length < 2) continue;
+
       const ind = indicators.find((i) => i.id === alert.indicatorId && i.type === 'STOCH_RSI');
       if (!ind) continue;
       const { k, d } = computeStochRSI(candles, ind.period, ind.period, ind.kPeriod ?? 3, ind.dPeriod ?? 3);
       if (k.length < 2 || d.length < 2) continue;
 
-      const lastK = k[k.length - 1].value;
-      const prevK = k[k.length - 2].value;
-      const lastD = d[d.length - 1].value;
-      const prevD = d[d.length - 2].value;
-
-      const prevDiff = prevK - prevD;
-      const currDiff = lastK - lastD;
+      const prevDiff = k[k.length - 2].value - d[d.length - 2].value;
+      const currDiff = k[k.length - 1].value - d[d.length - 1].value;
 
       let dir: 'above' | 'below' | null = null;
       if (prevDiff <= 0 && currDiff > 0) dir = 'above';
@@ -289,19 +301,22 @@ export function useAlertChecker() {
       if (!matches) continue;
 
       stochTriggeredRef.current.add(alert.id);
-      const dirLabel = dir === 'above' ? '↑ K crossed above D' : '↓ K crossed below D';
-      const message = `${alert.symbol} StochRSI(${ind.period}) ${dirLabel} (K:${lastK.toFixed(1)} D:${lastD.toFixed(1)}) at ${curr.close.toFixed(2)}`;
-      playAlertSound(alert.condition === 'cross_any' ? 'any' : dir);
-      toast.warning(message, { duration: 5000, description: `At ${new Date(curr.time * 1000).toLocaleTimeString()}` });
-      sendBrowserNotification(`⚠️ ${alert.symbol} StochRSI`, message);
-      if (alert.telegramEnabled !== false) {
-        sendTelegramMessage(`⚠️ <b>${alert.symbol} StochRSI</b>\n${message}\n🕐 ${new Date(curr.time * 1000).toLocaleTimeString()}`);
-      }
-      addAlertLog({ id: crypto.randomUUID(), alertId: alert.id, symbol: alert.symbol, message, timestamp: Date.now(), price: curr.close });
+      const curr = candles[candles.length - 1];
+      const lastK = k[k.length - 1].value;
+      const lastD = d[d.length - 1].value;
+      fireAlert({
+        message: `${alert.symbol} StochRSI(${ind.period}) ${dir === 'above' ? '↑ K above D' : '↓ K below D'} (K:${lastK.toFixed(1)} D:${lastD.toFixed(1)}) at ${curr.close.toFixed(2)}`,
+        symbol: alert.symbol,
+        alertId: alert.id,
+        price: curr.close,
+        direction: alert.condition === 'cross_any' ? 'any' : dir,
+        telegramEnabled: alert.telegramEnabled,
+        time: curr.time,
+      });
       useChartStore.getState().removeStochRSICrossAlert(alert.id);
       useChartStore.getState().addStochRSICrossAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
     }
-  }, [candles, stochRSICrossAlerts, indicators, addAlertLog]);
+  }, [alertCandles, stochRSICrossAlerts, indicators]);
 }
 
 function detectCrossingDynamic(
