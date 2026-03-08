@@ -618,17 +618,20 @@ export const RightSidebar: React.FC = () => {
           <div className="space-y-2">
             <QuickPriceAlert />
             <IndicatorCrossAlertForm />
+            <StochRSICrossAlertForm />
+            <IndicatorThresholdAlertForm />
             <div className="flex items-center justify-between px-1">
               <p className="text-xs text-muted-foreground">
-                {alerts.length + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length === 0
-                  ? 'No alerts set.'
-                  : `${alerts.length + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length} active alert(s)`}
+                {(() => {
+                  const total = alerts.length
+                    + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length
+                    + (indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).length
+                    + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length;
+                  return total === 0 ? 'No alerts set.' : `${total} active alert(s)`;
+                })()}
               </p>
-              {(alerts.length > 0 || indicatorCrossAlerts.length > 0) && (
-                <button
-                  onClick={clearAllAlerts}
-                  className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
-                >
+              {(alerts.length > 0 || indicatorCrossAlerts.length > 0 || (indicatorThresholdAlerts ?? []).length > 0 || (stochRSICrossAlerts ?? []).length > 0) && (
+                <button onClick={clearAllAlerts} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">
                   Delete All
                 </button>
               )}
@@ -639,19 +642,11 @@ export const RightSidebar: React.FC = () => {
                   <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) };
-                        removeAlert(alert.id);
-                        useChartStore.getState().addAlert(updated);
-                      }}
+                      onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeAlert(alert.id); useChartStore.getState().addAlert(updated); }}
                       className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
                       title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
-                    >
-                      <Send size={10} />
-                    </button>
-                    <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 size={12} />
-                    </button>
+                    ><Send size={10} /></button>
+                    <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                   </div>
                 </div>
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
@@ -665,21 +660,36 @@ export const RightSidebar: React.FC = () => {
                     <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) };
-                        removeIndicatorCrossAlert(alert.id);
-                        useChartStore.getState().addIndicatorCrossAlert(updated);
-                      }}
+                    <button onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeIndicatorCrossAlert(alert.id); useChartStore.getState().addIndicatorCrossAlert(updated); }}
                       className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
                       title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
-                    >
-                      <Send size={10} />
-                    </button>
-                    <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 size={12} />
-                    </button>
+                    ><Send size={10} /></button>
+                    <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                   </div>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">StochRSI {alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <button onClick={() => removeStochRSICrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Bell size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">{alert.condition} {alert.threshold}</span>
+                  </div>
+                  <button onClick={() => removeIndicatorThresholdAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
                 </div>
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
               </div>
