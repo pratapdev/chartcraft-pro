@@ -205,7 +205,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     (e: React.MouseEvent) => {
       const { mx, my } = getPos(e);
 
-      if (activeTool === 'trendline') {
+      if (activeTool === 'trendline' || activeTool === 'horizontal') {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
         bump((n) => n + 1);
