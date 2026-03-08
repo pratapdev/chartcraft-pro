@@ -89,39 +89,45 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
       }
     });
 
-    // Load data
-    fetchCandles(symbol, timeframe, 300).then((candles) => {
-      candlesRef.current = candles;
+    const loadData = () => {
+      fetchCandles(symbol, timeframe, 300).then((candles) => {
+        candlesRef.current = candles;
 
-      const candleData: CandlestickData[] = candles.map((c) => ({
-        time: c.time as Time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }));
-      const volumeData: HistogramData[] = candles.map((c) => ({
-        time: c.time as Time,
-        value: c.volume,
-        color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
-      }));
+        const candleData: CandlestickData[] = candles.map((c) => ({
+          time: c.time as Time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }));
+        const volumeData: HistogramData[] = candles.map((c) => ({
+          time: c.time as Time,
+          value: c.volume,
+          color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+        }));
 
-      candleSeries.setData(candleData);
-      volumeSeries.setData(volumeData);
+        candleSeries.setData(candleData);
+        volumeSeries.setData(volumeData);
 
-      // Add EMA 20
-      const ema = computeEMA(candles, 20);
-      if (ema.length > 0) {
-        const emaSeries = chart.addLineSeries({
-          color: '#2962FF',
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        emaSeries.setData(ema.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-      }
-    });
+        // Add EMA 20
+        const ema = computeEMA(candles, 20);
+        if (ema.length > 0) {
+          const emaSeries = chart.addLineSeries({
+            color: '#2962FF',
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          emaSeries.setData(ema.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+      });
+    };
+
+    loadData();
+
+    // Auto-refresh every 10 seconds for near-live updates
+    const interval = setInterval(loadData, 10_000);
 
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
