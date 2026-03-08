@@ -7,6 +7,7 @@ import {
   HistogramData,
   LineData,
   Time,
+  MouseEventParams,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { computeEMA, computeSMA } from '@/lib/marketData';
@@ -21,13 +22,11 @@ export const CandlestickChart: React.FC = () => {
 
   const { candles, indicators, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
-  // Load data and start live feed
   useEffect(() => {
     loadCandles().then(() => startLiveUpdates());
     return () => stopLiveUpdates();
   }, []);
 
-  // Initialize chart
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -90,6 +89,34 @@ export const CandlestickChart: React.FC = () => {
     candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
 
+    // Subscribe to chart clicks for trendline selection
+    chart.subscribeClick((param: MouseEventParams) => {
+      if (!param.point) return;
+      const { x, y } = param.point;
+      const store = useChartStore.getState();
+      if (store.activeTool !== 'cursor') return;
+
+      // Hit test trendlines
+      const series = candleSeriesRef.current;
+      if (!series) return;
+
+      let hitId: string | null = null;
+      for (let i = store.trendlines.length - 1; i >= 0; i--) {
+        const line = store.trendlines[i];
+        const x1 = chart.timeScale().timeToCoordinate(line.startTime as unknown as Time);
+        const x2 = chart.timeScale().timeToCoordinate(line.endTime as unknown as Time);
+        const y1 = series.priceToCoordinate(line.startPrice);
+        const y2 = series.priceToCoordinate(line.endPrice);
+        if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
+
+        if (ptLineDist(x, y, x1, y1 as number, x2, y2 as number) < 10) {
+          hitId = line.id;
+          break;
+        }
+      }
+      store.setSelectedTrendlineId(hitId);
+    });
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
@@ -132,15 +159,12 @@ export const CandlestickChart: React.FC = () => {
     if (!chartRef.current || candles.length === 0) return;
 
     lineSeriesRefs.current.forEach((series) => {
-      try {
-        chartRef.current?.removeSeries(series);
-      } catch {}
+      try { chartRef.current?.removeSeries(series); } catch {}
     });
     lineSeriesRefs.current.clear();
 
     for (const ind of indicators) {
       if (!ind.visible) continue;
-
       let data: { time: number; value: number }[] = [];
       if (ind.type === 'EMA') data = computeEMA(candles, ind.period);
       if (ind.type === 'SMA') data = computeSMA(candles, ind.period);
@@ -153,10 +177,7 @@ export const CandlestickChart: React.FC = () => {
         lastValueVisible: false,
         crosshairMarkerVisible: false,
       });
-
-      series.setData(
-        data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]
-      );
+      series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
       lineSeriesRefs.current.set(ind.id, series);
     }
   }, [candles, indicators]);
@@ -168,3 +189,15 @@ export const CandlestickChart: React.FC = () => {
     </div>
   );
 };
+
+function ptLineDist(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+  const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1;
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  const param = lenSq ? dot / lenSq : -1;
+  let xx: number, yy: number;
+  if (param < 0) { xx = x1; yy = y1; }
+  else if (param > 1) { xx = x2; yy = y2; }
+  else { xx = x1 + param * C; yy = y1 + param * D; }
+  return Math.hypot(px - xx, py - yy);
+}
