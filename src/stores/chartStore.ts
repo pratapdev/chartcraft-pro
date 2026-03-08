@@ -132,6 +132,17 @@ interface ChartStore {
     alertLine: { color: string; thickness: number; lineStyle: LineStyleType };
   };
   setDrawingDefault: (type: 'trendline' | 'horizontal' | 'alertLine', updates: Partial<{ color: string; thickness: number; lineStyle: LineStyleType }>) => void;
+
+  // Compound alerts
+  compoundAlerts: CompoundAlert[];
+  addCompoundAlert: (alert: CompoundAlert) => void;
+  removeCompoundAlert: (id: string) => void;
+  clearCompoundAlerts: () => void;
+
+  // Alert templates
+  alertTemplates: AlertTemplate[];
+  addAlertTemplate: (template: AlertTemplate) => void;
+  removeAlertTemplate: (id: string) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
