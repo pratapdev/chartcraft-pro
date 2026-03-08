@@ -183,6 +183,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     })),
 
+  crosshairData: null,
+  setCrosshairData: (crosshairData) => set({ crosshairData }),
+
   rightPanelOpen: false,
   rightPanelTab: 'alerts',
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
