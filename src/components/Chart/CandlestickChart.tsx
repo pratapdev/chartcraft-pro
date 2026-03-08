@@ -135,6 +135,27 @@ export const CandlestickChart: React.FC = () => {
       store.setSelectedTrendlineId(hitId);
     });
 
+    // Subscribe to crosshair move for data legend
+    chart.subscribeCrosshairMove((param: MouseEventParams) => {
+      if (!param.time || !param.seriesData) {
+        useChartStore.getState().setCrosshairData(null);
+        return;
+      }
+      const candleData = param.seriesData.get(candleSeries) as any;
+      if (candleData && candleData.open !== undefined) {
+        useChartStore.getState().setCrosshairData({
+          time: param.time as unknown as number,
+          open: candleData.open,
+          high: candleData.high,
+          low: candleData.low,
+          close: candleData.close,
+          volume: (param.seriesData.get(volumeSeries) as any)?.value ?? 0,
+        });
+      } else {
+        useChartStore.getState().setCrosshairData(null);
+      }
+    });
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
