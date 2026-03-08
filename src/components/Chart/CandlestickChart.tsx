@@ -10,7 +10,7 @@ import {
   MouseEventParams,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { computeEMA, computeSMA } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 

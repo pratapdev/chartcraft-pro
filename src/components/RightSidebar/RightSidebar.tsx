@@ -1,6 +1,104 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { X, Bell, BarChart3, Settings, Trash2, Plus, Eye, EyeOff } from 'lucide-react';
+import { X, Trash2, Eye, EyeOff, Plus, ChevronDown } from 'lucide-react';
+import { IndicatorType, IndicatorConfig } from '@/types/trading';
+
+const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial<IndicatorConfig> }[] = [
+  { type: 'EMA', label: 'EMA', defaults: { period: 20, color: '#2962FF' } },
+  { type: 'SMA', label: 'SMA', defaults: { period: 20, color: '#FF9800' } },
+  { type: 'RSI', label: 'RSI', defaults: { period: 14, color: '#E040FB' } },
+  { type: 'STOCH_RSI', label: 'Stoch RSI', defaults: { period: 14, color: '#00BCD4', color2: '#FF5722', kPeriod: 3, dPeriod: 3 } },
+];
+
+const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
+  const { toggleIndicator, removeIndicator, updateIndicator } = useChartStore();
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="panel-section rounded p-2 text-xs space-y-1.5">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setEditing(!editing)}
+          className="flex items-center gap-2 hover:text-foreground transition-colors"
+        >
+          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ind.color }} />
+          <span className="text-foreground font-medium">
+            {ind.type === 'STOCH_RSI' ? 'StochRSI' : ind.type}({ind.period})
+          </span>
+          <ChevronDown size={10} className={`text-muted-foreground transition-transform ${editing ? 'rotate-180' : ''}`} />
+        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => toggleIndicator(ind.id)} className="text-muted-foreground hover:text-foreground">
+            {ind.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+          </button>
+          <button onClick={() => removeIndicator(ind.id)} className="text-muted-foreground hover:text-destructive">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="space-y-1.5 pt-1 border-t border-border">
+          <div className="flex items-center justify-between">
+            <label className="text-muted-foreground">Period</label>
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={ind.period}
+              onChange={(e) => updateIndicator(ind.id, { period: Math.max(1, parseInt(e.target.value) || 1) })}
+              className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="text-muted-foreground">Color</label>
+            <input
+              type="color"
+              value={ind.color}
+              onChange={(e) => updateIndicator(ind.id, { color: e.target.value })}
+              className="w-6 h-5 rounded cursor-pointer border-0 bg-transparent"
+            />
+          </div>
+          {ind.type === 'STOCH_RSI' && (
+            <>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">K Smooth</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={ind.kPeriod ?? 3}
+                  onChange={(e) => updateIndicator(ind.id, { kPeriod: Math.max(1, parseInt(e.target.value) || 1) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">D Smooth</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={ind.dPeriod ?? 3}
+                  onChange={(e) => updateIndicator(ind.id, { dPeriod: Math.max(1, parseInt(e.target.value) || 1) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">D Color</label>
+                <input
+                  type="color"
+                  value={ind.color2 ?? '#FF5722'}
+                  onChange={(e) => updateIndicator(ind.id, { color2: e.target.value })}
+                  className="w-6 h-5 rounded cursor-pointer border-0 bg-transparent"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const RightSidebar: React.FC = () => {
   const {
@@ -11,29 +109,40 @@ export const RightSidebar: React.FC = () => {
     alertLogs,
     removeAlert,
     indicators,
-    toggleIndicator,
-    removeIndicator,
+    addIndicator,
     trendlines,
   } = useChartStore();
 
+  const [showAdd, setShowAdd] = useState(false);
+
   if (!rightPanelOpen) return null;
+
+  const handleAddIndicator = (preset: typeof INDICATOR_PRESETS[number]) => {
+    const id = `${preset.type.toLowerCase()}-${Date.now()}`;
+    addIndicator({
+      id,
+      type: preset.type,
+      period: preset.defaults.period ?? 14,
+      color: preset.defaults.color ?? '#2962FF',
+      visible: true,
+      kPeriod: preset.defaults.kPeriod,
+      dPeriod: preset.defaults.dPeriod,
+      color2: preset.defaults.color2,
+    });
+    setShowAdd(false);
+  };
 
   return (
     <div className="w-64 bg-card border-l border-border flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-panel-header">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {rightPanelTab}
         </span>
-        <button
-          onClick={() => setRightPanelOpen(false)}
-          className="text-muted-foreground hover:text-foreground"
-        >
+        <button onClick={() => setRightPanelOpen(false)} className="text-muted-foreground hover:text-foreground">
           <X size={14} />
         </button>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-2">
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
@@ -51,7 +160,6 @@ export const RightSidebar: React.FC = () => {
                 <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe}</div>
               </div>
             ))}
-
             {alertLogs.length > 0 && (
               <>
                 <div className="text-xs font-semibold text-muted-foreground mt-4 px-1">Recent Alerts</div>
@@ -71,21 +179,37 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'indicators' && (
           <div className="space-y-2">
             {indicators.map((ind) => (
-              <div key={ind.id} className="panel-section rounded p-2 text-xs flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: ind.color }} />
-                  <span className="text-foreground">{ind.type}({ind.period})</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => toggleIndicator(ind.id)} className="text-muted-foreground hover:text-foreground">
-                    {ind.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-                  </button>
-                  <button onClick={() => removeIndicator(ind.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
+              <IndicatorRow key={ind.id} ind={ind} />
             ))}
+
+            {!showAdd ? (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent transition-colors flex items-center gap-1.5 text-primary rounded"
+              >
+                <Plus size={12} />
+                Add Indicator
+              </button>
+            ) : (
+              <div className="panel-section rounded p-2 space-y-1">
+                <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide mb-1">Select indicator</div>
+                {INDICATOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.type}
+                    onClick={() => handleAddIndicator(preset)}
+                    className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent transition-colors rounded text-foreground"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setShowAdd(false)}
+                  className="w-full text-center px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         )}
 
