@@ -253,6 +253,79 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
+    if (indicator.type === 'PCT_DIFF_DON') {
+      const { pctDiff, emaLine, basis, upper, lower, upperNew, lowerNew } = computePctDiffDonchian(
+        candles,
+        indicator.period,
+        indicator.lookbackWindow ?? 10,
+        indicator.emaSmoothing ?? 5,
+        indicator.donchianLength ?? 20,
+        indicator.donLineDiff ?? 0.2,
+      );
+      if (pctDiff.length > 0) {
+        // Main percentage diff line (colored by sign)
+        const bullData = pctDiff.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[];
+        const mainSeries = chart.addLineSeries({
+          color: indicator.color,
+          lineWidth: 2 as 1 | 2 | 3 | 4,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        mainSeries.setData(bullData);
+
+        // EMA smoothing line (white)
+        if (emaLine.length > 0) {
+          const emaSeries = chart.addLineSeries({
+            color: '#ffffff',
+            lineWidth: 2 as 1 | 2 | 3 | 4,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          emaSeries.setData(emaLine.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+
+        // Donchian basis (orange)
+        if (basis.length > 0) {
+          const basisSeries = chart.addLineSeries({
+            color: '#FF6D00',
+            lineWidth: 1 as 1 | 2 | 3 | 4,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          basisSeries.setData(basis.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+
+        // Upper/Lower original (white, thin)
+        const channelStyle = { color: 'rgba(255,255,255,0.4)', lineWidth: 1 as 1 | 2 | 3 | 4, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+        if (upper.length > 0) {
+          const uSeries = chart.addLineSeries(channelStyle);
+          uSeries.setData(upper.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+        if (lower.length > 0) {
+          const lSeries = chart.addLineSeries({ ...channelStyle });
+          lSeries.setData(lower.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+
+        // Upper/Lower adjusted (dimmer)
+        const adjStyle = { color: 'rgba(255,255,255,0.2)', lineWidth: 1 as 1 | 2 | 3 | 4, lineStyle: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+        if (upperNew.length > 0) {
+          const unSeries = chart.addLineSeries(adjStyle);
+          unSeries.setData(upperNew.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+        if (lowerNew.length > 0) {
+          const lnSeries = chart.addLineSeries({ ...adjStyle });
+          lnSeries.setData(lowerNew.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        }
+
+        // Zero line
+        const zeroLine = chart.addLineSeries({ color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        zeroLine.setData(pctDiff.map((d) => ({ time: d.time as Time, value: 0 })) as LineData[]);
+      }
+    }
+
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       chart.applyOptions({ width, height });
