@@ -204,6 +204,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   rightPanelTab: 'alerts',
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
   setRightPanelTab: (rightPanelTab) => set({ rightPanelTab, rightPanelOpen: true }),
+
+  multiTfMode: false,
+  setMultiTfMode: (multiTfMode) => set({ multiTfMode }),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
