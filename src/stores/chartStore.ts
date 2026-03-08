@@ -123,6 +123,14 @@ interface ChartStore {
   alertCandles: Record<string, Candle[]>;
   setAlertCandles: (key: string, candles: Candle[]) => void;
   updateAlertCandle: (key: string, candle: Candle) => void;
+
+  // Drawing defaults
+  drawingDefaults: {
+    trendline: { color: string; thickness: number; lineStyle: LineStyleType };
+    horizontal: { color: string; thickness: number; lineStyle: LineStyleType };
+    alertLine: { color: string; thickness: number; lineStyle: LineStyleType };
+  };
+  setDrawingDefault: (type: 'trendline' | 'horizontal' | 'alertLine', updates: Partial<{ color: string; thickness: number; lineStyle: LineStyleType }>) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
