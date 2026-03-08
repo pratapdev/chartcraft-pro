@@ -13,6 +13,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'VWAP', label: 'VWAP', defaults: { period: 1, color: '#FFEB3B' } },
   { type: 'SUPERTREND', label: 'Supertrend', defaults: { period: 10, color: '#22c55e', color2: '#ef4444', multiplier: 3 } },
   { type: 'ADX', label: 'ADX', defaults: { period: 14, color: '#FFEB3B' } },
+  { type: 'ATR', label: 'ATR', defaults: { period: 14, color: '#26a69a' } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
