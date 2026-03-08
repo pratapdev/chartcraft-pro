@@ -105,6 +105,7 @@ export const TrendlineToolbar: React.FC<Props> = ({ chartRef, seriesRef }) => {
       if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
         setShowColors(false);
         setShowThickness(false);
+        setShowLineStyle(false);
         setShowAlertMenu(false);
       }
     };
