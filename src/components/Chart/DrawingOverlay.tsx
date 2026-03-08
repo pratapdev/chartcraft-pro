@@ -59,6 +59,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const [selectedFibId, setSelectedFibId] = useState<string | null>(null);
   const [fibDeletePos, setFibDeletePos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredAlertBtn, setHoveredAlertBtn] = useState<string | null>(null);
+  const [hoveredCrosshairBtn, setHoveredCrosshairBtn] = useState(false);
+  const crosshairMouseY = useRef<number | null>(null);
+  const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
 
