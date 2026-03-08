@@ -271,3 +271,50 @@ export function computeBollingerBands(
 
   return { upper, middle, lower };
 }
+
+// Compute MACD
+export function computeMACD(
+  candles: Candle[],
+  fastPeriod: number = 12,
+  slowPeriod: number = 26,
+  signalPeriod: number = 9
+): { macdLine: { time: number; value: number }[]; signalLine: { time: number; value: number }[]; histogram: { time: number; value: number }[] } {
+  if (candles.length < slowPeriod) return { macdLine: [], signalLine: [], histogram: [] };
+
+  const fastK = 2 / (fastPeriod + 1);
+  const slowK = 2 / (slowPeriod + 1);
+
+  let fastEma = candles[0].close;
+  let slowEma = candles[0].close;
+  const rawMacd: { time: number; value: number }[] = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i].close;
+    if (i === 0) { fastEma = c; slowEma = c; }
+    else { fastEma = c * fastK + fastEma * (1 - fastK); slowEma = c * slowK + slowEma * (1 - slowK); }
+    if (i >= slowPeriod - 1) {
+      rawMacd.push({ time: candles[i].time, value: Math.round((fastEma - slowEma) * 100) / 100 });
+    }
+  }
+
+  // Signal line (EMA of MACD)
+  const sigK = 2 / (signalPeriod + 1);
+  let sigEma = rawMacd.length > 0 ? rawMacd[0].value : 0;
+  const signalLine: { time: number; value: number }[] = [];
+  const histogram: { time: number; value: number }[] = [];
+
+  for (let i = 0; i < rawMacd.length; i++) {
+    if (i === 0) sigEma = rawMacd[i].value;
+    else sigEma = rawMacd[i].value * sigK + sigEma * (1 - sigK);
+    if (i >= signalPeriod - 1) {
+      signalLine.push({ time: rawMacd[i].time, value: Math.round(sigEma * 100) / 100 });
+      histogram.push({ time: rawMacd[i].time, value: Math.round((rawMacd[i].value - sigEma) * 100) / 100 });
+    }
+  }
+
+  // Trim macdLine to match signal start
+  const startTime = signalLine.length > 0 ? signalLine[0].time : Infinity;
+  const macdLine = rawMacd.filter((d) => d.time >= startTime);
+
+  return { macdLine, signalLine, histogram };
+}

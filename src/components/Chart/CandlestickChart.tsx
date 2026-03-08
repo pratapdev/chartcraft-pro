@@ -219,54 +219,7 @@ export const CandlestickChart: React.FC = () => {
         lineSeriesRefs.current.set(ind.id, series);
       }
 
-      if (ind.type === 'RSI') {
-        const data = computeRSI(candles, ind.period);
-        if (data.length === 0) continue;
-        const series = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: true,
-          crosshairMarkerVisible: false,
-          priceScaleId: 'rsi',
-        });
-        series.setData(data.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
-        series.priceScale().applyOptions({
-          scaleMargins: { top: 0.8, bottom: 0.0 },
-        });
-        lineSeriesRefs.current.set(ind.id, series);
-      }
-
-      if (ind.type === 'STOCH_RSI') {
-        const { k, d } = computeStochRSI(candles, ind.period, ind.period, ind.kPeriod ?? 3, ind.dPeriod ?? 3);
-        if (k.length === 0) continue;
-        const kSeries = chartRef.current.addLineSeries({
-          color: ind.color,
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: true,
-          crosshairMarkerVisible: false,
-          priceScaleId: 'stochrsi',
-        });
-        kSeries.setData(k.map((pt) => ({ time: pt.time as Time, value: pt.value })) as LineData[]);
-        kSeries.priceScale().applyOptions({
-          scaleMargins: { top: 0.8, bottom: 0.0 },
-        });
-        lineSeriesRefs.current.set(ind.id + '-k', kSeries);
-
-        if (d.length > 0) {
-          const dSeries = chartRef.current.addLineSeries({
-            color: ind.color2 ?? '#FF5722',
-            lineWidth: 1,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false,
-            priceScaleId: 'stochrsi',
-          });
-          dSeries.setData(d.map((pt) => ({ time: pt.time as Time, value: pt.value })) as LineData[]);
-          lineSeriesRefs.current.set(ind.id + '-d', dSeries);
-        }
-      }
+      // RSI and StochRSI are now rendered in separate IndicatorPane components
 
       if (ind.type === 'BBANDS') {
         const { upper, middle, lower } = computeBollingerBands(candles, ind.period, ind.stdDev ?? 2);
