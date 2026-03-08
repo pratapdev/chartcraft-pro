@@ -69,6 +69,16 @@ interface ChartStore {
   removeIndicatorCrossAlert: (id: string) => void;
   clearAllIndicatorCrossAlerts: () => void;
 
+  // Indicator threshold alerts (RSI above/below, ADX above/below)
+  indicatorThresholdAlerts: IndicatorThresholdAlert[];
+  addIndicatorThresholdAlert: (alert: IndicatorThresholdAlert) => void;
+  removeIndicatorThresholdAlert: (id: string) => void;
+
+  // StochRSI K/D cross alerts
+  stochRSICrossAlerts: StochRSICrossAlert[];
+  addStochRSICrossAlert: (alert: StochRSICrossAlert) => void;
+  removeStochRSICrossAlert: (id: string) => void;
+
   // Indicators
   selectedIndicatorId: string | null;
   setSelectedIndicatorId: (id: string | null) => void;
