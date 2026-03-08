@@ -182,6 +182,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   alertLogs: [],
   addAlert: (alert) => set((s) => ({ alerts: [...s.alerts, alert] })),
   removeAlert: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) })),
+  clearAllAlerts: () => set({ alerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
 
   indicators: [
