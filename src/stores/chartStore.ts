@@ -56,6 +56,10 @@ interface ChartStore {
   toggleIndicator: (id: string) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
 
+  // Crosshair
+  crosshairData: CrosshairData | null;
+  setCrosshairData: (data: CrosshairData | null) => void;
+
   // Right sidebar
   rightPanelOpen: boolean;
   rightPanelTab: 'alerts' | 'indicators' | 'settings';
