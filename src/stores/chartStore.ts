@@ -229,8 +229,13 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     }
     set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  clearAllAlerts: () => set({ alerts: [] }),
+  clearAllAlerts: () => set({ alerts: [], indicatorCrossAlerts: [] }),
   addAlertLog: (log) => set((s) => ({ alertLogs: [log, ...s.alertLogs].slice(0, 100) })),
+
+  indicatorCrossAlerts: [],
+  addIndicatorCrossAlert: (alert) => set((s) => ({ indicatorCrossAlerts: [...s.indicatorCrossAlerts, alert] })),
+  removeIndicatorCrossAlert: (id) => set((s) => ({ indicatorCrossAlerts: s.indicatorCrossAlerts.filter((a) => a.id !== id) })),
+  clearAllIndicatorCrossAlerts: () => set({ indicatorCrossAlerts: [] }),
 
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
