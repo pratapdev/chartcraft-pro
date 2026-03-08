@@ -64,7 +64,14 @@ export const KeyboardShortcuts: React.FC = () => {
       if (key === 'i') { store.setRightPanelTab('indicators'); return; }
       if (key === 's') { store.setRightPanelTab('settings'); return; }
 
-      // Delete
+      // Undo
+      if (key === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        store.undoLastDeletion();
+        return;
+      }
+
+      // Escape
       if (e.key === 'Escape') {
         store.setActiveTool('cursor');
         store.setSelectedTrendlineId(null);
