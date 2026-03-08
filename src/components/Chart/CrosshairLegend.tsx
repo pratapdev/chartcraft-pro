@@ -1,6 +1,6 @@
 import React from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands } from '@/lib/marketData';
 
 export const CrosshairLegend: React.FC = () => {
   const { crosshairData, candles, indicators } = useChartStore();
@@ -56,6 +56,16 @@ export const CrosshairLegend: React.FC = () => {
           value: dPt.value.toFixed(2),
           color: ind.color2 ?? '#FF5722',
         });
+      }
+    }
+
+    if (ind.type === 'BBANDS') {
+      const { upper, middle, lower } = computeBollingerBands(candles, ind.period, ind.stdDev ?? 2);
+      const uPt = upper.find((pt) => pt.time === crosshairData.time);
+      const mPt = middle.find((pt) => pt.time === crosshairData.time);
+      const lPt = lower.find((pt) => pt.time === crosshairData.time);
+      if (mPt) {
+        indicatorValues.push({ label: `BB(${ind.period})`, value: `${uPt?.value.toFixed(2)} / ${mPt.value.toFixed(2)} / ${lPt?.value.toFixed(2)}`, color: ind.color });
       }
     }
   }

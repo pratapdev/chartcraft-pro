@@ -243,3 +243,31 @@ export function computeStochRSI(
 
   return { k: kLine, d: dLine };
 }
+
+// Compute Bollinger Bands
+export function computeBollingerBands(
+  candles: Candle[],
+  period: number,
+  stdDev: number = 2
+): { upper: { time: number; value: number }[]; middle: { time: number; value: number }[]; lower: { time: number; value: number }[] } {
+  const upper: { time: number; value: number }[] = [];
+  const middle: { time: number; value: number }[] = [];
+  const lower: { time: number; value: number }[] = [];
+
+  for (let i = period - 1; i < candles.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += candles[j].close;
+    const sma = sum / period;
+
+    let sqSum = 0;
+    for (let j = i - period + 1; j <= i; j++) sqSum += (candles[j].close - sma) ** 2;
+    const sd = Math.sqrt(sqSum / period);
+
+    const t = candles[i].time;
+    middle.push({ time: t, value: Math.round(sma * 100) / 100 });
+    upper.push({ time: t, value: Math.round((sma + stdDev * sd) * 100) / 100 });
+    lower.push({ time: t, value: Math.round((sma - stdDev * sd) * 100) / 100 });
+  }
+
+  return { upper, middle, lower };
+}

@@ -10,7 +10,7 @@ import {
   MouseEventParams,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands } from '@/lib/marketData';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
@@ -266,6 +266,43 @@ export const CandlestickChart: React.FC = () => {
           dSeries.setData(d.map((pt) => ({ time: pt.time as Time, value: pt.value })) as LineData[]);
           lineSeriesRefs.current.set(ind.id + '-d', dSeries);
         }
+      }
+
+      if (ind.type === 'BBANDS') {
+        const { upper, middle, lower } = computeBollingerBands(candles, ind.period, ind.stdDev ?? 2);
+        if (middle.length === 0) continue;
+
+        const middleSeries = chartRef.current.addLineSeries({
+          color: ind.color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        middleSeries.setData(middle.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        lineSeriesRefs.current.set(ind.id + '-mid', middleSeries);
+
+        const upperSeries = chartRef.current.addLineSeries({
+          color: ind.color,
+          lineWidth: 1,
+          lineStyle: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        upperSeries.setData(upper.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        lineSeriesRefs.current.set(ind.id + '-upper', upperSeries);
+
+        const lowerSeries = chartRef.current.addLineSeries({
+          color: ind.color,
+          lineWidth: 1,
+          lineStyle: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        lowerSeries.setData(lower.map((d) => ({ time: d.time as Time, value: d.value })) as LineData[]);
+        lineSeriesRefs.current.set(ind.id + '-lower', lowerSeries);
       }
     }
   }, [candles, indicators]);

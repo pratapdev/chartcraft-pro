@@ -61,7 +61,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS';
 
 export interface IndicatorConfig {
   id: string;
@@ -75,4 +75,6 @@ export interface IndicatorConfig {
   dPeriod?: number;
   /** Secondary color for D line in StochRSI */
   color2?: string;
+  /** Standard deviation multiplier for Bollinger Bands */
+  stdDev?: number;
 }
