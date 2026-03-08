@@ -62,6 +62,7 @@ interface ChartStore {
   removeAlert: (id: string) => void;
   clearAllAlerts: () => void;
   addAlertLog: (log: AlertLog) => void;
+  clearAlertLogs: () => void;
 
   // Indicator cross alerts
   indicatorCrossAlerts: IndicatorCrossAlert[];
