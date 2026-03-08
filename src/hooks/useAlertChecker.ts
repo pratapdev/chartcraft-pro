@@ -34,10 +34,32 @@ function unlockAudio() {
   }
 }
 
+// Request notification permission early
+function requestNotificationPermission() {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function sendBrowserNotification(title: string, body: string) {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      new Notification(title, {
+        body,
+        icon: '/favicon.ico',
+        tag: 'price-alert',
+      } as NotificationOptions);
+    } catch {
+      // Notification API not available
+    }
+  }
+}
+
 if (typeof window !== 'undefined') {
   const events = ['click', 'touchstart', 'keydown'];
   const handler = () => {
     unlockAudio();
+    requestNotificationPermission();
     events.forEach((e) => document.removeEventListener(e, handler));
   };
   events.forEach((e) => document.addEventListener(e, handler, { once: false }));
@@ -134,6 +156,9 @@ export function useAlertChecker() {
           duration: 5000,
           description: `Alert triggered at ${new Date(curr.time * 1000).toLocaleTimeString()}`,
         });
+
+        // Send browser notification
+        sendBrowserNotification(`⚠️ ${alert.symbol} Alert`, message);
 
         // Log the alert
         addAlertLog({
