@@ -125,7 +125,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
               />
             </div>
-          )
+          )}
         </div>
       )}
     </div>
