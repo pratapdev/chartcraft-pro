@@ -246,7 +246,7 @@ export const CandlestickChart: React.FC = () => {
 
         const middleSeries = chartRef.current.addLineSeries({
           color: ind.color,
-          lineWidth: 1,
+          lineWidth: (ind.lineWidth ?? 1) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
