@@ -16,6 +16,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'ADX', label: 'ADX', defaults: { period: 14, color: '#FFEB3B' } },
   { type: 'ATR', label: 'ATR', defaults: { period: 14, color: '#26a69a' } },
   { type: 'OBV', label: 'OBV', defaults: { period: 1, color: '#AB47BC' } },
+  { type: 'PIVOT_HL', label: 'Pivot Points H/L', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
