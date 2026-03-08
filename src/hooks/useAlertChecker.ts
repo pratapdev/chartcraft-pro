@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { toast } from 'sonner';
 import { sendTelegramMessage } from '@/lib/telegram';
-import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV } from '@/lib/marketData';
-import { Candle, IndicatorConfig } from '@/types/trading';
+import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
+import { Candle, IndicatorConfig, PctDiffDonLine } from '@/types/trading';
 
 // Shared AudioContext, unlocked on first user gesture
 let sharedCtx: AudioContext | null = null;
