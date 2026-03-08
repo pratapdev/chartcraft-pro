@@ -100,6 +100,92 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
   );
 };
 
+const CONDITION_OPTIONS: { value: AlertCondition; label: string }[] = [
+  { value: 'cross_above', label: 'Cross Above' },
+  { value: 'cross_below', label: 'Cross Below' },
+  { value: 'cross_any', label: 'Any Cross' },
+];
+
+const QuickPriceAlert: React.FC = () => {
+  const { symbol, timeframe, candles, addTrendline, addAlert } = useChartStore();
+  const [price, setPrice] = useState('');
+  const [condition, setCondition] = useState<AlertCondition>('cross_above');
+
+  const lastPrice = candles.length > 0 ? candles[candles.length - 1].close : 0;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const priceVal = parseFloat(price);
+    if (!priceVal || priceVal <= 0) return;
+
+    const c = candles;
+    const startTime = c.length > 0 ? c[0].time : Math.floor(Date.now() / 1000) - 86400;
+    const endTime = c.length > 0 ? c[c.length - 1].time + (c.length > 1 ? (c[c.length - 1].time - c[0].time) : 86400) : Math.floor(Date.now() / 1000) + 86400;
+
+    const lineId = crypto.randomUUID();
+    addTrendline({
+      id: lineId,
+      symbol,
+      timeframe,
+      startTime,
+      startPrice: priceVal,
+      endTime,
+      endPrice: priceVal,
+      color: '#eab308',
+      thickness: 2,
+      createdAt: Date.now(),
+    });
+
+    addAlert({
+      id: crypto.randomUUID(),
+      symbol,
+      timeframe,
+      trendlineId: lineId,
+      condition,
+      active: true,
+      triggered: false,
+      message: `Price ${condition.replace('_', ' ')} ${priceVal.toFixed(2)}`,
+      createdAt: Date.now(),
+    });
+
+    setPrice('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="panel-section rounded p-2 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <Bell size={12} className="text-primary" />
+        Quick Price Alert
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          type="number"
+          step="any"
+          placeholder={lastPrice ? lastPrice.toFixed(2) : 'Price'}
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="flex-1 bg-accent text-foreground text-xs px-2 py-1.5 rounded outline-none placeholder:text-muted-foreground"
+        />
+        <select
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as AlertCondition)}
+          className="bg-accent text-foreground text-xs px-1.5 py-1.5 rounded outline-none"
+        >
+          {CONDITION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="submit"
+        className="w-full text-xs py-1.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors font-medium"
+      >
+        Set Alert
+      </button>
+    </form>
+  );
+};
+
 export const RightSidebar: React.FC = () => {
   const {
     rightPanelOpen,
