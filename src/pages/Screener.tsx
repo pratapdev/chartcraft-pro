@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search } from 'lucide-react';
 import { fetchScreenerData, applyFilters, sortScreenerData, ScreenerRow, ScreenerFilters, ALL_PATTERNS } from '@/lib/screenerService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ export const Screener: React.FC = () => {
   
   const [filters, setFilters] = useState<ScreenerFilters>({ timeframe: '1D' });
   const [customFormula, setCustomFormula] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
 
   const { setSymbol } = useChartStore();
 
@@ -95,6 +96,16 @@ export const Screener: React.FC = () => {
     }
   };
 
+  const normalizedFilterSearch = filterSearch.trim().toLowerCase();
+  const showPriceAction = !normalizedFilterSearch || ['price action', 'candlestick', 'pattern', 'break high', 'break low', 'sweep'].some((term) => term.includes(normalizedFilterSearch));
+  const showTrend = !normalizedFilterSearch || ['trend', 'crossover', 'supertrend', 'ema', 'ichimoku'].some((term) => term.includes(normalizedFilterSearch));
+  const showMomentum = !normalizedFilterSearch || ['momentum', 'oscillator', 'rsi', 'stochrsi', 'macd', 'adx'].some((term) => term.includes(normalizedFilterSearch));
+  const showBollinger = !normalizedFilterSearch || ['bollinger', 'bb', 'squeeze', 'breakout'].some((term) => term.includes(normalizedFilterSearch));
+  const showMarketStructure = !normalizedFilterSearch || ['market structure', 'ms highs', 'ms lows', 'hh', 'hl', 'lh', 'll'].some((term) => term.includes(normalizedFilterSearch));
+  const showPriceVolume = !normalizedFilterSearch || ['price', 'volume', 'change', 'range'].some((term) => term.includes(normalizedFilterSearch));
+  const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule'].some((term) => term.includes(normalizedFilterSearch));
+  const hasFilterMatches = showPriceAction || showTrend || showMomentum || showBollinger || showMarketStructure || showPriceVolume || showCustom;
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
@@ -153,10 +164,31 @@ export const Screener: React.FC = () => {
                     <span className="w-5 h-5 rounded-full bg-accent flex items-center justify-center text-[10px]">2</span>
                     SELECT INDICATORS
                   </Label>
-                  
+
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={filterSearch}
+                      onChange={(e) => setFilterSearch(e.target.value)}
+                      placeholder="Search filters (RSI, EMA, Breakout...)"
+                      className="h-8 pl-8 pr-8 text-xs"
+                    />
+                    {filterSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label="Clear filter search"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
                   <Accordion type="multiple" className="w-full">
                     {/* Price Action */}
-                    <AccordionItem value="price-action">
+                    {showPriceAction && (
+                      <AccordionItem value="price-action">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Price Action</div>
@@ -213,9 +245,11 @@ export const Screener: React.FC = () => {
                         </div>
                       </AccordionContent>
                     </AccordionItem>
+                    )}
 
                     {/* Trend / Crossover */}
-                    <AccordionItem value="trend">
+                    {showTrend && (
+                      <AccordionItem value="trend">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Trend / Crossover</div>
@@ -289,10 +323,12 @@ export const Screener: React.FC = () => {
                           </Select>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Momentum / Oscillator */}
-                    <AccordionItem value="momentum">
+                    {showMomentum && (
+                      <AccordionItem value="momentum">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Momentum / Oscillator</div>
@@ -338,10 +374,12 @@ export const Screener: React.FC = () => {
                           <Input type="number" placeholder="25" value={filters.minAdx ?? ''} onChange={(e) => setFilters({ ...filters, minAdx: e.target.value ? parseFloat(e.target.value) : undefined })} />
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Bollinger Bands */}
-                    <AccordionItem value="bb">
+                    {showBollinger && (
+                      <AccordionItem value="bb">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Bollinger Bands</div>
@@ -371,10 +409,12 @@ export const Screener: React.FC = () => {
                           </Select>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Market Structure */}
-                    <AccordionItem value="ms">
+                    {showMarketStructure && (
+                      <AccordionItem value="ms">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Market Structure</div>
@@ -415,10 +455,12 @@ export const Screener: React.FC = () => {
                           </div>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Price & Volume */}
-                    <AccordionItem value="price-volume">
+                    {showPriceVolume && (
+                      <AccordionItem value="price-volume">
                       <AccordionTrigger className="text-sm py-2">
                         <div className="font-medium">Price & Volume Filters</div>
                       </AccordionTrigger>
@@ -445,10 +487,12 @@ export const Screener: React.FC = () => {
                           </div>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Custom Value Filters */}
-                    <AccordionItem value="custom">
+                    {showCustom && (
+                      <AccordionItem value="custom">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Custom Value Filters</div>
@@ -471,7 +515,14 @@ export const Screener: React.FC = () => {
                           Apply Formula
                         </Button>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
+
+                    {!hasFilterMatches && (
+                      <div className="py-3 text-center text-xs text-muted-foreground">
+                        No matching filters found.
+                      </div>
+                    )}
                   </Accordion>
                 </div>
 
