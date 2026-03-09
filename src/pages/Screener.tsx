@@ -487,7 +487,8 @@ export const Screener: React.FC = () => {
                           </div>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Custom Value Filters */}
                     {showCustom && (
