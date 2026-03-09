@@ -323,7 +323,8 @@ export const Screener: React.FC = () => {
                           </Select>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Momentum / Oscillator */}
                     {showMomentum && (
