@@ -325,7 +325,8 @@ export const Screener: React.FC = () => {
                     </AccordionItem>
 
                     {/* Momentum / Oscillator */}
-                    <AccordionItem value="momentum">
+                    {showMomentum && (
+                      <AccordionItem value="momentum">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Momentum / Oscillator</div>
