@@ -52,6 +52,13 @@ export const KeyboardShortcuts: React.FC = () => {
       const key = e.key.toLowerCase();
       const store = useChartStore.getState();
 
+      // Ctrl+K for symbol search
+      if ((e.ctrlKey || e.metaKey) && key === 'k') {
+        e.preventDefault();
+        setSymbolSearchOpen(true);
+        return;
+      }
+
       // Toggle shortcuts panel
       if (e.key === '?') {
         setOpen((prev) => !prev);
