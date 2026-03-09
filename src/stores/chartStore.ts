@@ -431,6 +431,13 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   alertTemplates: [],
   addAlertTemplate: (template) => set((s) => ({ alertTemplates: [...s.alertTemplates, template] })),
   removeAlertTemplate: (id) => set((s) => ({ alertTemplates: s.alertTemplates.filter((t) => t.id !== id) })),
+
+  favorites: [],
+  toggleFavorite: (symbol) => set((s) => ({
+    favorites: s.favorites.includes(symbol)
+      ? s.favorites.filter((f) => f !== symbol)
+      : [...s.favorites, symbol]
+  })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
