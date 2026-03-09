@@ -17,6 +17,8 @@ import { Timeframe } from '@/types/trading';
 import { ScreenerHeatmap } from '@/components/Screener/ScreenerHeatmap';
 import { MultiTimeframePanel } from '@/components/Screener/MultiTimeframePanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Textarea } from '@/components/ui/textarea';
+import { Candle } from '@/types/trading';
 
 type SortColumn = keyof ScreenerRow;
 type SortOrder = 'asc' | 'desc';
