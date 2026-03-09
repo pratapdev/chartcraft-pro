@@ -509,7 +509,14 @@ export const Screener: React.FC = () => {
                           Apply Formula
                         </Button>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
+
+                    {!hasFilterMatches && (
+                      <div className="py-3 text-center text-xs text-muted-foreground">
+                        No matching filters found.
+                      </div>
+                    )}
                   </Accordion>
                 </div>
 
