@@ -412,10 +412,10 @@ export const Screener: React.FC = () => {
   const showBollinger = !normalizedFilterSearch || ['bollinger', 'bb', 'squeeze', 'breakout'].some((term) => term.includes(normalizedFilterSearch));
   const showMarketStructure = !normalizedFilterSearch || ['market structure', 'ms highs', 'ms lows', 'hh', 'hl', 'lh', 'll'].some((term) => term.includes(normalizedFilterSearch));
   const showPriceVolume = !normalizedFilterSearch || ['price', 'volume', 'change', 'range'].some((term) => term.includes(normalizedFilterSearch));
-  const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule'].some((term) => term.includes(normalizedFilterSearch));
+  const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule', 'indicator', 'code', 'typescript', 'crossover'].some((term) => term.includes(normalizedFilterSearch));
   const hasFilterMatches = showPriceAction || showTrend || showMomentum || showBollinger || showMarketStructure || showPriceVolume || showCustom;
 
-  const colCount = visibleColumns.length + 1; // +1 for star column
+  const colCount = visibleColumns.length + 1 + customIndicators.length; // +1 for star column
 
   return (
     <div className="flex flex-col h-screen bg-background">
