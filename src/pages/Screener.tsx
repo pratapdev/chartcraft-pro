@@ -485,7 +485,8 @@ export const Screener: React.FC = () => {
                     </AccordionItem>
 
                     {/* Custom Value Filters */}
-                    <AccordionItem value="custom">
+                    {showCustom && (
+                      <AccordionItem value="custom">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Custom Value Filters</div>
