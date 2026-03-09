@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3 } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch } from 'lucide-react';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
 import { checkSyncHealth, pushState, extractSyncPayload, getSyncServerUrl } from '@/lib/syncService';
@@ -132,6 +133,8 @@ const SyncStatusIndicator: React.FC = () => {
 };
 
 export const TopBar: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore();
   const [showSymbols, setShowSymbols] = useState(false);
   const [showMarketDropdown, setShowMarketDropdown] = useState(false);
@@ -340,6 +343,15 @@ export const TopBar: React.FC = () => {
           <span className="text-[10px] text-muted-foreground">NSE</span>
         )}
       </div>
+
+      <button
+        onClick={() => navigate('/screener')}
+        className={`trading-btn flex items-center gap-1 ${location.pathname === '/screener' ? 'text-primary' : ''}`}
+        title="Crypto Screener"
+      >
+        <ScanSearch size={14} />
+        <span className="hidden sm:inline">Screener</span>
+      </button>
 
       <button
         onClick={() => setMultiTfMode(!multiTfMode)}
