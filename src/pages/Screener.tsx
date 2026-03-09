@@ -883,6 +883,59 @@ export const Screener: React.FC = () => {
                       </AccordionItem>
                     )}
 
+                    {/* Custom Indicator (TypeScript Code) */}
+                    {showCustom && (
+                      <AccordionItem value="custom-indicator">
+                      <AccordionTrigger className="text-sm py-2">
+                        <div>
+                          <div className="font-medium flex items-center gap-1.5"><Code2 className="h-3.5 w-3.5" /> Custom Indicator (Code)</div>
+                          <div className="text-xs text-muted-foreground">Paste TypeScript/JS crossover logic. Shows as a new column in the table.</div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-4">
+                        {customIndicators.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Active Indicators</Label>
+                            {customIndicators.map(ind => (
+                              <div key={ind.id} className="flex items-center justify-between bg-accent/30 rounded px-2 py-1.5">
+                                <span className="text-xs font-medium text-foreground">{ind.name}</span>
+                                <button onClick={() => removeCustomIndicator(ind.id)} className="text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Indicator Name</Label>
+                          <Input
+                            placeholder="EMA 50/200 Cross"
+                            value={newIndicatorName}
+                            onChange={(e) => setNewIndicatorName(e.target.value)}
+                            maxLength={50}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Code (JS function body)</Label>
+                          <Textarea
+                            placeholder={`// Available: candles, price, ema20, ema50, ema200, sma20, sma50, sma200,\n// rsi, adx, atr, vwap, macdHist, stochK, stochD, bbUpper, bbLower, bbMiddle, volume\n\n// Example: EMA 50/200 Golden Cross\nif (ema50 > ema200) {\n  return { signal: 'bullish', label: 'Golden Cross' };\n} else if (ema50 < ema200) {\n  return { signal: 'bearish', label: 'Death Cross' };\n}\nreturn { signal: 'neutral' };`}
+                            value={newIndicatorCode}
+                            onChange={(e) => { setNewIndicatorCode(e.target.value); setIndicatorError(null); }}
+                            className="mt-1 font-mono text-[11px] min-h-[160px]"
+                          />
+                        </div>
+                        {indicatorError && (
+                          <p className="text-xs text-destructive">{indicatorError}</p>
+                        )}
+                        <Button size="sm" className="w-full" onClick={addCustomIndicator}>
+                          <Code2 className="mr-2 h-3.5 w-3.5" />
+                          Add Indicator Column
+                        </Button>
+                      </AccordionContent>
+                      </AccordionItem>
+                    )}
+
                     {!hasFilterMatches && (
                       <div className="py-3 text-center text-xs text-muted-foreground">
                         No matching filters found.
