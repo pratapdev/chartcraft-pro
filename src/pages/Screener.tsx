@@ -187,7 +187,8 @@ export const Screener: React.FC = () => {
 
                   <Accordion type="multiple" className="w-full">
                     {/* Price Action */}
-                    <AccordionItem value="price-action">
+                    {showPriceAction && (
+                      <AccordionItem value="price-action">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Price Action</div>
