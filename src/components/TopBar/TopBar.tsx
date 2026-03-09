@@ -133,6 +133,8 @@ const SyncStatusIndicator: React.FC = () => {
 };
 
 export const TopBar: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore();
   const [showSymbols, setShowSymbols] = useState(false);
   const [showMarketDropdown, setShowMarketDropdown] = useState(false);
