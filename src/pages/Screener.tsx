@@ -375,7 +375,8 @@ export const Screener: React.FC = () => {
                     </AccordionItem>
 
                     {/* Bollinger Bands */}
-                    <AccordionItem value="bb">
+                    {showBollinger && (
+                      <AccordionItem value="bb">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Bollinger Bands</div>
