@@ -409,7 +409,8 @@ export const Screener: React.FC = () => {
                           </Select>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Market Structure */}
                     {showMarketStructure && (
