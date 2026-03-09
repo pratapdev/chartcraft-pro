@@ -3,7 +3,10 @@ import { useChartStore } from '@/stores/chartStore';
 import { DrawingTool } from '@/types/trading';
 import { Keyboard, X } from 'lucide-react';
 
+import { SymbolSearch } from './SymbolSearch';
+
 const SHORTCUTS: { key: string; label: string; description: string; action?: () => void }[] = [
+  { key: 'Ctrl+K', label: '⌘K', description: 'Search symbols' },
   { key: 'V', label: 'V', description: 'Cursor / Select' },
   { key: 'T', label: 'T', description: 'Trendline' },
   { key: 'H', label: 'H', description: 'Horizontal Line' },
