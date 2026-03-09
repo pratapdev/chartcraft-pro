@@ -247,7 +247,8 @@ export const Screener: React.FC = () => {
                     </AccordionItem>
 
                     {/* Trend / Crossover */}
-                    <AccordionItem value="trend">
+                    {showTrend && (
+                      <AccordionItem value="trend">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Trend / Crossover</div>
