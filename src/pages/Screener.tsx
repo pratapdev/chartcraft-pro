@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers, Columns3, GripVertical, Eye, EyeOff } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers, Columns3, GripVertical, Eye, EyeOff, Code2, Trash2 } from 'lucide-react';
 import { fetchScreenerData, applyFilters, sortScreenerData, ScreenerRow, ScreenerFilters, ALL_PATTERNS } from '@/lib/screenerService';
 import { exportScreenerCSV } from '@/lib/screenerExport';
 import { Button } from '@/components/ui/button';
