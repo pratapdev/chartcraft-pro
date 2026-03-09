@@ -409,7 +409,8 @@ export const Screener: React.FC = () => {
                     </AccordionItem>
 
                     {/* Market Structure */}
-                    <AccordionItem value="ms">
+                    {showMarketStructure && (
+                      <AccordionItem value="ms">
                       <AccordionTrigger className="text-sm py-2">
                         <div>
                           <div className="font-medium">Market Structure</div>
