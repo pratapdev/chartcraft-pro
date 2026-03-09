@@ -345,6 +345,15 @@ export const TopBar: React.FC = () => {
       </div>
 
       <button
+        onClick={() => navigate('/screener')}
+        className={`trading-btn flex items-center gap-1 ${location.pathname === '/screener' ? 'text-primary' : ''}`}
+        title="Crypto Screener"
+      >
+        <ScanSearch size={14} />
+        <span className="hidden sm:inline">Screener</span>
+      </button>
+
+      <button
         onClick={() => setMultiTfMode(!multiTfMode)}
         className={`trading-btn flex items-center gap-1 ${multiTfMode ? 'text-primary' : ''}`}
         title="Multi-timeframe view"
