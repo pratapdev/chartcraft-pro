@@ -116,31 +116,80 @@ async function fetch24hTicker(binanceSymbol: string) {
   }
 }
 
-// Compute MACD (12, 26, 9)
+// Compute ATR
+function computeATR(candles: Candle[], period: number = 14): number | null {
+  if (candles.length < period + 1) return null;
+  const tr: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    tr.push(Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close)
+    ));
+  }
+  let atr = 0;
+  for (let i = 0; i < period; i++) atr += tr[i];
+  atr /= period;
+  for (let i = period; i < tr.length; i++) {
+    atr = (atr * (period - 1) + tr[i]) / period;
+  }
+  return Math.round(atr * 100) / 100;
+}
+
+// Compute Ichimoku Cloud signals
+function computeIchimoku(candles: Candle[]): { kumo: 'bullish' | 'bearish' | null; tk: 'bullish' | 'bearish' | null } {
+  if (candles.length < 52) return { kumo: null, tk: null };
+  
+  // Tenkan-sen (9-period high+low)/2
+  const tenkan = (Math.max(...candles.slice(-9).map(c => c.high)) + Math.min(...candles.slice(-9).map(c => c.low))) / 2;
+  // Kijun-sen (26-period high+low)/2
+  const kijun = (Math.max(...candles.slice(-26).map(c => c.high)) + Math.min(...candles.slice(-26).map(c => c.low))) / 2;
+  // Senkou Span A (Tenkan + Kijun) / 2 projected 26 ahead
+  const spanA = (tenkan + kijun) / 2;
+  // Senkou Span B (52-period high+low)/2 projected 26 ahead
+  const spanB = (Math.max(...candles.slice(-52).map(c => c.high)) + Math.min(...candles.slice(-52).map(c => c.low))) / 2;
+  
+  const price = candles[candles.length - 1].close;
+  const kumo = price > Math.max(spanA, spanB) ? 'bullish' : price < Math.min(spanA, spanB) ? 'bearish' : null;
+  const tk = tenkan > kijun ? 'bullish' : tenkan < kijun ? 'bearish' : null;
+  
+  return { kumo, tk };
+}
+
+// Market structure analysis (Higher Highs, Lower Lows, etc.)
+function analyzeMarketStructure(candles: Candle[]): { highs: 'HH' | 'LH' | 'HL' | 'LL' | null; lows: 'HH' | 'LH' | 'HL' | 'LL' | null } {
+  if (candles.length < 20) return { highs: null, lows: null };
+  const recent = candles.slice(-10);
+  const prev = candles.slice(-20, -10);
+  
+  const recentHigh = Math.max(...recent.map(c => c.high));
+  const prevHigh = Math.max(...prev.map(c => c.high));
+  const recentLow = Math.min(...recent.map(c => c.low));
+  const prevLow = Math.min(...prev.map(c => c.low));
+  
+  let highs: 'HH' | 'LH' | 'HL' | 'LL' | null = null;
+  let lows: 'HH' | 'LH' | 'HL' | 'LL' | null = null;
+  
+  if (recentHigh > prevHigh) highs = 'HH';
+  else if (recentHigh < prevHigh) highs = 'LH';
+  
+  if (recentLow > prevLow) lows = 'HL';
+  else if (recentLow < prevLow) lows = 'LL';
+  
+  return { highs, lows };
+}
+
+// Compute MACD with proper structure
 function computeMACD(candles: Candle[]) {
-  const ema12 = computeEMA(candles, 12);
-  const ema26 = computeEMA(candles, 26);
-  if (ema12.length === 0 || ema26.length === 0) return null;
-
-  const macdLine = ema12.map((e12, i) => ({
-    time: e12.time,
-    value: e12.value - (ema26[i]?.value ?? 0),
-  }));
-
-  const signalLine = computeEMA(
-    macdLine.map((m) => ({ time: m.time, open: m.value, high: m.value, low: m.value, close: m.value, volume: 0 })),
-    9
-  );
-
-  if (macdLine.length === 0 || signalLine.length === 0) return null;
-
-  const latest = macdLine[macdLine.length - 1];
-  const latestSignal = signalLine[signalLine.length - 1];
-
+  const macdData = computeMACD(candles, 12, 26, 9);
+  if (macdData.histogram.length === 0) return null;
+  const latest = macdData.histogram[macdData.histogram.length - 1];
+  const latestMacd = macdData.macdLine[macdData.macdLine.length - 1];
+  const latestSignal = macdData.signalLine[macdData.signalLine.length - 1];
   return {
-    value: latest.value,
+    value: latestMacd.value,
     signal: latestSignal.value,
-    histogram: latest.value - latestSignal.value,
+    histogram: latest.value,
   };
 }
 
