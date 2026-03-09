@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers } from 'lucide-react';
 import { fetchScreenerData, applyFilters, sortScreenerData, ScreenerRow, ScreenerFilters, ALL_PATTERNS } from '@/lib/screenerService';
+import { exportScreenerCSV } from '@/lib/screenerExport';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +12,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
+import { ScreenerHeatmap } from '@/components/Screener/ScreenerHeatmap';
+import { MultiTimeframePanel } from '@/components/Screener/MultiTimeframePanel';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type SortColumn = keyof ScreenerRow;
 type SortOrder = 'asc' | 'desc';
+type ViewMode = 'table' | 'heatmap' | 'mtf';
 
 const TIMEFRAMES: Timeframe[] = ['5m', '15m', '1h', '4h', '1D', '1W'];
 
@@ -24,12 +29,14 @@ export const Screener: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>('change24h');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
   const [filters, setFilters] = useState<ScreenerFilters>({ timeframe: '1D' });
   const [customFormula, setCustomFormula] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
 
-  const { setSymbol } = useChartStore();
+  const { setSymbol, favorites, toggleFavorite } = useChartStore();
 
   const loadData = async () => {
     setLoading(true);
@@ -49,9 +56,12 @@ export const Screener: React.FC = () => {
 
   useEffect(() => {
     let result = applyFilters(data, filters);
+    if (showFavoritesOnly) {
+      result = result.filter(r => favorites.includes(r.symbol));
+    }
     result = sortScreenerData(result, sortColumn, sortOrder);
     setFilteredData(result);
-  }, [data, filters, sortColumn, sortOrder]);
+  }, [data, filters, sortColumn, sortOrder, showFavoritesOnly, favorites]);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -113,9 +123,78 @@ export const Screener: React.FC = () => {
           <h1 className="text-xl font-semibold text-foreground">Advanced Crypto Screener</h1>
           <p className="text-xs text-muted-foreground">
             {filteredData.length} of {data.length} symbols • {filters.timeframe || '1D'} timeframe
+            {showFavoritesOnly && ` • ★ Favorites only`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View Mode Toggle */}
+          <TooltipProvider>
+            <div className="flex items-center border border-border rounded-md overflow-hidden">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`p-1.5 transition-colors ${viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setViewMode('table')}
+                  >
+                    <Table2 className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Table View</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`p-1.5 transition-colors ${viewMode === 'heatmap' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setViewMode('heatmap')}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Heatmap View</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`p-1.5 transition-colors ${viewMode === 'mtf' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setViewMode('mtf')}
+                  >
+                    <Layers className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Multi-Timeframe</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+
+          {/* Favorites Toggle */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showFavoritesOnly ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                  className="px-2"
+                >
+                  <Star className={`h-4 w-4 ${showFavoritesOnly ? 'fill-current' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{showFavoritesOnly ? 'Show All' : 'Show Favorites Only'}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* CSV Export */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={() => exportScreenerCSV(filteredData)} className="px-2">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -210,38 +289,10 @@ export const Screener: React.FC = () => {
                           ))}
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            size="sm"
-                            variant={filters.breakHigh ? 'default' : 'outline'}
-                            className="text-xs"
-                            onClick={() => setFilters({ ...filters, breakHigh: !filters.breakHigh })}
-                          >
-                            Break High
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={filters.breakLow ? 'default' : 'outline'}
-                            className="text-xs"
-                            onClick={() => setFilters({ ...filters, breakLow: !filters.breakLow })}
-                          >
-                            Break Low
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={filters.sweepHigh ? 'default' : 'outline'}
-                            className="text-xs"
-                            onClick={() => setFilters({ ...filters, sweepHigh: !filters.sweepHigh })}
-                          >
-                            Sweep High
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={filters.sweepLow ? 'default' : 'outline'}
-                            className="text-xs"
-                            onClick={() => setFilters({ ...filters, sweepLow: !filters.sweepLow })}
-                          >
-                            Sweep Low
-                          </Button>
+                          <Button size="sm" variant={filters.breakHigh ? 'default' : 'outline'} className="text-xs" onClick={() => setFilters({ ...filters, breakHigh: !filters.breakHigh })}>Break High</Button>
+                          <Button size="sm" variant={filters.breakLow ? 'default' : 'outline'} className="text-xs" onClick={() => setFilters({ ...filters, breakLow: !filters.breakLow })}>Break Low</Button>
+                          <Button size="sm" variant={filters.sweepHigh ? 'default' : 'outline'} className="text-xs" onClick={() => setFilters({ ...filters, sweepHigh: !filters.sweepHigh })}>Sweep High</Button>
+                          <Button size="sm" variant={filters.sweepLow ? 'default' : 'outline'} className="text-xs" onClick={() => setFilters({ ...filters, sweepLow: !filters.sweepLow })}>Sweep Low</Button>
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -260,9 +311,7 @@ export const Screener: React.FC = () => {
                         <div>
                           <Label className="text-xs text-muted-foreground">Supertrend Direction</Label>
                           <Select value={filters.trendDirection || 'any'} onValueChange={(val) => setFilters({ ...filters, trendDirection: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="bullish">Bullish</SelectItem>
@@ -273,9 +322,7 @@ export const Screener: React.FC = () => {
                         <div>
                           <Label className="text-xs text-muted-foreground">EMA 20/50 Cross</Label>
                           <Select value={filters.emaCross || 'any'} onValueChange={(val) => setFilters({ ...filters, emaCross: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="bullish">Bullish (20 &gt; 50)</SelectItem>
@@ -286,9 +333,7 @@ export const Screener: React.FC = () => {
                         <div>
                           <Label className="text-xs text-muted-foreground">Price vs EMA 200</Label>
                           <Select value={filters.priceVsEma200 || 'any'} onValueChange={(val) => setFilters({ ...filters, priceVsEma200: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="above">Above</SelectItem>
@@ -299,9 +344,7 @@ export const Screener: React.FC = () => {
                         <div>
                           <Label className="text-xs text-muted-foreground">Ichimoku Kumo</Label>
                           <Select value={filters.ichiKumo || 'any'} onValueChange={(val) => setFilters({ ...filters, ichiKumo: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="bullish">Bullish (Above Cloud)</SelectItem>
@@ -312,9 +355,7 @@ export const Screener: React.FC = () => {
                         <div>
                           <Label className="text-xs text-muted-foreground">Ichimoku TK Cross</Label>
                           <Select value={filters.ichiTk || 'any'} onValueChange={(val) => setFilters({ ...filters, ichiTk: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="bullish">Bullish</SelectItem>
@@ -359,9 +400,7 @@ export const Screener: React.FC = () => {
                         <div>
                           <Label className="text-xs text-muted-foreground">MACD Cross</Label>
                           <Select value={filters.macdCross || 'any'} onValueChange={(val) => setFilters({ ...filters, macdCross: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="bullish">Bullish (Above Signal)</SelectItem>
@@ -387,20 +426,13 @@ export const Screener: React.FC = () => {
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="space-y-3 pb-4">
-                        <Button
-                          size="sm"
-                          variant={filters.bbSqueeze ? 'default' : 'outline'}
-                          className="w-full text-xs"
-                          onClick={() => setFilters({ ...filters, bbSqueeze: !filters.bbSqueeze })}
-                        >
+                        <Button size="sm" variant={filters.bbSqueeze ? 'default' : 'outline'} className="w-full text-xs" onClick={() => setFilters({ ...filters, bbSqueeze: !filters.bbSqueeze })}>
                           BB Squeeze (Low Bandwidth)
                         </Button>
                         <div>
                           <Label className="text-xs text-muted-foreground">BB Breakout</Label>
                           <Select value={filters.bbBreakout || 'any'} onValueChange={(val) => setFilters({ ...filters, bbBreakout: val as any })}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
                               <SelectItem value="upper">Above Upper Band</SelectItem>
@@ -426,15 +458,7 @@ export const Screener: React.FC = () => {
                           <Label className="text-xs text-muted-foreground mb-2 block">MS Highs</Label>
                           <div className="flex gap-2">
                             {['HH', 'LH', 'HL', 'LL'].map(val => (
-                              <Button
-                                key={val}
-                                size="sm"
-                                variant={(filters.msHighs || []).includes(val) ? 'default' : 'outline'}
-                                className="text-xs flex-1"
-                                onClick={() => toggleMsFilter('highs', val)}
-                              >
-                                {val}
-                              </Button>
+                              <Button key={val} size="sm" variant={(filters.msHighs || []).includes(val) ? 'default' : 'outline'} className="text-xs flex-1" onClick={() => toggleMsFilter('highs', val)}>{val}</Button>
                             ))}
                           </div>
                         </div>
@@ -442,15 +466,7 @@ export const Screener: React.FC = () => {
                           <Label className="text-xs text-muted-foreground mb-2 block">MS Lows</Label>
                           <div className="flex gap-2">
                             {['HH', 'LH', 'HL', 'LL'].map(val => (
-                              <Button
-                                key={val}
-                                size="sm"
-                                variant={(filters.msLows || []).includes(val) ? 'default' : 'outline'}
-                                className="text-xs flex-1"
-                                onClick={() => toggleMsFilter('lows', val)}
-                              >
-                                {val}
-                              </Button>
+                              <Button key={val} size="sm" variant={(filters.msLows || []).includes(val) ? 'default' : 'outline'} className="text-xs flex-1" onClick={() => toggleMsFilter('lows', val)}>{val}</Button>
                             ))}
                           </div>
                         </div>
@@ -537,115 +553,136 @@ export const Screener: React.FC = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse">
-          <thead className="sticky top-0 bg-card border-b border-border z-10">
-            <tr>
-              <th className="text-left p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('symbol')}>
-                <div className="flex items-center">COIN <SortIcon column="symbol" /></div>
-              </th>
-              <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('price')}>
-                <div className="flex items-center justify-end">PRICE <SortIcon column="price" /></div>
-              </th>
-              <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('change24h')}>
-                <div className="flex items-center justify-end">24H % <SortIcon column="change24h" /></div>
-              </th>
-              <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('change7d')}>
-                <div className="flex items-center justify-end">7D % <SortIcon column="change7d" /></div>
-              </th>
-              <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('volume24h')}>
-                <div className="flex items-center justify-end">VOL <SortIcon column="volume24h" /></div>
-              </th>
-              <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('rsi')}>
-                <div className="flex items-center justify-end">RSI <SortIcon column="rsi" /></div>
-              </th>
-              <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('adx')}>
-                <div className="flex items-center justify-end">ADX <SortIcon column="adx" /></div>
-              </th>
-              <th className="text-center p-3 text-xs font-medium text-muted-foreground">MACD</th>
-              <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('ichiKumo')}>
-                <div className="flex items-center justify-center">ICHI KUMO <SortIcon column="ichiKumo" /></div>
-              </th>
-              <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('ichiTk')}>
-                <div className="flex items-center justify-center">ICHI TK <SortIcon column="ichiTk" /></div>
-              </th>
-              <th className="text-center p-3 text-xs font-medium text-muted-foreground">MS HIGHS</th>
-              <th className="text-center p-3 text-xs font-medium text-muted-foreground">MS LOWS</th>
-              <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('supertrend')}>
-                <div className="flex items-center justify-center">TREND <SortIcon column="supertrend" /></div>
-              </th>
-              <th className="text-left p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('pattern')}>
-                <div className="flex items-center">PATTERN <SortIcon column="pattern" /></div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {/* Content area */}
+      {viewMode === 'heatmap' ? (
+        <div className="flex-1 overflow-auto">
+          <ScreenerHeatmap data={filteredData} />
+        </div>
+      ) : viewMode === 'mtf' ? (
+        <MultiTimeframePanel />
+      ) : (
+        /* Table View */
+        <div className="flex-1 overflow-auto">
+          <table className="w-full border-collapse">
+            <thead className="sticky top-0 bg-card border-b border-border z-10">
               <tr>
-                <td colSpan={14} className="text-center py-8 text-muted-foreground">Loading...</td>
+                <th className="w-8 p-3"></th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('symbol')}>
+                  <div className="flex items-center">COIN <SortIcon column="symbol" /></div>
+                </th>
+                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('price')}>
+                  <div className="flex items-center justify-end">PRICE <SortIcon column="price" /></div>
+                </th>
+                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('change24h')}>
+                  <div className="flex items-center justify-end">24H % <SortIcon column="change24h" /></div>
+                </th>
+                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('change7d')}>
+                  <div className="flex items-center justify-end">7D % <SortIcon column="change7d" /></div>
+                </th>
+                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('volume24h')}>
+                  <div className="flex items-center justify-end">VOL <SortIcon column="volume24h" /></div>
+                </th>
+                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('rsi')}>
+                  <div className="flex items-center justify-end">RSI <SortIcon column="rsi" /></div>
+                </th>
+                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('adx')}>
+                  <div className="flex items-center justify-end">ADX <SortIcon column="adx" /></div>
+                </th>
+                <th className="text-center p-3 text-xs font-medium text-muted-foreground">MACD</th>
+                <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('ichiKumo')}>
+                  <div className="flex items-center justify-center">ICHI KUMO <SortIcon column="ichiKumo" /></div>
+                </th>
+                <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('ichiTk')}>
+                  <div className="flex items-center justify-center">ICHI TK <SortIcon column="ichiTk" /></div>
+                </th>
+                <th className="text-center p-3 text-xs font-medium text-muted-foreground">MS HIGHS</th>
+                <th className="text-center p-3 text-xs font-medium text-muted-foreground">MS LOWS</th>
+                <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('supertrend')}>
+                  <div className="flex items-center justify-center">TREND <SortIcon column="supertrend" /></div>
+                </th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('pattern')}>
+                  <div className="flex items-center">PATTERN <SortIcon column="pattern" /></div>
+                </th>
               </tr>
-            ) : filteredData.length === 0 ? (
-              <tr>
-                <td colSpan={14} className="text-center py-8 text-muted-foreground">No results found. Try adjusting your filters.</td>
-              </tr>
-            ) : (
-              filteredData.map((row) => (
-                <tr key={row.symbol} className="border-b border-border hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => handleRowClick(row.symbol)}>
-                  <td className="p-3 font-mono text-xs font-semibold">{row.symbol.replace('/USD', '')}</td>
-                  <td className="p-3 text-right font-mono text-xs">${row.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className={`p-3 text-right font-mono text-xs font-medium ${row.change24h >= 0 ? 'text-bull' : 'text-bear'}`}>
-                    {row.change24h >= 0 ? '+' : ''}{row.change24h.toFixed(2)}%
-                  </td>
-                  <td className={`p-3 text-right font-mono text-xs ${row.change7d >= 0 ? 'text-bull' : 'text-bear'}`}>
-                    {row.change7d ? `${row.change7d >= 0 ? '+' : ''}${row.change7d.toFixed(2)}%` : '-'}
-                  </td>
-                  <td className="p-3 text-right font-mono text-[10px] text-muted-foreground">
-                    ${(row.volume24h / 1_000_000).toFixed(0)}M
-                  </td>
-                  <td className={`p-3 text-right font-mono text-xs ${row.rsi !== null ? (row.rsi < 30 ? 'text-bull' : row.rsi > 70 ? 'text-bear' : '') : ''}`}>
-                    {row.rsi !== null ? row.rsi.toFixed(0) : '-'}
-                  </td>
-                  <td className="p-3 text-right font-mono text-xs text-muted-foreground">
-                    {row.adx !== null ? row.adx.toFixed(0) : '-'}
-                  </td>
-                  <td className="p-3 text-center text-xs">
-                    {row.macd ? (
-                      <span className={row.macd.histogram > 0 ? 'text-bull' : 'text-bear'}>
-                        {row.macd.histogram > 0 ? '↗' : '↘'}
-                      </span>
-                    ) : '-'}
-                  </td>
-                  <td className="p-3 text-center text-xs">
-                    {row.ichiKumo ? (
-                      <span className={row.ichiKumo === 'bullish' ? 'text-bull' : 'text-bear'}>
-                        {row.ichiKumo === 'bullish' ? '↗' : '↘'}
-                      </span>
-                    ) : '-'}
-                  </td>
-                  <td className="p-3 text-center text-xs">
-                    {row.ichiTk ? (
-                      <span className={row.ichiTk === 'bullish' ? 'text-bull' : 'text-bear'}>
-                        {row.ichiTk === 'bullish' ? '↗' : '↘'}
-                      </span>
-                    ) : '-'}
-                  </td>
-                  <td className="p-3 text-center text-xs font-semibold text-muted-foreground">{row.msHighs || '-'}</td>
-                  <td className="p-3 text-center text-xs font-semibold text-muted-foreground">{row.msLows || '-'}</td>
-                  <td className="p-3 text-center">
-                    {row.supertrend === 'bullish' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bull/20 text-bull">↑</span>
-                    ) : row.supertrend === 'bearish' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bear/20 text-bear">↓</span>
-                    ) : '-'}
-                  </td>
-                  <td className="p-3 text-[10px] text-muted-foreground max-w-[120px] truncate">{row.pattern || '-'}</td>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={15} className="text-center py-8 text-muted-foreground">Loading...</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan={15} className="text-center py-8 text-muted-foreground">No results found. Try adjusting your filters.</td>
+                </tr>
+              ) : (
+                filteredData.map((row) => {
+                  const isFav = favorites.includes(row.symbol);
+                  return (
+                    <tr key={row.symbol} className="border-b border-border hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => handleRowClick(row.symbol)}>
+                      <td className="p-2 text-center">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite(row.symbol); }}
+                          className="hover:scale-110 transition-transform"
+                        >
+                          <Star className={`h-3.5 w-3.5 ${isFav ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`} />
+                        </button>
+                      </td>
+                      <td className="p-3 font-mono text-xs font-semibold">{row.symbol.replace('/USD', '')}</td>
+                      <td className="p-3 text-right font-mono text-xs">${row.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className={`p-3 text-right font-mono text-xs font-medium ${row.change24h >= 0 ? 'text-bull' : 'text-bear'}`}>
+                        {row.change24h >= 0 ? '+' : ''}{row.change24h.toFixed(2)}%
+                      </td>
+                      <td className={`p-3 text-right font-mono text-xs ${row.change7d >= 0 ? 'text-bull' : 'text-bear'}`}>
+                        {row.change7d ? `${row.change7d >= 0 ? '+' : ''}${row.change7d.toFixed(2)}%` : '-'}
+                      </td>
+                      <td className="p-3 text-right font-mono text-[10px] text-muted-foreground">
+                        ${(row.volume24h / 1_000_000).toFixed(0)}M
+                      </td>
+                      <td className={`p-3 text-right font-mono text-xs ${row.rsi !== null ? (row.rsi < 30 ? 'text-bull' : row.rsi > 70 ? 'text-bear' : '') : ''}`}>
+                        {row.rsi !== null ? row.rsi.toFixed(0) : '-'}
+                      </td>
+                      <td className="p-3 text-right font-mono text-xs text-muted-foreground">
+                        {row.adx !== null ? row.adx.toFixed(0) : '-'}
+                      </td>
+                      <td className="p-3 text-center text-xs">
+                        {row.macd ? (
+                          <span className={row.macd.histogram > 0 ? 'text-bull' : 'text-bear'}>
+                            {row.macd.histogram > 0 ? '↗' : '↘'}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-center text-xs">
+                        {row.ichiKumo ? (
+                          <span className={row.ichiKumo === 'bullish' ? 'text-bull' : 'text-bear'}>
+                            {row.ichiKumo === 'bullish' ? '↗' : '↘'}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-center text-xs">
+                        {row.ichiTk ? (
+                          <span className={row.ichiTk === 'bullish' ? 'text-bull' : 'text-bear'}>
+                            {row.ichiTk === 'bullish' ? '↗' : '↘'}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-center text-xs font-semibold text-muted-foreground">{row.msHighs || '-'}</td>
+                      <td className="p-3 text-center text-xs font-semibold text-muted-foreground">{row.msLows || '-'}</td>
+                      <td className="p-3 text-center">
+                        {row.supertrend === 'bullish' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bull/20 text-bull">↑</span>
+                        ) : row.supertrend === 'bearish' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bear/20 text-bear">↓</span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-[10px] text-muted-foreground max-w-[120px] truncate">{row.pattern || '-'}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
