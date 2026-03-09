@@ -455,7 +455,8 @@ export const Screener: React.FC = () => {
                           </div>
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Price & Volume */}
                     {showPriceVolume && (
