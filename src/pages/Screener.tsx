@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers, Columns3, GripVertical, Eye, EyeOff } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers, Columns3, GripVertical, Eye, EyeOff, Code2, Trash2 } from 'lucide-react';
 import { fetchScreenerData, applyFilters, sortScreenerData, ScreenerRow, ScreenerFilters, ALL_PATTERNS } from '@/lib/screenerService';
 import { exportScreenerCSV } from '@/lib/screenerExport';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ import { Timeframe } from '@/types/trading';
 import { ScreenerHeatmap } from '@/components/Screener/ScreenerHeatmap';
 import { MultiTimeframePanel } from '@/components/Screener/MultiTimeframePanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Textarea } from '@/components/ui/textarea';
+import { Candle } from '@/types/trading';
 
 type SortColumn = keyof ScreenerRow;
 type SortOrder = 'asc' | 'desc';
@@ -160,6 +162,64 @@ function saveColumnConfig(visible: string[], order: string[]) {
   localStorage.setItem('screener-columns', JSON.stringify({ visible, order }));
 }
 
+// Custom indicator types
+interface CustomIndicator {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface CustomIndicatorResult {
+  signal: 'bullish' | 'bearish' | 'neutral';
+  value?: number;
+  label?: string;
+}
+
+function loadCustomIndicators(): CustomIndicator[] {
+  try {
+    const saved = localStorage.getItem('screener-custom-indicators');
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return [];
+}
+
+function saveCustomIndicators(indicators: CustomIndicator[]) {
+  localStorage.setItem('screener-custom-indicators', JSON.stringify(indicators));
+}
+
+/**
+ * Evaluates custom indicator code against a row's candle data.
+ * The code receives: candles, price, ema20, ema50, ema200, sma20, sma50, sma200, rsi, adx, atr, vwap
+ * Must return: { signal: 'bullish'|'bearish'|'neutral', value?: number, label?: string }
+ */
+function evaluateCustomIndicator(code: string, row: ScreenerRow): CustomIndicatorResult {
+  try {
+    const fn = new Function(
+      'candles', 'price', 'ema20', 'ema50', 'ema200', 'sma20', 'sma50', 'sma200',
+      'rsi', 'adx', 'atr', 'vwap', 'macdHist', 'stochK', 'stochD',
+      'bbUpper', 'bbLower', 'bbMiddle', 'volume',
+      code
+    );
+    const result = fn(
+      row.candles, row.price, row.ema20 ?? 0, row.ema50 ?? 0, row.ema200 ?? 0,
+      row.sma20 ?? 0, row.sma50 ?? 0, row.sma200 ?? 0,
+      row.rsi ?? 0, row.adx ?? 0, row.atr ?? 0, row.vwap ?? 0,
+      row.macd?.histogram ?? 0, row.stochRsi?.k ?? 0, row.stochRsi?.d ?? 0,
+      row.bb?.upper ?? 0, row.bb?.lower ?? 0, row.bb?.middle ?? 0, row.volume24h
+    );
+    if (result && typeof result === 'object' && result.signal) {
+      return { signal: result.signal, value: result.value, label: result.label };
+    }
+    // If returns boolean, treat as bullish/bearish
+    if (typeof result === 'boolean') {
+      return { signal: result ? 'bullish' : 'bearish' };
+    }
+    return { signal: 'neutral' };
+  } catch {
+    return { signal: 'neutral' };
+  }
+}
+
 export const Screener: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<ScreenerRow[]>([]);
@@ -177,6 +237,24 @@ export const Screener: React.FC = () => {
   // Column customization
   const [columnConfig, setColumnConfig] = useState(loadColumnConfig);
   const [draggedCol, setDraggedCol] = useState<string | null>(null);
+
+  // Custom indicators
+  const [customIndicators, setCustomIndicators] = useState<CustomIndicator[]>(loadCustomIndicators);
+  const [newIndicatorName, setNewIndicatorName] = useState('');
+  const [newIndicatorCode, setNewIndicatorCode] = useState('');
+  const [indicatorError, setIndicatorError] = useState<string | null>(null);
+
+  // Memoize custom indicator results
+  const customIndicatorResults = useMemo(() => {
+    const results: Record<string, Record<string, CustomIndicatorResult>> = {};
+    customIndicators.forEach(ind => {
+      results[ind.id] = {};
+      filteredData.forEach(row => {
+        results[ind.id][row.symbol] = evaluateCustomIndicator(ind.code, row);
+      });
+    });
+    return results;
+  }, [customIndicators, filteredData]);
 
   const { setSymbol, favorites, toggleFavorite } = useChartStore();
 
@@ -219,6 +297,45 @@ export const Screener: React.FC = () => {
     setColumnConfig({ visible: [...DEFAULT_VISIBLE], order: defaultOrder });
     saveColumnConfig([...DEFAULT_VISIBLE], defaultOrder);
   }, []);
+
+  const addCustomIndicator = useCallback(() => {
+    const name = newIndicatorName.trim();
+    const code = newIndicatorCode.trim();
+    if (!name || !code) {
+      setIndicatorError('Name and code are required.');
+      return;
+    }
+    if (name.length > 50) {
+      setIndicatorError('Name must be under 50 characters.');
+      return;
+    }
+    // Validate code by running it against a dummy
+    try {
+      const testFn = new Function(
+        'candles', 'price', 'ema20', 'ema50', 'ema200', 'sma20', 'sma50', 'sma200',
+        'rsi', 'adx', 'atr', 'vwap', 'macdHist', 'stochK', 'stochD',
+        'bbUpper', 'bbLower', 'bbMiddle', 'volume',
+        code
+      );
+      testFn([], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    } catch (e: any) {
+      setIndicatorError(`Code error: ${e.message}`);
+      return;
+    }
+    const newInd: CustomIndicator = { id: `ci_${Date.now()}`, name, code };
+    const updated = [...customIndicators, newInd];
+    setCustomIndicators(updated);
+    saveCustomIndicators(updated);
+    setNewIndicatorName('');
+    setNewIndicatorCode('');
+    setIndicatorError(null);
+  }, [newIndicatorName, newIndicatorCode, customIndicators]);
+
+  const removeCustomIndicator = useCallback((id: string) => {
+    const updated = customIndicators.filter(i => i.id !== id);
+    setCustomIndicators(updated);
+    saveCustomIndicators(updated);
+  }, [customIndicators]);
 
   const loadData = async () => {
     setLoading(true);
@@ -295,10 +412,10 @@ export const Screener: React.FC = () => {
   const showBollinger = !normalizedFilterSearch || ['bollinger', 'bb', 'squeeze', 'breakout'].some((term) => term.includes(normalizedFilterSearch));
   const showMarketStructure = !normalizedFilterSearch || ['market structure', 'ms highs', 'ms lows', 'hh', 'hl', 'lh', 'll'].some((term) => term.includes(normalizedFilterSearch));
   const showPriceVolume = !normalizedFilterSearch || ['price', 'volume', 'change', 'range'].some((term) => term.includes(normalizedFilterSearch));
-  const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule'].some((term) => term.includes(normalizedFilterSearch));
+  const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule', 'indicator', 'code', 'typescript', 'crossover'].some((term) => term.includes(normalizedFilterSearch));
   const hasFilterMatches = showPriceAction || showTrend || showMomentum || showBollinger || showMarketStructure || showPriceVolume || showCustom;
 
-  const colCount = visibleColumns.length + 1; // +1 for star column
+  const colCount = visibleColumns.length + 1 + customIndicators.length; // +1 for star column
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -766,6 +883,59 @@ export const Screener: React.FC = () => {
                       </AccordionItem>
                     )}
 
+                    {/* Custom Indicator (TypeScript Code) */}
+                    {showCustom && (
+                      <AccordionItem value="custom-indicator">
+                      <AccordionTrigger className="text-sm py-2">
+                        <div>
+                          <div className="font-medium flex items-center gap-1.5"><Code2 className="h-3.5 w-3.5" /> Custom Indicator (Code)</div>
+                          <div className="text-xs text-muted-foreground">Paste TypeScript/JS crossover logic. Shows as a new column in the table.</div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pb-4">
+                        {customIndicators.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Active Indicators</Label>
+                            {customIndicators.map(ind => (
+                              <div key={ind.id} className="flex items-center justify-between bg-accent/30 rounded px-2 py-1.5">
+                                <span className="text-xs font-medium text-foreground">{ind.name}</span>
+                                <button onClick={() => removeCustomIndicator(ind.id)} className="text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Indicator Name</Label>
+                          <Input
+                            placeholder="EMA 50/200 Cross"
+                            value={newIndicatorName}
+                            onChange={(e) => setNewIndicatorName(e.target.value)}
+                            maxLength={50}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Code (JS function body)</Label>
+                          <Textarea
+                            placeholder={`// Available: candles, price, ema20, ema50, ema200, sma20, sma50, sma200,\n// rsi, adx, atr, vwap, macdHist, stochK, stochD, bbUpper, bbLower, bbMiddle, volume\n\n// Example: EMA 50/200 Golden Cross\nif (ema50 > ema200) {\n  return { signal: 'bullish', label: 'Golden Cross' };\n} else if (ema50 < ema200) {\n  return { signal: 'bearish', label: 'Death Cross' };\n}\nreturn { signal: 'neutral' };`}
+                            value={newIndicatorCode}
+                            onChange={(e) => { setNewIndicatorCode(e.target.value); setIndicatorError(null); }}
+                            className="mt-1 font-mono text-[11px] min-h-[160px]"
+                          />
+                        </div>
+                        {indicatorError && (
+                          <p className="text-xs text-destructive">{indicatorError}</p>
+                        )}
+                        <Button size="sm" className="w-full" onClick={addCustomIndicator}>
+                          <Code2 className="mr-2 h-3.5 w-3.5" />
+                          Add Indicator Column
+                        </Button>
+                      </AccordionContent>
+                      </AccordionItem>
+                    )}
+
                     {!hasFilterMatches && (
                       <div className="py-3 text-center text-xs text-muted-foreground">
                         No matching filters found.
@@ -811,6 +981,14 @@ export const Screener: React.FC = () => {
                     </div>
                   </th>
                 ))}
+                {customIndicators.map(ind => (
+                  <th key={ind.id} className="p-3 text-xs font-medium text-muted-foreground text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Code2 className="h-3 w-3" />
+                      {ind.name}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -843,6 +1021,22 @@ export const Screener: React.FC = () => {
                           {col.render(row)}
                         </td>
                       ))}
+                      {customIndicators.map(ind => {
+                        const result = customIndicatorResults[ind.id]?.[row.symbol];
+                        if (!result) return <td key={ind.id} className="p-3 text-center text-xs">-</td>;
+                        return (
+                          <td key={ind.id} className="p-3 text-center text-xs">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${
+                              result.signal === 'bullish' ? 'bg-bull/20 text-bull' :
+                              result.signal === 'bearish' ? 'bg-bear/20 text-bear' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {result.signal === 'bullish' ? '↑' : result.signal === 'bearish' ? '↓' : '—'}
+                              {result.label && <span className="ml-0.5">{result.label}</span>}
+                            </span>
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })

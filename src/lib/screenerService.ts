@@ -72,12 +72,7 @@ export interface ScreenerFilters {
   customFormula?: string;
 }
 
-const CRYPTO_SYMBOLS = [
-  'BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD',
-  'ADA/USD', 'DOGE/USD', 'AVAX/USD', 'MATIC/USD', 'DOT/USD',
-  'LINK/USD', 'UNI/USD', 'ATOM/USD', 'LTC/USD', 'ETC/USD',
-  'BCH/USD', 'XLM/USD', 'FIL/USD', 'TRX/USD', 'NEAR/USD',
-];
+import { CRYPTO_SYMBOLS } from './cryptoSymbols';
 
 async function fetch24hTicker(binanceSymbol: string) {
   try {

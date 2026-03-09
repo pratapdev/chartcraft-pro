@@ -3,12 +3,7 @@ import { useChartStore } from '@/stores/chartStore';
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const CRYPTO_SYMBOLS = [
-  'BTC/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XRP/USD', 
-  'ADA/USD', 'DOGE/USD', 'AVAX/USD', 'MATIC/USD', 'DOT/USD',
-  'LINK/USD', 'UNI/USD', 'ATOM/USD', 'LTC/USD', 'ETC/USD'
-];
+import { CRYPTO_SYMBOLS } from '@/lib/cryptoSymbols';
 
 interface SymbolSearchProps {
   open: boolean;
