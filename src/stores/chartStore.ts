@@ -399,6 +399,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   chartFontSize: 11,
   setChartFontSize: (chartFontSize) => set({ chartFontSize }),
 
+  timezone: 'Exchange',
+  setTimezone: (timezone) => set({ timezone }),
+
   alertCandles: {},
   setAlertCandles: (key, candles) => set((s) => ({ alertCandles: { ...s.alertCandles, [key]: candles } })),
   updateAlertCandle: (key, candle) => set((s) => {
