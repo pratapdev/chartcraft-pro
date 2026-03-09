@@ -218,11 +218,27 @@ export const CandlestickChart: React.FC = () => {
     };
   }, []);
 
-  // Update font size reactively
+  // Update font size and timezone reactively
   useEffect(() => {
     if (!chartRef.current) return;
     chartRef.current.applyOptions({ layout: { fontSize: chartFontSize } });
   }, [chartFontSize]);
+
+  // Force re-render tick marks when timezone changes
+  useEffect(() => {
+    if (!chartRef.current || !candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return;
+    const candleData = candles.map((c) => ({
+      time: c.time as Time,
+      open: c.open, high: c.high, low: c.low, close: c.close,
+    }));
+    const volumeData = candles.map((c) => ({
+      time: c.time as Time,
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+    }));
+    candleSeriesRef.current.setData(candleData as CandlestickData[]);
+    volumeSeriesRef.current.setData(volumeData as HistogramData[]);
+  }, [timezone]);
 
   // Update candle data
   useEffect(() => {
