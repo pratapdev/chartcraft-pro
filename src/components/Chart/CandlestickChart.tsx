@@ -26,7 +26,7 @@ export const CandlestickChart: React.FC = () => {
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const { candles, indicators, chartFontSize, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
+  const { candles, indicators, chartFontSize, timezone, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
 
   const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, indicators);
 
@@ -71,6 +71,22 @@ export const CandlestickChart: React.FC = () => {
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 15,
+        tickMarkFormatter: (time: number) => {
+          const tz = useChartStore.getState().timezone;
+          const tzId = tz === 'Exchange' ? 'UTC' : tz;
+          const d = new Date(time * 1000);
+          return d.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tzId });
+        },
+      },
+      localization: {
+        timeFormatter: (time: number) => {
+          const tz = useChartStore.getState().timezone;
+          const tzId = tz === 'Exchange' ? 'UTC' : tz;
+          const d = new Date(time * 1000);
+          return d.toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tzId,
+          });
+        },
       },
       handleScroll: { vertTouchDrag: false },
     });
@@ -202,11 +218,27 @@ export const CandlestickChart: React.FC = () => {
     };
   }, []);
 
-  // Update font size reactively
+  // Update font size and timezone reactively
   useEffect(() => {
     if (!chartRef.current) return;
     chartRef.current.applyOptions({ layout: { fontSize: chartFontSize } });
   }, [chartFontSize]);
+
+  // Force re-render tick marks when timezone changes
+  useEffect(() => {
+    if (!chartRef.current || !candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return;
+    const candleData = candles.map((c) => ({
+      time: c.time as Time,
+      open: c.open, high: c.high, low: c.low, close: c.close,
+    }));
+    const volumeData = candles.map((c) => ({
+      time: c.time as Time,
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+    }));
+    candleSeriesRef.current.setData(candleData as CandlestickData[]);
+    volumeSeriesRef.current.setData(volumeData as HistogramData[]);
+  }, [timezone]);
 
   // Update candle data
   useEffect(() => {

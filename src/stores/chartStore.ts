@@ -125,6 +125,10 @@ interface ChartStore {
   chartFontSize: number;
   setChartFontSize: (size: number) => void;
 
+  // Timezone
+  timezone: string;
+  setTimezone: (tz: string) => void;
+
   // Background alert candle data (keyed by "symbol:timeframe")
   alertCandles: Record<string, Candle[]>;
   setAlertCandles: (key: string, candles: Candle[]) => void;
@@ -395,6 +399,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   chartFontSize: 11,
   setChartFontSize: (chartFontSize) => set({ chartFontSize }),
 
+  timezone: 'Exchange',
+  setTimezone: (timezone) => set({ timezone }),
+
   alertCandles: {},
   setAlertCandles: (key, candles) => set((s) => ({ alertCandles: { ...s.alertCandles, [key]: candles } })),
   updateAlertCandle: (key, candle) => set((s) => {
@@ -454,6 +461,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     timeframe: state.timeframe,
     marketType: state.marketType,
     chartFontSize: state.chartFontSize,
+    timezone: state.timezone,
     drawingDefaults: state.drawingDefaults,
     compoundAlerts: state.compoundAlerts,
     alertTemplates: state.alertTemplates,
