@@ -1,5 +1,5 @@
 import { Candle, Timeframe } from '@/types/trading';
-import { fetchCandles, computeRSI, computeSMA, computeEMA, computeSupertrend, computeMACD, computeADX, computeStochRSI, computeBollingerBands, computeVWAP } from './marketData';
+import { fetchCandles, computeRSI, computeSMA, computeEMA, computeSupertrend, computeMACD as computeMACDFull, computeADX, computeStochRSI, computeBollingerBands, computeVWAP } from './marketData';
 
 export interface ScreenerRow {
   symbol: string;
@@ -8,7 +8,6 @@ export interface ScreenerRow {
   change7d: number;
   volume24h: number;
   volumeChange: number;
-  marketCap?: number;
   rsi: number | null;
   macd: { value: number; signal: number; histogram: number } | null;
   ema20: number | null;
@@ -22,7 +21,7 @@ export interface ScreenerRow {
   plusDI: number | null;
   minusDI: number | null;
   stochRsi: { k: number; d: number } | null;
-  bollingerBands: { upper: number; middle: number; lower: number; bandwidth: number } | null;
+  bb: { upper: number; middle: number; lower: number; bandwidth: number } | null;
   vwap: number | null;
   atr: number | null;
   pattern: string | null;
@@ -30,15 +29,11 @@ export interface ScreenerRow {
   ichiTk: 'bullish' | 'bearish' | null;
   msHighs: 'LH' | 'HH' | 'HL' | 'LL' | null;
   msLows: 'LH' | 'HH' | 'HL' | 'LL' | null;
-  pivotFib: number | null;
-  pivPct: number | null;
   candles: Candle[];
 }
 
 export interface ScreenerFilters {
-  // Timeframe
   timeframe?: Timeframe;
-  
   // Price & Volume
   minPrice?: number;
   maxPrice?: number;
@@ -46,48 +41,34 @@ export interface ScreenerFilters {
   maxVolume?: number;
   minChange?: number;
   maxChange?: number;
-  
   // Trend / Crossover
   trendDirection?: 'bullish' | 'bearish' | 'any';
-  emaCross?: 'bullish' | 'bearish' | 'any'; // EMA 20/50 cross
-  smaCross?: 'bullish' | 'bearish' | 'any'; // SMA 20/50 cross
+  emaCross?: 'bullish' | 'bearish' | 'any';
   priceVsEma200?: 'above' | 'below' | 'any';
   priceVsSma200?: 'above' | 'below' | 'any';
-  
   // Momentum / Oscillator
-  rsiOversold?: number; // e.g., < 30
-  rsiOverbought?: number; // e.g., > 70
-  stochRsiOversold?: number; // e.g., < 20
-  stochRsiOverbought?: number; // e.g., > 80
+  rsiOversold?: number;
+  rsiOverbought?: number;
+  stochRsiOversold?: number;
+  stochRsiOverbought?: number;
   macdCross?: 'bullish' | 'bearish' | 'any';
-  adxStrength?: number; // e.g., > 25 for strong trend
-  
+  minAdx?: number;
   // Price Action
   candlePattern?: string[];
-  breakHigh?: boolean; // Breaking recent high
-  breakLow?: boolean; // Breaking recent low
-  supportLevel?: boolean;
-  resistanceLevel?: boolean;
+  breakHigh?: boolean;
+  breakLow?: boolean;
   sweepHigh?: boolean;
   sweepLow?: boolean;
-  
   // Bollinger Bands
-  bbSqueeze?: boolean; // Low bandwidth
+  bbSqueeze?: boolean;
   bbBreakout?: 'upper' | 'lower' | 'any';
-  
   // Ichimoku
   ichiKumo?: 'bullish' | 'bearish' | 'any';
   ichiTk?: 'bullish' | 'bearish' | 'any';
-  
   // Market Structure
-  msHighs?: ('LH' | 'HH' | 'HL' | 'LL')[];
-  msLows?: ('LH' | 'HH' | 'HL' | 'LL')[];
-  
-  // Fibonacci
-  fib618Bull?: boolean;
-  fib618Bear?: boolean;
-  
-  // Custom formula
+  msHighs?: string[];
+  msLows?: string[];
+  // Custom
   customFormula?: string;
 }
 
@@ -98,25 +79,19 @@ const CRYPTO_SYMBOLS = [
   'BCH/USD', 'XLM/USD', 'FIL/USD', 'TRX/USD', 'NEAR/USD',
 ];
 
-// Fetch 24h ticker data from Binance
 async function fetch24hTicker(binanceSymbol: string) {
   try {
     const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSymbol}`);
     if (!res.ok) return null;
     const data = await res.json();
     return {
-      priceChange: parseFloat(data.priceChange),
       priceChangePercent: parseFloat(data.priceChangePercent),
       lastPrice: parseFloat(data.lastPrice),
-      volume: parseFloat(data.volume),
       quoteVolume: parseFloat(data.quoteVolume),
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// Compute ATR
 function computeATR(candles: Candle[], period: number = 14): number | null {
   if (candles.length < period + 1) return null;
   const tr: number[] = [];
@@ -130,219 +105,239 @@ function computeATR(candles: Candle[], period: number = 14): number | null {
   let atr = 0;
   for (let i = 0; i < period; i++) atr += tr[i];
   atr /= period;
-  for (let i = period; i < tr.length; i++) {
-    atr = (atr * (period - 1) + tr[i]) / period;
-  }
+  for (let i = period; i < tr.length; i++) atr = (atr * (period - 1) + tr[i]) / period;
   return Math.round(atr * 100) / 100;
 }
 
-// Compute Ichimoku Cloud signals
 function computeIchimoku(candles: Candle[]): { kumo: 'bullish' | 'bearish' | null; tk: 'bullish' | 'bearish' | null } {
   if (candles.length < 52) return { kumo: null, tk: null };
-  
-  // Tenkan-sen (9-period high+low)/2
   const tenkan = (Math.max(...candles.slice(-9).map(c => c.high)) + Math.min(...candles.slice(-9).map(c => c.low))) / 2;
-  // Kijun-sen (26-period high+low)/2
   const kijun = (Math.max(...candles.slice(-26).map(c => c.high)) + Math.min(...candles.slice(-26).map(c => c.low))) / 2;
-  // Senkou Span A (Tenkan + Kijun) / 2 projected 26 ahead
   const spanA = (tenkan + kijun) / 2;
-  // Senkou Span B (52-period high+low)/2 projected 26 ahead
   const spanB = (Math.max(...candles.slice(-52).map(c => c.high)) + Math.min(...candles.slice(-52).map(c => c.low))) / 2;
-  
   const price = candles[candles.length - 1].close;
   const kumo = price > Math.max(spanA, spanB) ? 'bullish' : price < Math.min(spanA, spanB) ? 'bearish' : null;
   const tk = tenkan > kijun ? 'bullish' : tenkan < kijun ? 'bearish' : null;
-  
   return { kumo, tk };
 }
 
-// Market structure analysis (Higher Highs, Lower Lows, etc.)
 function analyzeMarketStructure(candles: Candle[]): { highs: 'HH' | 'LH' | 'HL' | 'LL' | null; lows: 'HH' | 'LH' | 'HL' | 'LL' | null } {
   if (candles.length < 20) return { highs: null, lows: null };
   const recent = candles.slice(-10);
   const prev = candles.slice(-20, -10);
-  
-  const recentHigh = Math.max(...recent.map(c => c.high));
-  const prevHigh = Math.max(...prev.map(c => c.high));
-  const recentLow = Math.min(...recent.map(c => c.low));
-  const prevLow = Math.min(...prev.map(c => c.low));
-  
-  let highs: 'HH' | 'LH' | 'HL' | 'LL' | null = null;
-  let lows: 'HH' | 'LH' | 'HL' | 'LL' | null = null;
-  
-  if (recentHigh > prevHigh) highs = 'HH';
-  else if (recentHigh < prevHigh) highs = 'LH';
-  
-  if (recentLow > prevLow) lows = 'HL';
-  else if (recentLow < prevLow) lows = 'LL';
-  
-  return { highs, lows };
-}
-
-// Compute MACD with proper structure
-function computeMACD(candles: Candle[]) {
-  const macdData = computeMACD(candles, 12, 26, 9);
-  if (macdData.histogram.length === 0) return null;
-  const latest = macdData.histogram[macdData.histogram.length - 1];
-  const latestMacd = macdData.macdLine[macdData.macdLine.length - 1];
-  const latestSignal = macdData.signalLine[macdData.signalLine.length - 1];
+  const rH = Math.max(...recent.map(c => c.high));
+  const pH = Math.max(...prev.map(c => c.high));
+  const rL = Math.min(...recent.map(c => c.low));
+  const pL = Math.min(...prev.map(c => c.low));
   return {
-    value: latestMacd.value,
-    signal: latestSignal.value,
-    histogram: latest.value,
+    highs: rH > pH ? 'HH' : rH < pH ? 'LH' : null,
+    lows: rL > pL ? 'HL' : rL < pL ? 'LL' : null,
   };
 }
 
-// Simple pattern detection (engulfing, doji, hammer, etc.)
 function detectPattern(candles: Candle[]): string | null {
-  if (candles.length < 2) return null;
+  if (candles.length < 3) return null;
   const curr = candles[candles.length - 1];
   const prev = candles[candles.length - 2];
-
   const currBody = Math.abs(curr.close - curr.open);
   const prevBody = Math.abs(prev.close - prev.open);
   const currRange = curr.high - curr.low;
-
-  // Bullish Engulfing
-  if (prev.close < prev.open && curr.close > curr.open && curr.open <= prev.close && curr.close >= prev.open) {
-    return 'Bullish Engulfing';
-  }
-
-  // Bearish Engulfing
-  if (prev.close > prev.open && curr.close < curr.open && curr.open >= prev.close && curr.close <= prev.open) {
-    return 'Bearish Engulfing';
-  }
-
-  // Doji (small body)
-  if (currBody < currRange * 0.1 && currRange > 0) {
-    return 'Doji';
-  }
-
-  // Hammer (bullish reversal)
-  const lowerWick = Math.min(curr.open, curr.close) - curr.low;
-  const upperWick = curr.high - Math.max(curr.open, curr.close);
-  if (lowerWick > currBody * 2 && upperWick < currBody * 0.5 && currRange > 0) {
-    return 'Hammer';
-  }
-
-  // Shooting Star (bearish reversal)
-  if (upperWick > currBody * 2 && lowerWick < currBody * 0.5 && currRange > 0) {
-    return 'Shooting Star';
-  }
-
+  if (prev.close < prev.open && curr.close > curr.open && curr.open <= prev.close && curr.close >= prev.open) return 'Bullish Engulfing';
+  if (prev.close > prev.open && curr.close < curr.open && curr.open >= prev.close && curr.close <= prev.open) return 'Bearish Engulfing';
+  if (currBody < currRange * 0.1 && currRange > 0) return 'Doji';
+  const lw = Math.min(curr.open, curr.close) - curr.low;
+  const uw = curr.high - Math.max(curr.open, curr.close);
+  if (lw > currBody * 2 && uw < currBody * 0.5 && currRange > 0) return 'Hammer';
+  if (uw > currBody * 2 && lw < currBody * 0.5 && currRange > 0) return 'Shooting Star';
+  // Morning Star (3-candle pattern)
+  const pp = candles[candles.length - 3];
+  if (pp && pp.close < pp.open && Math.abs(prev.close - prev.open) < prevBody * 0.3 && curr.close > curr.open && curr.close > (pp.open + pp.close) / 2) return 'Morning Star';
   return null;
+}
+
+function last<T>(arr: { time: number; value: T }[]): T | null {
+  return arr.length > 0 ? arr[arr.length - 1].value : null;
 }
 
 export async function fetchScreenerData(timeframe: Timeframe = '1D'): Promise<ScreenerRow[]> {
   const results: ScreenerRow[] = [];
 
-  for (const symbol of CRYPTO_SYMBOLS) {
+  // Fetch all in parallel
+  const promises = CRYPTO_SYMBOLS.map(async (symbol) => {
     try {
       const binanceSymbol = symbol.replace('/', '').replace('USD', 'USDT');
-      
-      // Fetch candles and 24h ticker in parallel
       const [candles, ticker24h] = await Promise.all([
-        fetchCandles(symbol, timeframe, 100),
+        fetchCandles(symbol, timeframe, 200),
         fetch24hTicker(binanceSymbol),
       ]);
+      if (!candles || candles.length === 0 || !ticker24h) return null;
 
-      if (!candles || candles.length === 0 || !ticker24h) continue;
-
-      // Compute indicators
       const rsiData = computeRSI(candles, 14);
-      const rsi = rsiData.length > 0 ? rsiData[rsiData.length - 1].value : null;
+      const rsi = last(rsiData);
 
-      const macd = computeMACD(candles);
+      const macdData = computeMACDFull(candles, 12, 26, 9);
+      const macd = macdData.histogram.length > 0 ? {
+        value: macdData.macdLine[macdData.macdLine.length - 1].value,
+        signal: macdData.signalLine[macdData.signalLine.length - 1].value,
+        histogram: macdData.histogram[macdData.histogram.length - 1].value,
+      } : null;
 
-      const ema20Data = computeEMA(candles, 20);
-      const ema20 = ema20Data.length > 0 ? ema20Data[ema20Data.length - 1].value : null;
+      const ema20 = last(computeEMA(candles, 20));
+      const ema50 = last(computeEMA(candles, 50));
+      const ema200 = last(computeEMA(candles, 200));
+      const sma20 = last(computeSMA(candles, 20));
+      const sma50 = last(computeSMA(candles, 50));
+      const sma200 = last(computeSMA(candles, 200));
 
-      const ema50Data = computeEMA(candles, 50);
-      const ema50 = ema50Data.length > 0 ? ema50Data[ema50Data.length - 1].value : null;
+      const stData = computeSupertrend(candles, 10, 3);
+      const lastST = stData.line[stData.line.length - 1];
+      const supertrend = lastST?.color === '#22c55e' ? 'bullish' as const : 'bearish' as const;
 
-      const supertrendData = computeSupertrend(candles, 10, 3);
-      const lastSupertrend = supertrendData.line[supertrendData.line.length - 1];
-      const supertrend = lastSupertrend?.color === '#22c55e' ? 'bullish' : 'bearish';
+      const adxData = computeADX(candles, 14);
+      const adx = last(adxData.adx);
+      const plusDI = last(adxData.plusDI);
+      const minusDI = last(adxData.minusDI);
 
+      const stochData = computeStochRSI(candles, 14, 14, 3, 3);
+      const stochRsi = stochData.k.length > 0 && stochData.d.length > 0
+        ? { k: stochData.k[stochData.k.length - 1].value, d: stochData.d[stochData.d.length - 1].value }
+        : null;
+
+      const bbData = computeBollingerBands(candles, 20, 2);
+      const bb = bbData.upper.length > 0 ? {
+        upper: bbData.upper[bbData.upper.length - 1].value,
+        middle: bbData.middle[bbData.middle.length - 1].value,
+        lower: bbData.lower[bbData.lower.length - 1].value,
+        bandwidth: ((bbData.upper[bbData.upper.length - 1].value - bbData.lower[bbData.lower.length - 1].value) / bbData.middle[bbData.middle.length - 1].value) * 100,
+      } : null;
+
+      const vwapData = computeVWAP(candles);
+      const vwap = last(vwapData);
+      const atr = computeATR(candles);
+      const ichi = computeIchimoku(candles);
+      const ms = analyzeMarketStructure(candles);
       const pattern = detectPattern(candles);
 
-      // Estimate 7d change (compare current price to 7 days ago if available)
       let change7d = 0;
       if (timeframe === '1D' && candles.length >= 7) {
-        const weekAgoPrice = candles[candles.length - 7].close;
-        change7d = ((ticker24h.lastPrice - weekAgoPrice) / weekAgoPrice) * 100;
+        change7d = ((ticker24h.lastPrice - candles[candles.length - 7].close) / candles[candles.length - 7].close) * 100;
       }
 
-      results.push({
-        symbol,
-        price: ticker24h.lastPrice,
-        change24h: ticker24h.priceChangePercent,
-        change7d,
-        volume24h: ticker24h.quoteVolume,
-        volumeChange: 0, // Binance doesn't provide this directly
-        rsi,
-        macd,
-        ema20,
-        ema50,
-        supertrend,
-        pattern,
-        candles,
-      });
+      return {
+        symbol, price: ticker24h.lastPrice, change24h: ticker24h.priceChangePercent, change7d,
+        volume24h: ticker24h.quoteVolume, volumeChange: 0,
+        rsi, macd, ema20, ema50, ema200, sma20, sma50, sma200,
+        supertrend, adx, plusDI, minusDI, stochRsi, bb, vwap, atr,
+        pattern, ichiKumo: ichi.kumo, ichiTk: ichi.tk,
+        msHighs: ms.highs, msLows: ms.lows, candles,
+      } as ScreenerRow;
     } catch (err) {
-      console.error(`Failed to fetch screener data for ${symbol}:`, err);
+      console.error(`Screener error for ${symbol}:`, err);
+      return null;
     }
-  }
+  });
 
-  return results;
+  const all = await Promise.all(promises);
+  return all.filter((r): r is ScreenerRow => r !== null);
 }
 
 export function applyFilters(data: ScreenerRow[], filters: ScreenerFilters): ScreenerRow[] {
   return data.filter((row) => {
-    // Price filters
+    // Price
     if (filters.minPrice !== undefined && row.price < filters.minPrice) return false;
     if (filters.maxPrice !== undefined && row.price > filters.maxPrice) return false;
-
-    // Volume filters
+    // Volume
     if (filters.minVolume !== undefined && row.volume24h < filters.minVolume) return false;
     if (filters.maxVolume !== undefined && row.volume24h > filters.maxVolume) return false;
-
-    // Change filters
+    // Change
     if (filters.minChange !== undefined && row.change24h < filters.minChange) return false;
     if (filters.maxChange !== undefined && row.change24h > filters.maxChange) return false;
-
-    // RSI filters
+    // RSI
     if (filters.rsiOversold !== undefined && row.rsi !== null && row.rsi >= filters.rsiOversold) return false;
     if (filters.rsiOverbought !== undefined && row.rsi !== null && row.rsi <= filters.rsiOverbought) return false;
-
-    // Trend direction
-    if (filters.trendDirection && filters.trendDirection !== 'any') {
-      if (row.supertrend !== filters.trendDirection) return false;
-    }
-
-    // Pattern filter
-    if (filters.pattern && filters.pattern.length > 0) {
-      if (!row.pattern || !filters.pattern.includes(row.pattern)) return false;
-    }
-
-    // Custom formula (basic eval - in production, use a safe parser)
-    if (filters.customFormula) {
-      try {
-        const context = {
-          price: row.price,
-          change: row.change24h,
-          volume: row.volume24h,
-          rsi: row.rsi ?? 0,
-          ema20: row.ema20 ?? 0,
-          ema50: row.ema50 ?? 0,
-        };
-        // Simple formula evaluation (e.g., "rsi < 30 && volume > 1000000")
-        const result = new Function(...Object.keys(context), `return ${filters.customFormula}`)(...Object.values(context));
-        if (!result) return false;
-      } catch {
-        return false;
+    // StochRSI
+    if (filters.stochRsiOversold !== undefined && row.stochRsi && row.stochRsi.k >= filters.stochRsiOversold) return false;
+    if (filters.stochRsiOverbought !== undefined && row.stochRsi && row.stochRsi.k <= filters.stochRsiOverbought) return false;
+    // Trend
+    if (filters.trendDirection && filters.trendDirection !== 'any' && row.supertrend !== filters.trendDirection) return false;
+    // EMA Cross
+    if (filters.emaCross && filters.emaCross !== 'any') {
+      if (row.ema20 !== null && row.ema50 !== null) {
+        if (filters.emaCross === 'bullish' && row.ema20 <= row.ema50) return false;
+        if (filters.emaCross === 'bearish' && row.ema20 >= row.ema50) return false;
       }
     }
-
+    // Price vs EMA 200
+    if (filters.priceVsEma200 && filters.priceVsEma200 !== 'any' && row.ema200 !== null) {
+      if (filters.priceVsEma200 === 'above' && row.price <= row.ema200) return false;
+      if (filters.priceVsEma200 === 'below' && row.price >= row.ema200) return false;
+    }
+    // Price vs SMA 200
+    if (filters.priceVsSma200 && filters.priceVsSma200 !== 'any' && row.sma200 !== null) {
+      if (filters.priceVsSma200 === 'above' && row.price <= row.sma200) return false;
+      if (filters.priceVsSma200 === 'below' && row.price >= row.sma200) return false;
+    }
+    // MACD Cross
+    if (filters.macdCross && filters.macdCross !== 'any' && row.macd) {
+      if (filters.macdCross === 'bullish' && row.macd.histogram <= 0) return false;
+      if (filters.macdCross === 'bearish' && row.macd.histogram >= 0) return false;
+    }
+    // ADX
+    if (filters.minAdx !== undefined && row.adx !== null && row.adx < filters.minAdx) return false;
+    // Candle patterns
+    if (filters.candlePattern && filters.candlePattern.length > 0) {
+      if (!row.pattern || !filters.candlePattern.includes(row.pattern)) return false;
+    }
+    // BB Squeeze
+    if (filters.bbSqueeze && row.bb) {
+      if (row.bb.bandwidth > 4) return false; // Not squeezing
+    }
+    // BB Breakout
+    if (filters.bbBreakout && filters.bbBreakout !== 'any' && row.bb) {
+      if (filters.bbBreakout === 'upper' && row.price <= row.bb.upper) return false;
+      if (filters.bbBreakout === 'lower' && row.price >= row.bb.lower) return false;
+    }
+    // Ichimoku
+    if (filters.ichiKumo && filters.ichiKumo !== 'any' && row.ichiKumo !== filters.ichiKumo) return false;
+    if (filters.ichiTk && filters.ichiTk !== 'any' && row.ichiTk !== filters.ichiTk) return false;
+    // Market Structure
+    if (filters.msHighs && filters.msHighs.length > 0 && (!row.msHighs || !filters.msHighs.includes(row.msHighs))) return false;
+    if (filters.msLows && filters.msLows.length > 0 && (!row.msLows || !filters.msLows.includes(row.msLows))) return false;
+    // Break High/Low
+    if (filters.breakHigh && row.candles.length >= 20) {
+      const prev20High = Math.max(...row.candles.slice(-21, -1).map(c => c.high));
+      if (row.price <= prev20High) return false;
+    }
+    if (filters.breakLow && row.candles.length >= 20) {
+      const prev20Low = Math.min(...row.candles.slice(-21, -1).map(c => c.low));
+      if (row.price >= prev20Low) return false;
+    }
+    // Sweep High/Low
+    if (filters.sweepHigh && row.candles.length >= 20) {
+      const prev20High = Math.max(...row.candles.slice(-21, -1).map(c => c.high));
+      const curr = row.candles[row.candles.length - 1];
+      if (!(curr.high > prev20High && curr.close < prev20High)) return false;
+    }
+    if (filters.sweepLow && row.candles.length >= 20) {
+      const prev20Low = Math.min(...row.candles.slice(-21, -1).map(c => c.low));
+      const curr = row.candles[row.candles.length - 1];
+      if (!(curr.low < prev20Low && curr.close > prev20Low)) return false;
+    }
+    // Custom formula
+    if (filters.customFormula) {
+      try {
+        const ctx = {
+          price: row.price, change: row.change24h, volume: row.volume24h,
+          rsi: row.rsi ?? 0, ema20: row.ema20 ?? 0, ema50: row.ema50 ?? 0, ema200: row.ema200 ?? 0,
+          sma20: row.sma20 ?? 0, sma50: row.sma50 ?? 0, sma200: row.sma200 ?? 0,
+          adx: row.adx ?? 0, atr: row.atr ?? 0, vwap: row.vwap ?? 0,
+          macd: row.macd?.histogram ?? 0, stochK: row.stochRsi?.k ?? 0, stochD: row.stochRsi?.d ?? 0,
+          bbUpper: row.bb?.upper ?? 0, bbLower: row.bb?.lower ?? 0, bbBandwidth: row.bb?.bandwidth ?? 0,
+        };
+        const result = new Function(...Object.keys(ctx), `return ${filters.customFormula}`)(...Object.values(ctx));
+        if (!result) return false;
+      } catch { return false; }
+    }
     return true;
   });
 }
@@ -351,18 +346,12 @@ export function sortScreenerData(data: ScreenerRow[], sortBy: keyof ScreenerRow,
   return [...data].sort((a, b) => {
     const aVal = a[sortBy];
     const bVal = b[sortBy];
-
     if (aVal === null || aVal === undefined) return 1;
     if (bVal === null || bVal === undefined) return -1;
-
-    if (typeof aVal === 'number' && typeof bVal === 'number') {
-      return order === 'asc' ? aVal - bVal : bVal - aVal;
-    }
-
-    if (typeof aVal === 'string' && typeof bVal === 'string') {
-      return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    }
-
+    if (typeof aVal === 'number' && typeof bVal === 'number') return order === 'asc' ? aVal - bVal : bVal - aVal;
+    if (typeof aVal === 'string' && typeof bVal === 'string') return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     return 0;
   });
 }
+
+export const ALL_PATTERNS = ['Bullish Engulfing', 'Bearish Engulfing', 'Doji', 'Hammer', 'Shooting Star', 'Morning Star'];
