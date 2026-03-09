@@ -148,6 +148,10 @@ interface ChartStore {
   alertTemplates: AlertTemplate[];
   addAlertTemplate: (template: AlertTemplate) => void;
   removeAlertTemplate: (id: string) => void;
+
+  // Favorites
+  favorites: string[];
+  toggleFavorite: (symbol: string) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
@@ -427,6 +431,13 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   alertTemplates: [],
   addAlertTemplate: (template) => set((s) => ({ alertTemplates: [...s.alertTemplates, template] })),
   removeAlertTemplate: (id) => set((s) => ({ alertTemplates: s.alertTemplates.filter((t) => t.id !== id) })),
+
+  favorites: [],
+  toggleFavorite: (symbol) => set((s) => ({
+    favorites: s.favorites.includes(symbol)
+      ? s.favorites.filter((f) => f !== symbol)
+      : [...s.favorites, symbol]
+  })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
@@ -446,5 +457,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     drawingDefaults: state.drawingDefaults,
     compoundAlerts: state.compoundAlerts,
     alertTemplates: state.alertTemplates,
+    favorites: state.favorites,
   }),
 }));

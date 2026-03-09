@@ -3,7 +3,10 @@ import { useChartStore } from '@/stores/chartStore';
 import { DrawingTool } from '@/types/trading';
 import { Keyboard, X } from 'lucide-react';
 
+import { SymbolSearch } from './SymbolSearch';
+
 const SHORTCUTS: { key: string; label: string; description: string; action?: () => void }[] = [
+  { key: 'Ctrl+K', label: '⌘K', description: 'Search symbols' },
   { key: 'V', label: 'V', description: 'Cursor / Select' },
   { key: 'T', label: 'T', description: 'Trendline' },
   { key: 'H', label: 'H', description: 'Horizontal Line' },
@@ -29,6 +32,7 @@ const TOOL_MAP: Record<string, DrawingTool> = {
 
 export const KeyboardShortcuts: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const {
     setActiveTool,
     setRightPanelTab,
@@ -47,6 +51,13 @@ export const KeyboardShortcuts: React.FC = () => {
 
       const key = e.key.toLowerCase();
       const store = useChartStore.getState();
+
+      // Ctrl+K for symbol search
+      if ((e.ctrlKey || e.metaKey) && key === 'k') {
+        e.preventDefault();
+        setSymbolSearchOpen(true);
+        return;
+      }
 
       // Toggle shortcuts panel
       if (e.key === '?') {
@@ -108,6 +119,9 @@ export const KeyboardShortcuts: React.FC = () => {
 
   return (
     <>
+      {/* Symbol Search Dialog */}
+      <SymbolSearch open={symbolSearchOpen} onOpenChange={setSymbolSearchOpen} />
+
       {/* Trigger button */}
       <button
         onClick={() => setOpen((prev: boolean) => !prev)}
