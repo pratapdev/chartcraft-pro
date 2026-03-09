@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search } from 'lucide-react';
 import { fetchScreenerData, applyFilters, sortScreenerData, ScreenerRow, ScreenerFilters, ALL_PATTERNS } from '@/lib/screenerService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
