@@ -71,6 +71,22 @@ export const CandlestickChart: React.FC = () => {
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 15,
+        tickMarkFormatter: (time: number) => {
+          const tz = useChartStore.getState().timezone;
+          const tzId = tz === 'Exchange' ? 'UTC' : tz;
+          const d = new Date(time * 1000);
+          return d.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tzId });
+        },
+      },
+      localization: {
+        timeFormatter: (time: number) => {
+          const tz = useChartStore.getState().timezone;
+          const tzId = tz === 'Exchange' ? 'UTC' : tz;
+          const d = new Date(time * 1000);
+          return d.toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tzId,
+          });
+        },
       },
       handleScroll: { vertTouchDrag: false },
     });
