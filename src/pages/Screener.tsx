@@ -374,7 +374,8 @@ export const Screener: React.FC = () => {
                           <Input type="number" placeholder="25" value={filters.minAdx ?? ''} onChange={(e) => setFilters({ ...filters, minAdx: e.target.value ? parseFloat(e.target.value) : undefined })} />
                         </div>
                       </AccordionContent>
-                    </AccordionItem>
+                      </AccordionItem>
+                    )}
 
                     {/* Bollinger Bands */}
                     {showBollinger && (
