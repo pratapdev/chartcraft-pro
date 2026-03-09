@@ -1,5 +1,5 @@
 import { Candle, Timeframe } from '@/types/trading';
-import { fetchCandles, computeRSI, computeSMA, computeEMA, computeSupertrend } from './marketData';
+import { fetchCandles, computeRSI, computeSMA, computeEMA, computeSupertrend, computeMACD, computeADX, computeStochRSI, computeBollingerBands, computeVWAP } from './marketData';
 
 export interface ScreenerRow {
   symbol: string;
@@ -13,8 +13,25 @@ export interface ScreenerRow {
   macd: { value: number; signal: number; histogram: number } | null;
   ema20: number | null;
   ema50: number | null;
+  ema200: number | null;
+  sma20: number | null;
+  sma50: number | null;
+  sma200: number | null;
   supertrend: 'bullish' | 'bearish' | null;
+  adx: number | null;
+  plusDI: number | null;
+  minusDI: number | null;
+  stochRsi: { k: number; d: number } | null;
+  bollingerBands: { upper: number; middle: number; lower: number; bandwidth: number } | null;
+  vwap: number | null;
+  atr: number | null;
   pattern: string | null;
+  ichiKumo: 'bullish' | 'bearish' | null;
+  ichiTk: 'bullish' | 'bearish' | null;
+  msHighs: 'LH' | 'HH' | 'HL' | 'LL' | null;
+  msLows: 'LH' | 'HH' | 'HL' | 'LL' | null;
+  pivotFib: number | null;
+  pivPct: number | null;
   candles: Candle[];
 }
 
