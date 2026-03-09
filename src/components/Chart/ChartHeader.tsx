@@ -1,18 +1,49 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
 import { ReplayBar } from './ReplayBar';
+import { Globe, ChevronDown } from 'lucide-react';
 
 const TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
+const TIMEZONES = [
+  { value: 'Exchange', label: 'Exchange', abbr: 'Exch' },
+  { value: 'UTC', label: 'UTC', abbr: 'UTC' },
+  { value: 'America/New_York', label: 'New York', abbr: 'EST' },
+  { value: 'America/Chicago', label: 'Chicago', abbr: 'CST' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles', abbr: 'PST' },
+  { value: 'Europe/London', label: 'London', abbr: 'GMT' },
+  { value: 'Europe/Berlin', label: 'Berlin', abbr: 'CET' },
+  { value: 'Europe/Moscow', label: 'Moscow', abbr: 'MSK' },
+  { value: 'Asia/Kolkata', label: 'Mumbai', abbr: 'IST' },
+  { value: 'Asia/Shanghai', label: 'Shanghai', abbr: 'CST' },
+  { value: 'Asia/Tokyo', label: 'Tokyo', abbr: 'JST' },
+  { value: 'Asia/Singapore', label: 'Singapore', abbr: 'SGT' },
+  { value: 'Australia/Sydney', label: 'Sydney', abbr: 'AEST' },
+];
+
 export const ChartHeader: React.FC = () => {
-  const { symbol, timeframe, setTimeframe, candles, connected, loading } = useChartStore();
+  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone } = useChartStore();
+  const [showTzDropdown, setShowTzDropdown] = useState(false);
+  const tzRef = useRef<HTMLDivElement>(null);
   const last = candles[candles.length - 1];
   const prev = candles.length > 1 ? candles[candles.length - 2] : null;
 
   const change = last && prev ? last.close - prev.close : 0;
   const changePct = prev ? (change / prev.close) * 100 : 0;
   const isUp = change >= 0;
+
+  const currentTz = TIMEZONES.find((t) => t.value === timezone) || TIMEZONES[0];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tzRef.current && !tzRef.current.contains(e.target as Node)) {
+        setShowTzDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   return (
     <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border bg-card min-h-[40px]">
@@ -57,6 +88,42 @@ export const ChartHeader: React.FC = () => {
 
       <div className="w-px h-5 bg-border" />
       <ReplayBar />
+
+      <div className="w-px h-5 bg-border" />
+
+      {/* Timezone selector */}
+      <div className="relative" ref={tzRef}>
+        <button
+          onClick={() => setShowTzDropdown(!showTzDropdown)}
+          className="trading-btn flex items-center gap-1 text-muted-foreground hover:text-foreground"
+        >
+          <Globe size={12} />
+          <span className="text-[11px] font-mono">{currentTz.abbr}</span>
+          <ChevronDown size={10} />
+        </button>
+
+        {showTzDropdown && (
+          <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-md shadow-xl z-50 min-w-[180px] overflow-hidden">
+            <div className="py-1 max-h-[300px] overflow-y-auto">
+              {TIMEZONES.map((tz) => (
+                <button
+                  key={tz.value}
+                  onClick={() => {
+                    setTimezone(tz.value);
+                    setShowTzDropdown(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center justify-between ${
+                    tz.value === timezone ? 'text-primary' : 'text-foreground'
+                  }`}
+                >
+                  <span>{tz.label}</span>
+                  <span className="text-muted-foreground font-mono text-[10px]">{tz.abbr}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* OHLCV */}
       {last && (
