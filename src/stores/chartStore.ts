@@ -457,5 +457,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     drawingDefaults: state.drawingDefaults,
     compoundAlerts: state.compoundAlerts,
     alertTemplates: state.alertTemplates,
+    favorites: state.favorites,
   }),
 }));

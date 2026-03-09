@@ -119,6 +119,9 @@ export const KeyboardShortcuts: React.FC = () => {
 
   return (
     <>
+      {/* Symbol Search Dialog */}
+      <SymbolSearch open={symbolSearchOpen} onOpenChange={setSymbolSearchOpen} />
+
       {/* Trigger button */}
       <button
         onClick={() => setOpen((prev: boolean) => !prev)}
