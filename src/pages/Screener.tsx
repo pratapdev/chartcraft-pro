@@ -244,7 +244,7 @@ export const Screener: React.FC = () => {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="any">Any</SelectItem>
-                              <SelectItem value="bullish">Bullish (20 > 50)</SelectItem>
+                              <SelectItem value="bullish">Bullish (20 &gt; 50)</SelectItem>
                               <SelectItem value="bearish">Bearish (20 &lt; 50)</SelectItem>
                             </SelectContent>
                           </Select>
