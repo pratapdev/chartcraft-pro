@@ -981,6 +981,14 @@ export const Screener: React.FC = () => {
                     </div>
                   </th>
                 ))}
+                {customIndicators.map(ind => (
+                  <th key={ind.id} className="p-3 text-xs font-medium text-muted-foreground text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Code2 className="h-3 w-3" />
+                      {ind.name}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -1013,6 +1021,22 @@ export const Screener: React.FC = () => {
                           {col.render(row)}
                         </td>
                       ))}
+                      {customIndicators.map(ind => {
+                        const result = customIndicatorResults[ind.id]?.[row.symbol];
+                        if (!result) return <td key={ind.id} className="p-3 text-center text-xs">-</td>;
+                        return (
+                          <td key={ind.id} className="p-3 text-center text-xs">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${
+                              result.signal === 'bullish' ? 'bg-bull/20 text-bull' :
+                              result.signal === 'bearish' ? 'bg-bear/20 text-bear' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {result.signal === 'bullish' ? '↑' : result.signal === 'bearish' ? '↓' : '—'}
+                              {result.label && <span className="ml-0.5">{result.label}</span>}
+                            </span>
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })
