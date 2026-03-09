@@ -96,6 +96,16 @@ export const Screener: React.FC = () => {
     }
   };
 
+  const normalizedFilterSearch = filterSearch.trim().toLowerCase();
+  const showPriceAction = !normalizedFilterSearch || ['price action', 'candlestick', 'pattern', 'break high', 'break low', 'sweep'].some((term) => term.includes(normalizedFilterSearch));
+  const showTrend = !normalizedFilterSearch || ['trend', 'crossover', 'supertrend', 'ema', 'ichimoku'].some((term) => term.includes(normalizedFilterSearch));
+  const showMomentum = !normalizedFilterSearch || ['momentum', 'oscillator', 'rsi', 'stochrsi', 'macd', 'adx'].some((term) => term.includes(normalizedFilterSearch));
+  const showBollinger = !normalizedFilterSearch || ['bollinger', 'bb', 'squeeze', 'breakout'].some((term) => term.includes(normalizedFilterSearch));
+  const showMarketStructure = !normalizedFilterSearch || ['market structure', 'ms highs', 'ms lows', 'hh', 'hl', 'lh', 'll'].some((term) => term.includes(normalizedFilterSearch));
+  const showPriceVolume = !normalizedFilterSearch || ['price', 'volume', 'change', 'range'].some((term) => term.includes(normalizedFilterSearch));
+  const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule'].some((term) => term.includes(normalizedFilterSearch));
+  const hasFilterMatches = showPriceAction || showTrend || showMomentum || showBollinger || showMarketStructure || showPriceVolume || showCustom;
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
