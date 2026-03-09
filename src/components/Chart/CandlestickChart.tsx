@@ -216,7 +216,7 @@ export const CandlestickChart: React.FC = () => {
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
     };
-  }, []);
+  }, [timezone]);
 
   // Update font size and timezone reactively
   useEffect(() => {
