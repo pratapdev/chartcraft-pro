@@ -245,6 +245,7 @@ export const Screener: React.FC = () => {
                         </div>
                       </AccordionContent>
                     </AccordionItem>
+                    )}
 
                     {/* Trend / Crossover */}
                     {showTrend && (
