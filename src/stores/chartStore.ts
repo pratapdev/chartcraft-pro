@@ -148,6 +148,10 @@ interface ChartStore {
   alertTemplates: AlertTemplate[];
   addAlertTemplate: (template: AlertTemplate) => void;
   removeAlertTemplate: (id: string) => void;
+
+  // Favorites
+  favorites: string[];
+  toggleFavorite: (symbol: string) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
