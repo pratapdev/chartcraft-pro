@@ -36,16 +36,58 @@ export interface ScreenerRow {
 }
 
 export interface ScreenerFilters {
+  // Timeframe
+  timeframe?: Timeframe;
+  
+  // Price & Volume
   minPrice?: number;
   maxPrice?: number;
   minVolume?: number;
   maxVolume?: number;
   minChange?: number;
   maxChange?: number;
+  
+  // Trend / Crossover
+  trendDirection?: 'bullish' | 'bearish' | 'any';
+  emaCross?: 'bullish' | 'bearish' | 'any'; // EMA 20/50 cross
+  smaCross?: 'bullish' | 'bearish' | 'any'; // SMA 20/50 cross
+  priceVsEma200?: 'above' | 'below' | 'any';
+  priceVsSma200?: 'above' | 'below' | 'any';
+  
+  // Momentum / Oscillator
   rsiOversold?: number; // e.g., < 30
   rsiOverbought?: number; // e.g., > 70
-  trendDirection?: 'bullish' | 'bearish' | 'any';
-  pattern?: string[];
+  stochRsiOversold?: number; // e.g., < 20
+  stochRsiOverbought?: number; // e.g., > 80
+  macdCross?: 'bullish' | 'bearish' | 'any';
+  adxStrength?: number; // e.g., > 25 for strong trend
+  
+  // Price Action
+  candlePattern?: string[];
+  breakHigh?: boolean; // Breaking recent high
+  breakLow?: boolean; // Breaking recent low
+  supportLevel?: boolean;
+  resistanceLevel?: boolean;
+  sweepHigh?: boolean;
+  sweepLow?: boolean;
+  
+  // Bollinger Bands
+  bbSqueeze?: boolean; // Low bandwidth
+  bbBreakout?: 'upper' | 'lower' | 'any';
+  
+  // Ichimoku
+  ichiKumo?: 'bullish' | 'bearish' | 'any';
+  ichiTk?: 'bullish' | 'bearish' | 'any';
+  
+  // Market Structure
+  msHighs?: ('LH' | 'HH' | 'HL' | 'LL')[];
+  msLows?: ('LH' | 'HH' | 'HL' | 'LL')[];
+  
+  // Fibonacci
+  fib618Bull?: boolean;
+  fib618Bear?: boolean;
+  
+  // Custom formula
   customFormula?: string;
 }
 
