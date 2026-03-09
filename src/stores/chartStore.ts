@@ -125,6 +125,10 @@ interface ChartStore {
   chartFontSize: number;
   setChartFontSize: (size: number) => void;
 
+  // Timezone
+  timezone: string;
+  setTimezone: (tz: string) => void;
+
   // Background alert candle data (keyed by "symbol:timeframe")
   alertCandles: Record<string, Candle[]>;
   setAlertCandles: (key: string, candles: Candle[]) => void;
