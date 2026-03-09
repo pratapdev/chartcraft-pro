@@ -27,6 +27,7 @@ export const Screener: React.FC = () => {
   
   const [filters, setFilters] = useState<ScreenerFilters>({ timeframe: '1D' });
   const [customFormula, setCustomFormula] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
 
   const { setSymbol } = useChartStore();
 
