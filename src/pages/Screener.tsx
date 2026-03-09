@@ -162,6 +162,64 @@ function saveColumnConfig(visible: string[], order: string[]) {
   localStorage.setItem('screener-columns', JSON.stringify({ visible, order }));
 }
 
+// Custom indicator types
+interface CustomIndicator {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface CustomIndicatorResult {
+  signal: 'bullish' | 'bearish' | 'neutral';
+  value?: number;
+  label?: string;
+}
+
+function loadCustomIndicators(): CustomIndicator[] {
+  try {
+    const saved = localStorage.getItem('screener-custom-indicators');
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return [];
+}
+
+function saveCustomIndicators(indicators: CustomIndicator[]) {
+  localStorage.setItem('screener-custom-indicators', JSON.stringify(indicators));
+}
+
+/**
+ * Evaluates custom indicator code against a row's candle data.
+ * The code receives: candles, price, ema20, ema50, ema200, sma20, sma50, sma200, rsi, adx, atr, vwap
+ * Must return: { signal: 'bullish'|'bearish'|'neutral', value?: number, label?: string }
+ */
+function evaluateCustomIndicator(code: string, row: ScreenerRow): CustomIndicatorResult {
+  try {
+    const fn = new Function(
+      'candles', 'price', 'ema20', 'ema50', 'ema200', 'sma20', 'sma50', 'sma200',
+      'rsi', 'adx', 'atr', 'vwap', 'macdHist', 'stochK', 'stochD',
+      'bbUpper', 'bbLower', 'bbMiddle', 'volume',
+      code
+    );
+    const result = fn(
+      row.candles, row.price, row.ema20 ?? 0, row.ema50 ?? 0, row.ema200 ?? 0,
+      row.sma20 ?? 0, row.sma50 ?? 0, row.sma200 ?? 0,
+      row.rsi ?? 0, row.adx ?? 0, row.atr ?? 0, row.vwap ?? 0,
+      row.macd?.histogram ?? 0, row.stochRsi?.k ?? 0, row.stochRsi?.d ?? 0,
+      row.bb?.upper ?? 0, row.bb?.lower ?? 0, row.bb?.middle ?? 0, row.volume24h
+    );
+    if (result && typeof result === 'object' && result.signal) {
+      return { signal: result.signal, value: result.value, label: result.label };
+    }
+    // If returns boolean, treat as bullish/bearish
+    if (typeof result === 'boolean') {
+      return { signal: result ? 'bullish' : 'bearish' };
+    }
+    return { signal: 'neutral' };
+  } catch {
+    return { signal: 'neutral' };
+  }
+}
+
 export const Screener: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<ScreenerRow[]>([]);
@@ -179,6 +237,24 @@ export const Screener: React.FC = () => {
   // Column customization
   const [columnConfig, setColumnConfig] = useState(loadColumnConfig);
   const [draggedCol, setDraggedCol] = useState<string | null>(null);
+
+  // Custom indicators
+  const [customIndicators, setCustomIndicators] = useState<CustomIndicator[]>(loadCustomIndicators);
+  const [newIndicatorName, setNewIndicatorName] = useState('');
+  const [newIndicatorCode, setNewIndicatorCode] = useState('');
+  const [indicatorError, setIndicatorError] = useState<string | null>(null);
+
+  // Memoize custom indicator results
+  const customIndicatorResults = useMemo(() => {
+    const results: Record<string, Record<string, CustomIndicatorResult>> = {};
+    customIndicators.forEach(ind => {
+      results[ind.id] = {};
+      filteredData.forEach(row => {
+        results[ind.id][row.symbol] = evaluateCustomIndicator(ind.code, row);
+      });
+    });
+    return results;
+  }, [customIndicators, filteredData]);
 
   const { setSymbol, favorites, toggleFavorite } = useChartStore();
 
