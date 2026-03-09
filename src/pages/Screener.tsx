@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Settings2, X, Search, Star, Download, Table2, LayoutGrid, Layers, Columns3, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { fetchScreenerData, applyFilters, sortScreenerData, ScreenerRow, ScreenerFilters, ALL_PATTERNS } from '@/lib/screenerService';
 import { exportScreenerCSV } from '@/lib/screenerExport';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
 import { ScreenerHeatmap } from '@/components/Screener/ScreenerHeatmap';
@@ -21,6 +23,142 @@ type SortOrder = 'asc' | 'desc';
 type ViewMode = 'table' | 'heatmap' | 'mtf';
 
 const TIMEFRAMES: Timeframe[] = ['5m', '15m', '1h', '4h', '1D', '1W'];
+
+// Column definitions
+export interface ColumnDef {
+  id: string;
+  label: string;
+  sortKey?: SortColumn;
+  align?: 'left' | 'right' | 'center';
+  minWidth?: string;
+  render: (row: ScreenerRow) => React.ReactNode;
+}
+
+const ALL_COLUMNS: ColumnDef[] = [
+  {
+    id: 'symbol', label: 'COIN', sortKey: 'symbol', align: 'left',
+    render: (row) => <span className="font-mono text-xs font-semibold">{row.symbol.replace('/USD', '')}</span>,
+  },
+  {
+    id: 'price', label: 'PRICE', sortKey: 'price', align: 'right',
+    render: (row) => <span className="font-mono text-xs">${row.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>,
+  },
+  {
+    id: 'change24h', label: '24H %', sortKey: 'change24h', align: 'right',
+    render: (row) => <span className={`font-mono text-xs font-medium ${row.change24h >= 0 ? 'text-bull' : 'text-bear'}`}>{row.change24h >= 0 ? '+' : ''}{row.change24h.toFixed(2)}%</span>,
+  },
+  {
+    id: 'change7d', label: '7D %', sortKey: 'change7d', align: 'right',
+    render: (row) => <span className={`font-mono text-xs ${row.change7d >= 0 ? 'text-bull' : 'text-bear'}`}>{row.change7d ? `${row.change7d >= 0 ? '+' : ''}${row.change7d.toFixed(2)}%` : '-'}</span>,
+  },
+  {
+    id: 'volume24h', label: 'VOL', sortKey: 'volume24h', align: 'right',
+    render: (row) => <span className="font-mono text-[10px] text-muted-foreground">${(row.volume24h / 1_000_000).toFixed(0)}M</span>,
+  },
+  {
+    id: 'rsi', label: 'RSI', sortKey: 'rsi', align: 'right',
+    render: (row) => <span className={`font-mono text-xs ${row.rsi !== null ? (row.rsi < 30 ? 'text-bull' : row.rsi > 70 ? 'text-bear' : '') : ''}`}>{row.rsi !== null ? row.rsi.toFixed(0) : '-'}</span>,
+  },
+  {
+    id: 'adx', label: 'ADX', sortKey: 'adx', align: 'right',
+    render: (row) => <span className="font-mono text-xs text-muted-foreground">{row.adx !== null ? row.adx.toFixed(0) : '-'}</span>,
+  },
+  {
+    id: 'macd', label: 'MACD', align: 'center',
+    render: (row) => row.macd ? <span className={row.macd.histogram > 0 ? 'text-bull' : 'text-bear'}>{row.macd.histogram > 0 ? '↗' : '↘'}</span> : <span>-</span>,
+  },
+  {
+    id: 'ichiKumo', label: 'ICHI KUMO', sortKey: 'ichiKumo', align: 'center',
+    render: (row) => row.ichiKumo ? <span className={row.ichiKumo === 'bullish' ? 'text-bull' : 'text-bear'}>{row.ichiKumo === 'bullish' ? '↗' : '↘'}</span> : <span>-</span>,
+  },
+  {
+    id: 'ichiTk', label: 'ICHI TK', sortKey: 'ichiTk', align: 'center',
+    render: (row) => row.ichiTk ? <span className={row.ichiTk === 'bullish' ? 'text-bull' : 'text-bear'}>{row.ichiTk === 'bullish' ? '↗' : '↘'}</span> : <span>-</span>,
+  },
+  {
+    id: 'msHighs', label: 'MS HIGHS', align: 'center',
+    render: (row) => <span className="font-semibold text-xs text-muted-foreground">{row.msHighs || '-'}</span>,
+  },
+  {
+    id: 'msLows', label: 'MS LOWS', align: 'center',
+    render: (row) => <span className="font-semibold text-xs text-muted-foreground">{row.msLows || '-'}</span>,
+  },
+  {
+    id: 'supertrend', label: 'TREND', sortKey: 'supertrend', align: 'center',
+    render: (row) => row.supertrend === 'bullish'
+      ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bull/20 text-bull">↑</span>
+      : row.supertrend === 'bearish'
+        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bear/20 text-bear">↓</span>
+        : <span>-</span>,
+  },
+  {
+    id: 'pattern', label: 'PATTERN', sortKey: 'pattern', align: 'left',
+    render: (row) => <span className="text-[10px] text-muted-foreground max-w-[120px] truncate block">{row.pattern || '-'}</span>,
+  },
+  {
+    id: 'stochRsi', label: 'STOCH RSI', align: 'center',
+    render: (row) => row.stochRsi ? <span className="font-mono text-xs text-muted-foreground">{row.stochRsi.k.toFixed(0)}/{row.stochRsi.d.toFixed(0)}</span> : <span>-</span>,
+  },
+  {
+    id: 'bb', label: 'BB BW', align: 'right',
+    render: (row) => row.bb ? <span className="font-mono text-xs text-muted-foreground">{row.bb.bandwidth.toFixed(1)}%</span> : <span>-</span>,
+  },
+  {
+    id: 'vwap', label: 'VWAP', sortKey: 'vwap', align: 'right',
+    render: (row) => row.vwap ? <span className="font-mono text-xs text-muted-foreground">${row.vwap.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> : <span>-</span>,
+  },
+  {
+    id: 'atr', label: 'ATR', sortKey: 'atr', align: 'right',
+    render: (row) => row.atr ? <span className="font-mono text-xs text-muted-foreground">{row.atr.toFixed(2)}</span> : <span>-</span>,
+  },
+  {
+    id: 'ema20', label: 'EMA 20', sortKey: 'ema20', align: 'right',
+    render: (row) => row.ema20 ? <span className="font-mono text-xs text-muted-foreground">{row.ema20.toFixed(2)}</span> : <span>-</span>,
+  },
+  {
+    id: 'ema50', label: 'EMA 50', sortKey: 'ema50', align: 'right',
+    render: (row) => row.ema50 ? <span className="font-mono text-xs text-muted-foreground">{row.ema50.toFixed(2)}</span> : <span>-</span>,
+  },
+  {
+    id: 'ema200', label: 'EMA 200', sortKey: 'ema200', align: 'right',
+    render: (row) => row.ema200 ? <span className="font-mono text-xs text-muted-foreground">{row.ema200.toFixed(2)}</span> : <span>-</span>,
+  },
+  {
+    id: 'sma20', label: 'SMA 20', sortKey: 'sma20', align: 'right',
+    render: (row) => row.sma20 ? <span className="font-mono text-xs text-muted-foreground">{row.sma20.toFixed(2)}</span> : <span>-</span>,
+  },
+  {
+    id: 'sma50', label: 'SMA 50', sortKey: 'sma50', align: 'right',
+    render: (row) => row.sma50 ? <span className="font-mono text-xs text-muted-foreground">{row.sma50.toFixed(2)}</span> : <span>-</span>,
+  },
+  {
+    id: 'sma200', label: 'SMA 200', sortKey: 'sma200', align: 'right',
+    render: (row) => row.sma200 ? <span className="font-mono text-xs text-muted-foreground">{row.sma200.toFixed(2)}</span> : <span>-</span>,
+  },
+];
+
+const DEFAULT_VISIBLE = ['symbol', 'price', 'change24h', 'change7d', 'volume24h', 'rsi', 'adx', 'macd', 'ichiKumo', 'ichiTk', 'msHighs', 'msLows', 'supertrend', 'pattern'];
+
+function loadColumnConfig(): { visible: string[]; order: string[] } {
+  try {
+    const saved = localStorage.getItem('screener-columns');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Ensure all column ids are valid
+      const allIds = ALL_COLUMNS.map(c => c.id);
+      const visible = (parsed.visible || DEFAULT_VISIBLE).filter((id: string) => allIds.includes(id));
+      const order = (parsed.order || allIds).filter((id: string) => allIds.includes(id));
+      // Add any new columns not in saved order
+      allIds.forEach(id => { if (!order.includes(id)) order.push(id); });
+      return { visible, order };
+    }
+  } catch {}
+  return { visible: [...DEFAULT_VISIBLE], order: ALL_COLUMNS.map(c => c.id) };
+}
+
+function saveColumnConfig(visible: string[], order: string[]) {
+  localStorage.setItem('screener-columns', JSON.stringify({ visible, order }));
+}
 
 export const Screener: React.FC = () => {
   const navigate = useNavigate();
@@ -36,7 +174,51 @@ export const Screener: React.FC = () => {
   const [customFormula, setCustomFormula] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
 
+  // Column customization
+  const [columnConfig, setColumnConfig] = useState(loadColumnConfig);
+  const [draggedCol, setDraggedCol] = useState<string | null>(null);
+
   const { setSymbol, favorites, toggleFavorite } = useChartStore();
+
+  const visibleColumns = columnConfig.order
+    .filter(id => columnConfig.visible.includes(id))
+    .map(id => ALL_COLUMNS.find(c => c.id === id)!)
+    .filter(Boolean);
+
+  const toggleColumnVisibility = useCallback((colId: string) => {
+    setColumnConfig(prev => {
+      const newVisible = prev.visible.includes(colId)
+        ? prev.visible.filter(id => id !== colId)
+        : [...prev.visible, colId];
+      saveColumnConfig(newVisible, prev.order);
+      return { ...prev, visible: newVisible };
+    });
+  }, []);
+
+  const handleColumnDragStart = (colId: string) => setDraggedCol(colId);
+
+  const handleColumnDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedCol || draggedCol === targetId) return;
+    setColumnConfig(prev => {
+      const newOrder = [...prev.order];
+      const fromIdx = newOrder.indexOf(draggedCol);
+      const toIdx = newOrder.indexOf(targetId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      newOrder.splice(fromIdx, 1);
+      newOrder.splice(toIdx, 0, draggedCol);
+      saveColumnConfig(prev.visible, newOrder);
+      return { ...prev, order: newOrder };
+    });
+  };
+
+  const handleColumnDragEnd = () => setDraggedCol(null);
+
+  const resetColumns = useCallback(() => {
+    const defaultOrder = ALL_COLUMNS.map(c => c.id);
+    setColumnConfig({ visible: [...DEFAULT_VISIBLE], order: defaultOrder });
+    saveColumnConfig([...DEFAULT_VISIBLE], defaultOrder);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -116,6 +298,8 @@ export const Screener: React.FC = () => {
   const showCustom = !normalizedFilterSearch || ['custom', 'formula', 'rule'].some((term) => term.includes(normalizedFilterSearch));
   const hasFilterMatches = showPriceAction || showTrend || showMomentum || showBollinger || showMarketStructure || showPriceVolume || showCustom;
 
+  const colCount = visibleColumns.length + 1; // +1 for star column
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
@@ -165,6 +349,54 @@ export const Screener: React.FC = () => {
               </Tooltip>
             </div>
           </TooltipProvider>
+
+          {/* Column Customization */}
+          <Popover>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="px-2">
+                      <Columns3 className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Customize Columns</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <PopoverContent className="w-64 max-h-[420px] overflow-y-auto p-0" align="end">
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground">Columns</span>
+                <button onClick={resetColumns} className="text-[10px] text-muted-foreground hover:text-foreground underline">Reset</button>
+              </div>
+              <div className="p-1">
+                {columnConfig.order.map(colId => {
+                  const col = ALL_COLUMNS.find(c => c.id === colId);
+                  if (!col) return null;
+                  const isVisible = columnConfig.visible.includes(colId);
+                  return (
+                    <div
+                      key={colId}
+                      draggable
+                      onDragStart={() => handleColumnDragStart(colId)}
+                      onDragOver={(e) => handleColumnDragOver(e, colId)}
+                      onDragEnd={handleColumnDragEnd}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-grab text-xs transition-colors hover:bg-accent/50 ${draggedCol === colId ? 'opacity-50 bg-accent' : ''}`}
+                    >
+                      <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <Checkbox
+                        checked={isVisible}
+                        onCheckedChange={() => toggleColumnVisibility(colId)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className={`flex-1 ${isVisible ? 'text-foreground' : 'text-muted-foreground'}`}>{col.label}</span>
+                      {isVisible ? <Eye className="h-3 w-3 text-muted-foreground" /> : <EyeOff className="h-3 w-3 text-muted-foreground/50" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* Favorites Toggle */}
           <TooltipProvider>
@@ -567,52 +799,28 @@ export const Screener: React.FC = () => {
             <thead className="sticky top-0 bg-card border-b border-border z-10">
               <tr>
                 <th className="w-8 p-3"></th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('symbol')}>
-                  <div className="flex items-center">COIN <SortIcon column="symbol" /></div>
-                </th>
-                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('price')}>
-                  <div className="flex items-center justify-end">PRICE <SortIcon column="price" /></div>
-                </th>
-                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('change24h')}>
-                  <div className="flex items-center justify-end">24H % <SortIcon column="change24h" /></div>
-                </th>
-                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('change7d')}>
-                  <div className="flex items-center justify-end">7D % <SortIcon column="change7d" /></div>
-                </th>
-                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('volume24h')}>
-                  <div className="flex items-center justify-end">VOL <SortIcon column="volume24h" /></div>
-                </th>
-                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('rsi')}>
-                  <div className="flex items-center justify-end">RSI <SortIcon column="rsi" /></div>
-                </th>
-                <th className="text-right p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('adx')}>
-                  <div className="flex items-center justify-end">ADX <SortIcon column="adx" /></div>
-                </th>
-                <th className="text-center p-3 text-xs font-medium text-muted-foreground">MACD</th>
-                <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('ichiKumo')}>
-                  <div className="flex items-center justify-center">ICHI KUMO <SortIcon column="ichiKumo" /></div>
-                </th>
-                <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('ichiTk')}>
-                  <div className="flex items-center justify-center">ICHI TK <SortIcon column="ichiTk" /></div>
-                </th>
-                <th className="text-center p-3 text-xs font-medium text-muted-foreground">MS HIGHS</th>
-                <th className="text-center p-3 text-xs font-medium text-muted-foreground">MS LOWS</th>
-                <th className="text-center p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('supertrend')}>
-                  <div className="flex items-center justify-center">TREND <SortIcon column="supertrend" /></div>
-                </th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground cursor-pointer hover:bg-accent/50" onClick={() => handleSort('pattern')}>
-                  <div className="flex items-center">PATTERN <SortIcon column="pattern" /></div>
-                </th>
+                {visibleColumns.map(col => (
+                  <th
+                    key={col.id}
+                    className={`p-3 text-xs font-medium text-muted-foreground ${col.sortKey ? 'cursor-pointer hover:bg-accent/50' : ''} ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                    onClick={() => col.sortKey && handleSort(col.sortKey)}
+                  >
+                    <div className={`flex items-center ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}`}>
+                      {col.label}
+                      {col.sortKey && <SortIcon column={col.sortKey} />}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={15} className="text-center py-8 text-muted-foreground">Loading...</td>
+                  <td colSpan={colCount} className="text-center py-8 text-muted-foreground">Loading...</td>
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="text-center py-8 text-muted-foreground">No results found. Try adjusting your filters.</td>
+                  <td colSpan={colCount} className="text-center py-8 text-muted-foreground">No results found. Try adjusting your filters.</td>
                 </tr>
               ) : (
                 filteredData.map((row) => {
@@ -627,54 +835,14 @@ export const Screener: React.FC = () => {
                           <Star className={`h-3.5 w-3.5 ${isFav ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`} />
                         </button>
                       </td>
-                      <td className="p-3 font-mono text-xs font-semibold">{row.symbol.replace('/USD', '')}</td>
-                      <td className="p-3 text-right font-mono text-xs">${row.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className={`p-3 text-right font-mono text-xs font-medium ${row.change24h >= 0 ? 'text-bull' : 'text-bear'}`}>
-                        {row.change24h >= 0 ? '+' : ''}{row.change24h.toFixed(2)}%
-                      </td>
-                      <td className={`p-3 text-right font-mono text-xs ${row.change7d >= 0 ? 'text-bull' : 'text-bear'}`}>
-                        {row.change7d ? `${row.change7d >= 0 ? '+' : ''}${row.change7d.toFixed(2)}%` : '-'}
-                      </td>
-                      <td className="p-3 text-right font-mono text-[10px] text-muted-foreground">
-                        ${(row.volume24h / 1_000_000).toFixed(0)}M
-                      </td>
-                      <td className={`p-3 text-right font-mono text-xs ${row.rsi !== null ? (row.rsi < 30 ? 'text-bull' : row.rsi > 70 ? 'text-bear' : '') : ''}`}>
-                        {row.rsi !== null ? row.rsi.toFixed(0) : '-'}
-                      </td>
-                      <td className="p-3 text-right font-mono text-xs text-muted-foreground">
-                        {row.adx !== null ? row.adx.toFixed(0) : '-'}
-                      </td>
-                      <td className="p-3 text-center text-xs">
-                        {row.macd ? (
-                          <span className={row.macd.histogram > 0 ? 'text-bull' : 'text-bear'}>
-                            {row.macd.histogram > 0 ? '↗' : '↘'}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-center text-xs">
-                        {row.ichiKumo ? (
-                          <span className={row.ichiKumo === 'bullish' ? 'text-bull' : 'text-bear'}>
-                            {row.ichiKumo === 'bullish' ? '↗' : '↘'}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-center text-xs">
-                        {row.ichiTk ? (
-                          <span className={row.ichiTk === 'bullish' ? 'text-bull' : 'text-bear'}>
-                            {row.ichiTk === 'bullish' ? '↗' : '↘'}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-center text-xs font-semibold text-muted-foreground">{row.msHighs || '-'}</td>
-                      <td className="p-3 text-center text-xs font-semibold text-muted-foreground">{row.msLows || '-'}</td>
-                      <td className="p-3 text-center">
-                        {row.supertrend === 'bullish' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bull/20 text-bull">↑</span>
-                        ) : row.supertrend === 'bearish' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-bear/20 text-bear">↓</span>
-                        ) : '-'}
-                      </td>
-                      <td className="p-3 text-[10px] text-muted-foreground max-w-[120px] truncate">{row.pattern || '-'}</td>
+                      {visibleColumns.map(col => (
+                        <td
+                          key={col.id}
+                          className={`p-3 text-xs ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                        >
+                          {col.render(row)}
+                        </td>
+                      ))}
                     </tr>
                   );
                 })
