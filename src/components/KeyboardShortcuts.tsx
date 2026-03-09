@@ -32,6 +32,7 @@ const TOOL_MAP: Record<string, DrawingTool> = {
 
 export const KeyboardShortcuts: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
   const {
     setActiveTool,
     setRightPanelTab,
