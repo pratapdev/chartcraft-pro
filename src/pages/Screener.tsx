@@ -298,6 +298,45 @@ export const Screener: React.FC = () => {
     saveColumnConfig([...DEFAULT_VISIBLE], defaultOrder);
   }, []);
 
+  const addCustomIndicator = useCallback(() => {
+    const name = newIndicatorName.trim();
+    const code = newIndicatorCode.trim();
+    if (!name || !code) {
+      setIndicatorError('Name and code are required.');
+      return;
+    }
+    if (name.length > 50) {
+      setIndicatorError('Name must be under 50 characters.');
+      return;
+    }
+    // Validate code by running it against a dummy
+    try {
+      const testFn = new Function(
+        'candles', 'price', 'ema20', 'ema50', 'ema200', 'sma20', 'sma50', 'sma200',
+        'rsi', 'adx', 'atr', 'vwap', 'macdHist', 'stochK', 'stochD',
+        'bbUpper', 'bbLower', 'bbMiddle', 'volume',
+        code
+      );
+      testFn([], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    } catch (e: any) {
+      setIndicatorError(`Code error: ${e.message}`);
+      return;
+    }
+    const newInd: CustomIndicator = { id: `ci_${Date.now()}`, name, code };
+    const updated = [...customIndicators, newInd];
+    setCustomIndicators(updated);
+    saveCustomIndicators(updated);
+    setNewIndicatorName('');
+    setNewIndicatorCode('');
+    setIndicatorError(null);
+  }, [newIndicatorName, newIndicatorCode, customIndicators]);
+
+  const removeCustomIndicator = useCallback((id: string) => {
+    const updated = customIndicators.filter(i => i.id !== id);
+    setCustomIndicators(updated);
+    saveCustomIndicators(updated);
+  }, [customIndicators]);
+
   const loadData = async () => {
     setLoading(true);
     try {
