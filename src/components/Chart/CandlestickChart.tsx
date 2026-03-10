@@ -70,7 +70,8 @@ export const CandlestickChart: React.FC = () => {
         borderColor: '#1c2333',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 15,
+        rightOffset: 50,
+        shiftVisibleRangeOnNewBar: true,
         tickMarkFormatter: (time: number) => {
           const tz = useChartStore.getState().timezone;
           const tzId = tz === 'Exchange' ? 'UTC' : tz;
@@ -246,7 +247,9 @@ export const CandlestickChart: React.FC = () => {
 
     const timeScale = chartRef.current.timeScale();
     const prevRange = timeScale.getVisibleLogicalRange();
-    const wasNearRealtime = Math.abs(timeScale.scrollPosition()) <= 1;
+    // With rightOffset=50, scrollPosition near 0 means we're at the latest data
+    const scrollPos = timeScale.scrollPosition();
+    const wasNearRealtime = scrollPos >= -2;
 
     const candleData: CandlestickData[] = candles.map((c) => ({
       time: c.time as Time,
@@ -267,9 +270,14 @@ export const CandlestickChart: React.FC = () => {
 
     // Keep user position if they are reviewing history, otherwise stay at latest candle
     if (wasNearRealtime) {
-      timeScale.scrollToRealTime();
+      // Use requestAnimationFrame to avoid mid-render jumps
+      requestAnimationFrame(() => {
+        try { timeScale.scrollToRealTime(); } catch {}
+      });
     } else if (prevRange) {
-      timeScale.setVisibleLogicalRange(prevRange);
+      requestAnimationFrame(() => {
+        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
+      });
     }
 
     // Store initial range on first load
