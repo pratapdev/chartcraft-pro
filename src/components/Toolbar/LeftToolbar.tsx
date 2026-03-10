@@ -5,6 +5,7 @@ import {
   MousePointer2,
   TrendingUp,
   Minus,
+  SeparatorVertical,
   Bell,
   BarChart3,
   Settings,

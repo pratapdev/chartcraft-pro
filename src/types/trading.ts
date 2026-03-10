@@ -27,7 +27,7 @@ export interface Trendline {
   createdAt: number;
 }
 
-export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'ray' | 'measure' | 'fibonacci';
+export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'vertical' | 'ray' | 'measure' | 'fibonacci';
 
 export interface FibonacciDrawing {
   id: string;
