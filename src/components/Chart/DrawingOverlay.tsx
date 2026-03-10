@@ -457,6 +457,36 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (activeTool === 'vertical') {
+        // Single-click placement for vertical line
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          const series = seriesRef.current;
+          if (series) {
+            // Use a very large price range to span the full chart height
+            const topPrice = 1e12;
+            const bottomPrice = -1e12;
+            addTrendline({
+              id: crypto.randomUUID(),
+              symbol,
+              timeframe,
+              startTime: coords.time,
+              startPrice: topPrice,
+              endTime: coords.time,
+              endPrice: bottomPrice,
+              color: useChartStore.getState().drawingDefaults.trendline.color,
+              thickness: useChartStore.getState().drawingDefaults.trendline.thickness,
+              lineStyle: useChartStore.getState().drawingDefaults.trendline.lineStyle,
+              createdAt: Date.now(),
+            });
+          }
+        }
+        setActiveTool('cursor');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       if (activeTool === 'trendline') {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
