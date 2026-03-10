@@ -70,7 +70,8 @@ export const CandlestickChart: React.FC = () => {
         borderColor: '#1c2333',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 15,
+        rightOffset: 50,
+        shiftVisibleRangeOnNewBar: true,
         tickMarkFormatter: (time: number) => {
           const tz = useChartStore.getState().timezone;
           const tzId = tz === 'Exchange' ? 'UTC' : tz;
