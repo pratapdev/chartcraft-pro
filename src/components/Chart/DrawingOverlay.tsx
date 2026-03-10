@@ -643,7 +643,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
 
-      if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
+      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
