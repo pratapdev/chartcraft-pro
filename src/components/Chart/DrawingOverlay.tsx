@@ -156,13 +156,20 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const hitTest = useCallback(
     (mx: number, my: number) => {
       for (let i = trendlines.length - 1; i >= 0; i--) {
-        const px = lineToPixels(trendlines[i]);
+        const line = trendlines[i];
+        const isVertical = line.startTime === line.endTime && Math.abs(line.startPrice - line.endPrice) > 1e10;
+        if (isVertical) {
+          const x = timeToPixel(line.startTime);
+          if (x !== null && Math.abs(mx - x) < 8) return line.id;
+          continue;
+        }
+        const px = lineToPixels(line);
         if (!px) continue;
-        if (ptLineDist(mx, my, px.x1, px.y1, px.x2, px.y2) < 8) return trendlines[i].id;
+        if (ptLineDist(mx, my, px.x1, px.y1, px.x2, px.y2) < 8) return line.id;
       }
       return null;
     },
-    [trendlines, lineToPixels]
+    [trendlines, lineToPixels, timeToPixel]
   );
 
   // ---- Canvas render ----
