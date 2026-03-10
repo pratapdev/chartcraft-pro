@@ -268,9 +268,14 @@ export const CandlestickChart: React.FC = () => {
 
     // Keep user position if they are reviewing history, otherwise stay at latest candle
     if (wasNearRealtime) {
-      timeScale.scrollToRealTime();
+      // Use requestAnimationFrame to avoid mid-render jumps
+      requestAnimationFrame(() => {
+        try { timeScale.scrollToRealTime(); } catch {}
+      });
     } else if (prevRange) {
-      timeScale.setVisibleLogicalRange(prevRange);
+      requestAnimationFrame(() => {
+        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
+      });
     }
 
     // Store initial range on first load
