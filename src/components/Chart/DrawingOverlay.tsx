@@ -183,9 +183,48 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     ctx.clearRect(0, 0, w, h);
 
     for (const line of trendlines) {
+      const sel = selectedTrendlineId === line.id;
+      const isVertical = line.startTime === line.endTime && Math.abs(line.startPrice - line.endPrice) > 1e10;
+
+      if (isVertical) {
+        // Render vertical line spanning full height
+        const x = timeToPixel(line.startTime);
+        if (x === null) continue;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = sel ? line.thickness + 1.5 : line.thickness;
+        const style = line.lineStyle ?? 'solid';
+        if (style === 'dashed') ctx.setLineDash([8, 5]);
+        else if (style === 'dotted') ctx.setLineDash([2, 3]);
+        else ctx.setLineDash([]);
+        if (sel) {
+          ctx.shadowColor = line.color;
+          ctx.shadowBlur = 8;
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        if (sel) {
+          for (const ey of [20, h - 20]) {
+            ctx.beginPath();
+            ctx.arc(x, ey, 5, 0, Math.PI * 2);
+            ctx.fillStyle = line.color;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+        continue;
+      }
+
       const px = lineToPixels(line);
       if (!px) continue;
-      const sel = selectedTrendlineId === line.id;
 
       ctx.save();
       ctx.beginPath();
