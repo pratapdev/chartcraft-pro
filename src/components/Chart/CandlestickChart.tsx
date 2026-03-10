@@ -247,7 +247,9 @@ export const CandlestickChart: React.FC = () => {
 
     const timeScale = chartRef.current.timeScale();
     const prevRange = timeScale.getVisibleLogicalRange();
-    const wasNearRealtime = Math.abs(timeScale.scrollPosition()) <= 1;
+    // With rightOffset=50, scrollPosition near 0 means we're at the latest data
+    const scrollPos = timeScale.scrollPosition();
+    const wasNearRealtime = scrollPos >= -2;
 
     const candleData: CandlestickData[] = candles.map((c) => ({
       time: c.time as Time,
