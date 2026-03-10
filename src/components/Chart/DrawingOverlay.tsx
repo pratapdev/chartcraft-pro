@@ -156,13 +156,20 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const hitTest = useCallback(
     (mx: number, my: number) => {
       for (let i = trendlines.length - 1; i >= 0; i--) {
-        const px = lineToPixels(trendlines[i]);
+        const line = trendlines[i];
+        const isVertical = line.startTime === line.endTime && Math.abs(line.startPrice - line.endPrice) > 1e10;
+        if (isVertical) {
+          const x = timeToPixel(line.startTime);
+          if (x !== null && Math.abs(mx - x) < 8) return line.id;
+          continue;
+        }
+        const px = lineToPixels(line);
         if (!px) continue;
-        if (ptLineDist(mx, my, px.x1, px.y1, px.x2, px.y2) < 8) return trendlines[i].id;
+        if (ptLineDist(mx, my, px.x1, px.y1, px.x2, px.y2) < 8) return line.id;
       }
       return null;
     },
-    [trendlines, lineToPixels]
+    [trendlines, lineToPixels, timeToPixel]
   );
 
   // ---- Canvas render ----
@@ -183,9 +190,48 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     ctx.clearRect(0, 0, w, h);
 
     for (const line of trendlines) {
+      const sel = selectedTrendlineId === line.id;
+      const isVertical = line.startTime === line.endTime && Math.abs(line.startPrice - line.endPrice) > 1e10;
+
+      if (isVertical) {
+        // Render vertical line spanning full height
+        const x = timeToPixel(line.startTime);
+        if (x === null) continue;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = sel ? line.thickness + 1.5 : line.thickness;
+        const style = line.lineStyle ?? 'solid';
+        if (style === 'dashed') ctx.setLineDash([8, 5]);
+        else if (style === 'dotted') ctx.setLineDash([2, 3]);
+        else ctx.setLineDash([]);
+        if (sel) {
+          ctx.shadowColor = line.color;
+          ctx.shadowBlur = 8;
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        if (sel) {
+          for (const ey of [20, h - 20]) {
+            ctx.beginPath();
+            ctx.arc(x, ey, 5, 0, Math.PI * 2);
+            ctx.fillStyle = line.color;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+        continue;
+      }
+
       const px = lineToPixels(line);
       if (!px) continue;
-      const sel = selectedTrendlineId === line.id;
 
       ctx.save();
       ctx.beginPath();
@@ -457,6 +503,36 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (activeTool === 'vertical') {
+        // Single-click placement for vertical line
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          const series = seriesRef.current;
+          if (series) {
+            // Use a very large price range to span the full chart height
+            const topPrice = 1e12;
+            const bottomPrice = -1e12;
+            addTrendline({
+              id: crypto.randomUUID(),
+              symbol,
+              timeframe,
+              startTime: coords.time,
+              startPrice: topPrice,
+              endTime: coords.time,
+              endPrice: bottomPrice,
+              color: useChartStore.getState().drawingDefaults.trendline.color,
+              thickness: useChartStore.getState().drawingDefaults.trendline.thickness,
+              lineStyle: useChartStore.getState().drawingDefaults.trendline.lineStyle,
+              createdAt: Date.now(),
+            });
+          }
+        }
+        setActiveTool('cursor');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       if (activeTool === 'trendline') {
         drawRef.current = { phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my };
         setIsInteracting(true);
@@ -613,7 +689,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
 
-      if (activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci') {
+      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
@@ -769,7 +845,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
 
   return (
     <>
