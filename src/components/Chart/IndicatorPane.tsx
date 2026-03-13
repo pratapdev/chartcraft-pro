@@ -250,20 +250,20 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    // Don't manually restore range here — the ChartSyncContext handles alignment
-    // with the main chart. Manually restoring prevRange causes offset mismatches.
-    // Just scroll to realtime so the latest indicator value matches the latest candle.
-    const scrollPos = timeScale.scrollPosition();
-    const wasNearRealtime = scrollPos >= -2;
-    if (wasNearRealtime) {
-      requestAnimationFrame(() => {
-        try { timeScale.scrollToRealTime(); } catch {}
-      });
-    } else if (prevRange) {
-      requestAnimationFrame(() => {
-        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
-      });
-    }
+    // Sync visible range from the main chart to ensure perfect alignment.
+    // Using scrollToRealTime() independently causes misalignment because
+    // each chart positions based on its own data length.
+    requestAnimationFrame(() => {
+      if (chartSync) {
+        const mainRange = chartSync.getMainRange();
+        if (mainRange) {
+          try { timeScale.setVisibleLogicalRange(mainRange); } catch {}
+          return;
+        }
+      }
+      // Fallback: if no main chart range available
+      try { timeScale.scrollToRealTime(); } catch {}
+    });
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
