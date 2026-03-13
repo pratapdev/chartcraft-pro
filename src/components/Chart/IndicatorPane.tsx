@@ -256,18 +256,15 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    // Sync visible range from the main chart to ensure perfect alignment.
-    // Using scrollToRealTime() independently causes misalignment because
-    // each chart positions based on its own data length.
+    // Sync using time-based range (not logical range) to handle different data lengths
     requestAnimationFrame(() => {
       if (chartSync) {
-        const mainRange = chartSync.getMainRange();
-        if (mainRange) {
-          try { timeScale.setVisibleLogicalRange(mainRange); } catch {}
+        const mainTimeRange = chartSync.getMainTimeRange();
+        if (mainTimeRange) {
+          try { timeScale.setVisibleRange(mainTimeRange); } catch {}
           return;
         }
       }
-      // Fallback: if no main chart range available
       try { timeScale.scrollToRealTime(); } catch {}
     });
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);

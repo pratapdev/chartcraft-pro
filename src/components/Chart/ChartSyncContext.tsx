@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useRef, useCallback } from 'react';
-import { IChartApi, LogicalRange } from 'lightweight-charts';
+import { IChartApi, LogicalRange, Time, Range } from 'lightweight-charts';
 
 interface ChartSyncContextValue {
   registerChart: (id: string, chart: IChartApi) => void;
   unregisterChart: (id: string) => void;
   syncRange: (sourceId: string, range: LogicalRange) => void;
-  getMainRange: () => LogicalRange | null;
+  getMainTimeRange: () => Range<Time> | null;
 }
 
 const ChartSyncContext = createContext<ChartSyncContextValue | null>(null);
@@ -37,18 +37,18 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     isSyncing.current = false;
   }, []);
 
-  const getMainRange = useCallback((): LogicalRange | null => {
+  const getMainTimeRange = useCallback((): Range<Time> | null => {
     const mainChart = chartsRef.current.get('main');
     if (!mainChart) return null;
     try {
-      return mainChart.timeScale().getVisibleLogicalRange();
+      return mainChart.timeScale().getVisibleRange();
     } catch {
       return null;
     }
   }, []);
 
   return (
-    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainRange }}>
+    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainTimeRange }}>
       {children}
     </ChartSyncContext.Provider>
   );
