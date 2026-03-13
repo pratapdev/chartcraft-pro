@@ -139,17 +139,23 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     });
     ro.observe(containerRef.current);
 
-    // Restore saved range
-    if (savedRangeRef.current) {
-      chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
-    }
-
-    // Register with sync context
+    // Register with sync context and align to main chart range
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
+
+      // Immediately sync to the main chart's visible range
+      const mainRange = chartSync.getMainRange();
+      if (mainRange) {
+        try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
+      } else if (savedRangeRef.current) {
+        chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
+      }
+
       chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
         if (range) chartSync.syncRange(chartId, range);
       });
+    } else if (savedRangeRef.current) {
+      chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
     }
 
     // Store indicator key to detect type changes
