@@ -143,10 +143,10 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
 
-      // Immediately sync to the main chart's visible range
-      const mainRange = chartSync.getMainRange();
-      if (mainRange) {
-        try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
+      // Immediately sync to the main chart's visible time range
+      const mainTimeRange = chartSync.getMainTimeRange();
+      if (mainTimeRange) {
+        try { chart.timeScale().setVisibleRange(mainTimeRange); } catch {}
       } else if (savedRangeRef.current) {
         chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
       }
