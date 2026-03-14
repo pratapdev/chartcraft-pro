@@ -58,7 +58,7 @@ export const CandlestickChart: React.FC = () => {
         horzLines: { color: '#1c2333' },
       },
       crosshair: {
-        mode: 0,
+        mode: 1,
         vertLine: { color: '#ffffff', width: 1, style: 3, labelBackgroundColor: '#2563eb' },
         horzLine: { color: '#ffffff', width: 1, style: 3, labelBackgroundColor: '#2563eb' },
       },
@@ -72,10 +72,20 @@ export const CandlestickChart: React.FC = () => {
         secondsVisible: false,
         rightOffset: 50,
         shiftVisibleRangeOnNewBar: true,
-        tickMarkFormatter: (time: number) => {
+        tickMarkFormatter: (time: number, tickMarkType: number) => {
           const tz = useChartStore.getState().timezone;
           const tzId = tz === 'Exchange' ? 'UTC' : tz;
           const d = new Date(time * 1000);
+          // tickMarkType: 0=Year, 1=Month, 2=DayOfMonth, 3=Time, 4=TimeWithSeconds
+          if (tickMarkType <= 2) {
+            return d.toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: tzId });
+          }
+          // Check if this is the first bar of a new day (00:00)
+          const hours = parseInt(d.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: tzId }));
+          const minutes = parseInt(d.toLocaleString('en-US', { minute: '2-digit', timeZone: tzId }));
+          if (hours === 0 && minutes === 0) {
+            return d.toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: tzId });
+          }
           return d.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tzId });
         },
       },
