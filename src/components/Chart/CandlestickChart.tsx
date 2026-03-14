@@ -261,9 +261,6 @@ export const CandlestickChart: React.FC = () => {
 
     const timeScale = chartRef.current.timeScale();
     const prevRange = timeScale.getVisibleLogicalRange();
-    // With rightOffset=50, scrollPosition near 0 means we're at the latest data
-    const scrollPos = timeScale.scrollPosition();
-    const wasNearRealtime = scrollPos >= -2;
 
     const candleData: CandlestickData[] = candles.map((c) => ({
       time: c.time as Time,
@@ -282,13 +279,8 @@ export const CandlestickChart: React.FC = () => {
     candleSeriesRef.current.setData(candleData);
     volumeSeriesRef.current.setData(volumeData);
 
-    // Keep user position if they are reviewing history, otherwise stay at latest candle
-    if (wasNearRealtime) {
-      // Use requestAnimationFrame to avoid mid-render jumps
-      requestAnimationFrame(() => {
-        try { timeScale.scrollToRealTime(); } catch {}
-      });
-    } else if (prevRange) {
+    // Preserve the user's current viewport — don't auto-scroll
+    if (prevRange) {
       requestAnimationFrame(() => {
         try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
       });
