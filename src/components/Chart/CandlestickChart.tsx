@@ -58,7 +58,7 @@ export const CandlestickChart: React.FC = () => {
         horzLines: { color: '#1c2333' },
       },
       crosshair: {
-        mode: 0,
+        mode: 1,
         vertLine: { color: '#ffffff', width: 1, style: 3, labelBackgroundColor: '#2563eb' },
         horzLine: { color: '#ffffff', width: 1, style: 3, labelBackgroundColor: '#2563eb' },
       },
