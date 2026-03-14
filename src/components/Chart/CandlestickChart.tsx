@@ -71,7 +71,7 @@ export const CandlestickChart: React.FC = () => {
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 50,
-        shiftVisibleRangeOnNewBar: true,
+        shiftVisibleRangeOnNewBar: false,
         tickMarkFormatter: (time: number, tickMarkType: number) => {
           const tz = useChartStore.getState().timezone;
           const tzId = tz === 'Exchange' ? 'UTC' : tz;
