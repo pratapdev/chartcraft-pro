@@ -71,7 +71,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         secondsVisible: false,
         visible: false,
         rightOffset: 50,
-        shiftVisibleRangeOnNewBar: true,
+        shiftVisibleRangeOnNewBar: false,
       },
       handleScroll: { vertTouchDrag: false },
     });
