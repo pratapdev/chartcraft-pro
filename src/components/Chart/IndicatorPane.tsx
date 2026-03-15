@@ -256,17 +256,19 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    // Sync using time-based range (not logical range) to handle different data lengths
-    requestAnimationFrame(() => {
-      if (chartSync) {
-        const mainTimeRange = chartSync.getMainTimeRange();
-        if (mainTimeRange) {
+    // Preserve current viewport – only sync to main on first render (no prior range)
+    if (prevRange) {
+      requestAnimationFrame(() => {
+        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
+      });
+    } else if (chartSync) {
+      const mainTimeRange = chartSync.getMainTimeRange();
+      if (mainTimeRange) {
+        requestAnimationFrame(() => {
           try { timeScale.setVisibleRange(mainTimeRange); } catch {}
-          return;
-        }
+        });
       }
-      try { timeScale.scrollToRealTime(); } catch {}
-    });
+    }
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
