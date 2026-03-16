@@ -187,8 +187,9 @@ export function useAlertChecker() {
         telegramEnabled: alert.telegramEnabled,
         time: curr.time,
       });
-      useChartStore.getState().removeAlert(alert.id);
-      useChartStore.getState().addAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
+      useChartStore.setState((s) => ({
+        alerts: s.alerts.map((a) => a.id === alert.id ? { ...a, triggered: true, triggeredAt: Date.now() } : a),
+      }));
     }
   }, [alertCandles, alerts, trendlines]);
 
