@@ -26,7 +26,13 @@ interface CrosshairData {
   volume: number;
 }
 
+export type ChartMode = 'candles' | 'footprint';
+
 interface ChartStore {
+  // Chart mode
+  chartMode: ChartMode;
+  setChartMode: (mode: ChartMode) => void;
+
   // Market type & Symbol & timeframe
   marketType: MarketType;
   setMarketType: (mt: MarketType) => void;
