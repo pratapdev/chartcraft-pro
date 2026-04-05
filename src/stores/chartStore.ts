@@ -26,7 +26,13 @@ interface CrosshairData {
   volume: number;
 }
 
+export type ChartMode = 'candles' | 'footprint';
+
 interface ChartStore {
+  // Chart mode
+  chartMode: ChartMode;
+  setChartMode: (mode: ChartMode) => void;
+
   // Market type & Symbol & timeframe
   marketType: MarketType;
   setMarketType: (mt: MarketType) => void;
@@ -159,6 +165,9 @@ interface ChartStore {
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
+  chartMode: 'candles',
+  setChartMode: (chartMode) => set({ chartMode }),
+
   marketType: 'crypto',
   setMarketType: (marketType) => {
     const defaultSymbol = marketType === 'crypto' ? 'BTC/USD' : 'RELIANCE';

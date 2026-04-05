@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
+import { ChartMode } from '@/stores/chartStore';
 import { ReplayBar } from './ReplayBar';
-import { Globe, ChevronDown } from 'lucide-react';
+import { Globe, ChevronDown, BarChart3, CandlestickChart as CandlestickIcon } from 'lucide-react';
 
 const TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
@@ -23,7 +24,7 @@ const TIMEZONES = [
 ];
 
 export const ChartHeader: React.FC = () => {
-  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone } = useChartStore();
+  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone, chartMode, setChartMode } = useChartStore();
   const [showTzDropdown, setShowTzDropdown] = useState(false);
   const tzRef = useRef<HTMLDivElement>(null);
   const last = candles[candles.length - 1];
@@ -84,6 +85,27 @@ export const ChartHeader: React.FC = () => {
             {tf}
           </button>
         ))}
+      </div>
+
+      <div className="w-px h-5 bg-border" />
+
+      {/* Chart mode toggle */}
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={() => setChartMode('candles')}
+          className={`trading-btn flex items-center gap-1 ${chartMode === 'candles' ? 'active' : ''}`}
+          title="Candlestick Chart"
+        >
+          <CandlestickIcon size={12} />
+        </button>
+        <button
+          onClick={() => setChartMode('footprint')}
+          className={`trading-btn flex items-center gap-1 ${chartMode === 'footprint' ? 'active' : ''}`}
+          title="Delta Footprint"
+        >
+          <BarChart3 size={12} />
+          <span className="text-[10px]">FP</span>
+        </button>
       </div>
 
       <div className="w-px h-5 bg-border" />
