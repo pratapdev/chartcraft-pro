@@ -165,6 +165,9 @@ interface ChartStore {
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
+  chartMode: 'candles',
+  setChartMode: (chartMode) => set({ chartMode }),
+
   marketType: 'crypto',
   setMarketType: (marketType) => {
     const defaultSymbol = marketType === 'crypto' ? 'BTC/USD' : 'RELIANCE';

@@ -88,6 +88,27 @@ export const ChartHeader: React.FC = () => {
       </div>
 
       <div className="w-px h-5 bg-border" />
+
+      {/* Chart mode toggle */}
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={() => setChartMode('candles')}
+          className={`trading-btn flex items-center gap-1 ${chartMode === 'candles' ? 'active' : ''}`}
+          title="Candlestick Chart"
+        >
+          <CandlestickIcon size={12} />
+        </button>
+        <button
+          onClick={() => setChartMode('footprint')}
+          className={`trading-btn flex items-center gap-1 ${chartMode === 'footprint' ? 'active' : ''}`}
+          title="Delta Footprint"
+        >
+          <BarChart3 size={12} />
+          <span className="text-[10px]">FP</span>
+        </button>
+      </div>
+
+      <div className="w-px h-5 bg-border" />
       <ReplayBar />
 
       <div className="w-px h-5 bg-border" />
