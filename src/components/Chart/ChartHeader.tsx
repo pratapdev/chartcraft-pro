@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
+import { ChartMode } from '@/stores/chartStore';
 import { ReplayBar } from './ReplayBar';
-import { Globe, ChevronDown } from 'lucide-react';
+import { Globe, ChevronDown, BarChart3, CandlestickChart as CandlestickIcon } from 'lucide-react';
 
 const TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
