@@ -24,7 +24,7 @@ const TIMEZONES = [
 ];
 
 export const ChartHeader: React.FC = () => {
-  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone } = useChartStore();
+  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone, chartMode, setChartMode } = useChartStore();
   const [showTzDropdown, setShowTzDropdown] = useState(false);
   const tzRef = useRef<HTMLDivElement>(null);
   const last = candles[candles.length - 1];
