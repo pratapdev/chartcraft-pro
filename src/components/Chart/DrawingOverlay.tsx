@@ -630,7 +630,19 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
-      if (activeTool === 'measure') {
+      if (activeTool === 'riskreward') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          rrRef.current = {
+            phase: 'drawing', entryPrice: coords.price, entryTime: coords.time,
+            currentPrice: coords.price, startX: mx, startY: my, currentX: mx, currentY: my,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
         const coords = pixelToCoords(mx, my);
         if (coords) {
           measureRef.current = {
@@ -722,6 +734,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (rrRef.current.phase === 'drawing') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          rrRef.current = { ...rrRef.current, currentX: mx, currentY: my, currentPrice: coords.price };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
       if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
@@ -761,7 +782,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
 
-      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci') {
+      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
@@ -848,8 +869,37 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         dragRef.current = null;
         setIsInteracting(false);
       }
+
+      if (rrRef.current.phase === 'drawing') {
+        const rs = rrRef.current;
+        const dist = Math.hypot(mx - rs.startX, my - rs.startY);
+        if (dist > 10) {
+          const slPrice = rs.currentPrice;
+          const entryPrice = rs.entryPrice;
+          const risk = Math.abs(entryPrice - slPrice);
+          const isLong = slPrice < entryPrice;
+          const tpPrice = isLong ? entryPrice + risk * 2 : entryPrice - risk * 2;
+          if (risk > 0) {
+            addRiskReward({
+              id: crypto.randomUUID(),
+              symbol,
+              timeframe,
+              entryPrice,
+              stopLoss: slPrice,
+              takeProfit: tpPrice,
+              entryTime: rs.entryTime,
+              createdAt: Date.now(),
+            });
+          }
+        }
+        rrRef.current = EMPTY_RR;
+        setActiveTool('cursor');
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
     },
-    [pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
+    [pixelToCoords, addTrendline, addRiskReward, symbol, timeframe, setActiveTool]
   );
 
   // Keyboard
@@ -903,6 +953,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         drawRef.current = EMPTY_DRAW;
         measureRef.current = EMPTY_MEASURE;
         fibRef.current = EMPTY_FIB;
+        rrRef.current = EMPTY_RR;
         setActiveTool('cursor');
         setIsInteracting(false);
         bump((n) => n + 1);
@@ -917,7 +968,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor';
 
   return (
     <>
