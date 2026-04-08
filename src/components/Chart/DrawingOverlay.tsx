@@ -425,7 +425,65 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting]);
+
+    // Render persisted Risk/Reward drawings
+    if (series) {
+      for (const rr of riskRewardDrawings) {
+        renderRiskReward(ctx, rr, w, h, series, timeToPixel);
+      }
+    }
+
+    // Render in-progress R/R drawing
+    const rs = rrRef.current;
+    if (rs.phase === 'drawing' && series) {
+      const entryY = series.priceToCoordinate(rs.entryPrice);
+      const slY = series.priceToCoordinate(rs.currentPrice);
+      if (entryY !== null && slY !== null) {
+        const isLong = rs.currentPrice < rs.entryPrice;
+        const risk = Math.abs(rs.entryPrice - rs.currentPrice);
+        const tpPrice = isLong ? rs.entryPrice + risk * 2 : rs.entryPrice - risk * 2;
+        const tpY = series.priceToCoordinate(tpPrice);
+        if (tpY !== null) {
+          const x1 = rs.startX;
+          const boxW = 120;
+
+          // Profit zone
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+          ctx.fillRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+
+          // Loss zone
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+          ctx.fillRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+
+          // Entry line
+          ctx.beginPath();
+          ctx.moveTo(x1, entryY as number);
+          ctx.lineTo(x1 + boxW, entryY as number);
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Labels
+          ctx.font = '11px "JetBrains Mono", monospace';
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillText(`Entry: ${rs.entryPrice.toFixed(2)}`, x1 + 4, (entryY as number) - 5);
+          ctx.fillStyle = '#22c55e';
+          ctx.fillText(`TP: ${tpPrice.toFixed(2)}`, x1 + 4, (tpY as number) + (isLong ? -5 : 14));
+          ctx.fillStyle = '#ef4444';
+          ctx.fillText(`SL: ${rs.currentPrice.toFixed(2)}`, x1 + 4, (slY as number) + (isLong ? 14 : -5));
+          ctx.fillStyle = '#e5e7eb';
+          ctx.font = 'bold 12px "JetBrains Mono", monospace';
+          ctx.fillText('R:R 1:2.0', x1 + boxW - 76, (entryY as number) - 5);
+        }
+      }
+    }
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting, riskRewardDrawings]);
 
   useEffect(() => {
     let raf: number;
