@@ -15,6 +15,7 @@ import { useIndicatorRenderer } from './useIndicatorRenderer';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
+import { VPVROverlay } from './VPVROverlay';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -281,9 +282,7 @@ export const CandlestickChart: React.FC = () => {
 
     // Preserve the user's current viewport — don't auto-scroll
     if (prevRange) {
-      requestAnimationFrame(() => {
-        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
-      });
+      try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
     }
 
     // Store initial range on first load
@@ -315,6 +314,7 @@ export const CandlestickChart: React.FC = () => {
     <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
       <div ref={containerRef} className="w-full h-full" />
       <CrosshairLegend />
+      <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
       {contextMenu && (

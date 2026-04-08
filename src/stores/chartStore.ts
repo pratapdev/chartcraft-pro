@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, PctDiffDonCrossAlert, LineStyleType } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, PctDiffDonCrossAlert, LineStyleType, RiskRewardDrawing } from '@/types/trading';
 import { CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
@@ -107,6 +107,12 @@ interface ChartStore {
   addFibonacci: (fib: FibonacciDrawing) => void;
   removeFibonacci: (id: string) => void;
   clearAllDrawings: () => void;
+
+  // Risk/Reward
+  riskRewardDrawings: RiskRewardDrawing[];
+  addRiskReward: (rr: RiskRewardDrawing) => void;
+  removeRiskReward: (id: string) => void;
+  updateRiskReward: (id: string, updates: Partial<RiskRewardDrawing>) => void;
 
   // Crosshair
   crosshairData: CrosshairData | null;
@@ -272,7 +278,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     });
   },
   clearAllTrendlines: () => set({ trendlines: [], selectedTrendlineId: null }),
-  clearAllDrawings: () => set({ trendlines: [], fibonacciDrawings: [], selectedTrendlineId: null, alerts: [] }),
+  clearAllDrawings: () => set({ trendlines: [], fibonacciDrawings: [], riskRewardDrawings: [], selectedTrendlineId: null, alerts: [] }),
   selectedTrendlineId: null,
   setSelectedTrendlineId: (id) => set({ selectedTrendlineId: id }),
 
@@ -355,6 +361,11 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   fibonacciDrawings: [],
   addFibonacci: (fib) => set((s) => ({ fibonacciDrawings: [...s.fibonacciDrawings, fib] })),
   removeFibonacci: (id) => set((s) => ({ fibonacciDrawings: s.fibonacciDrawings.filter((f) => f.id !== id) })),
+
+  riskRewardDrawings: [],
+  addRiskReward: (rr) => set((s) => ({ riskRewardDrawings: [...s.riskRewardDrawings, rr] })),
+  removeRiskReward: (id) => set((s) => ({ riskRewardDrawings: s.riskRewardDrawings.filter((r) => r.id !== id) })),
+  updateRiskReward: (id, updates) => set((s) => ({ riskRewardDrawings: s.riskRewardDrawings.map((r) => r.id === id ? { ...r, ...updates } : r) })),
 
   crosshairData: null,
   setCrosshairData: (crosshairData) => set({ crosshairData }),
@@ -466,6 +477,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     stochRSICrossAlerts: state.stochRSICrossAlerts,
     pctDiffDonCrossAlerts: state.pctDiffDonCrossAlerts,
     fibonacciDrawings: state.fibonacciDrawings,
+    riskRewardDrawings: state.riskRewardDrawings,
     symbol: state.symbol,
     timeframe: state.timeframe,
     marketType: state.marketType,

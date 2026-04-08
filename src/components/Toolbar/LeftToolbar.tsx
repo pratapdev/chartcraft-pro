@@ -15,6 +15,7 @@ import {
   Activity,
   Eraser,
   Diamond,
+  Target,
 } from 'lucide-react';
 
 interface ToolButton {
@@ -48,6 +49,7 @@ export const LeftToolbar: React.FC = () => {
     { id: 'horizontal', icon: <Minus size={18} />, label: 'Horizontal Line' },
     { id: 'vertical', icon: <SeparatorVertical size={18} />, label: 'Vertical Line' },
     { id: 'fibonacci', icon: <GitFork size={18} />, label: 'Fibonacci Retracement' },
+    { id: 'riskreward', icon: <Target size={18} />, label: 'Risk/Reward' },
     { id: 'measure', icon: <Ruler size={18} />, label: 'Measure' },
   ];
 

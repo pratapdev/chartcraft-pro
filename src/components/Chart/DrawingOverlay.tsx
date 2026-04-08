@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline, FibonacciDrawing, AlertCondition } from '@/types/trading';
+import { Trendline, FibonacciDrawing, AlertCondition, RiskRewardDrawing } from '@/types/trading';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -29,6 +29,16 @@ interface FibDrawState {
   startTime: number; currentTime: number;
 }
 const EMPTY_FIB: FibDrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
+interface RRDrawState {
+  phase: 'idle' | 'drawing';
+  entryPrice: number;
+  entryTime: number;
+  currentPrice: number;
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+}
+const EMPTY_RR: RRDrawState = { phase: 'idle', entryPrice: 0, entryTime: 0, currentPrice: 0, startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const FIB_COLORS: Record<number, string> = {
@@ -67,6 +77,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
+  const rrRef = useRef<RRDrawState>(EMPTY_RR);
 
   const {
     activeTool,
@@ -83,6 +94,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     addFibonacci,
     removeFibonacci,
     addAlert,
+    riskRewardDrawings,
+    addRiskReward,
+    removeRiskReward,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
@@ -411,7 +425,65 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const tempFib: FibDrawState = fs;
       renderFibPreview(ctx, tempFib, w, series);
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting]);
+
+    // Render persisted Risk/Reward drawings
+    if (series) {
+      for (const rr of riskRewardDrawings) {
+        renderRiskReward(ctx, rr, w, h, series, timeToPixel);
+      }
+    }
+
+    // Render in-progress R/R drawing
+    const rs = rrRef.current;
+    if (rs.phase === 'drawing' && series) {
+      const entryY = series.priceToCoordinate(rs.entryPrice);
+      const slY = series.priceToCoordinate(rs.currentPrice);
+      if (entryY !== null && slY !== null) {
+        const isLong = rs.currentPrice < rs.entryPrice;
+        const risk = Math.abs(rs.entryPrice - rs.currentPrice);
+        const tpPrice = isLong ? rs.entryPrice + risk * 2 : rs.entryPrice - risk * 2;
+        const tpY = series.priceToCoordinate(tpPrice);
+        if (tpY !== null) {
+          const x1 = rs.startX;
+          const boxW = 120;
+
+          // Profit zone
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+          ctx.fillRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+
+          // Loss zone
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+          ctx.fillRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+
+          // Entry line
+          ctx.beginPath();
+          ctx.moveTo(x1, entryY as number);
+          ctx.lineTo(x1 + boxW, entryY as number);
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Labels
+          ctx.font = '11px "JetBrains Mono", monospace';
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillText(`Entry: ${rs.entryPrice.toFixed(2)}`, x1 + 4, (entryY as number) - 5);
+          ctx.fillStyle = '#22c55e';
+          ctx.fillText(`TP: ${tpPrice.toFixed(2)}`, x1 + 4, (tpY as number) + (isLong ? -5 : 14));
+          ctx.fillStyle = '#ef4444';
+          ctx.fillText(`SL: ${rs.currentPrice.toFixed(2)}`, x1 + 4, (slY as number) + (isLong ? 14 : -5));
+          ctx.fillStyle = '#e5e7eb';
+          ctx.font = 'bold 12px "JetBrains Mono", monospace';
+          ctx.fillText('R:R 1:2.0', x1 + boxW - 76, (entryY as number) - 5);
+        }
+      }
+    }
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting, riskRewardDrawings]);
 
   useEffect(() => {
     let raf: number;
@@ -558,13 +630,28 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (activeTool === 'riskreward') {
+        const rrCoords = pixelToCoords(mx, my);
+        if (rrCoords) {
+          rrRef.current = {
+            phase: 'drawing', entryPrice: rrCoords.price, entryTime: rrCoords.time,
+            currentPrice: rrCoords.price, startX: mx, startY: my, currentX: mx, currentY: my,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       if (activeTool === 'measure') {
-        const coords = pixelToCoords(mx, my);
-        if (coords) {
+        const mCoords = pixelToCoords(mx, my);
+        if (mCoords) {
           measureRef.current = {
             phase: 'measuring', startX: mx, startY: my, currentX: mx, currentY: my,
-            startPrice: coords.price, currentPrice: coords.price,
-            startTime: coords.time, currentTime: coords.time,
+            startPrice: mCoords.price, currentPrice: mCoords.price,
+            startTime: mCoords.time, currentTime: mCoords.time,
           };
           setIsInteracting(true);
           bump((n) => n + 1);
@@ -650,6 +737,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         return;
       }
 
+      if (rrRef.current.phase === 'drawing') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          rrRef.current = { ...rrRef.current, currentX: mx, currentY: my, currentPrice: coords.price };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
       if (dragRef.current) {
         const coords = pixelToCoords(mx, my);
         if (!coords) return;
@@ -689,7 +785,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
 
-      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci') {
+      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
@@ -776,8 +872,37 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         dragRef.current = null;
         setIsInteracting(false);
       }
+
+      if (rrRef.current.phase === 'drawing') {
+        const rs = rrRef.current;
+        const dist = Math.hypot(mx - rs.startX, my - rs.startY);
+        if (dist > 10) {
+          const slPrice = rs.currentPrice;
+          const entryPrice = rs.entryPrice;
+          const risk = Math.abs(entryPrice - slPrice);
+          const isLong = slPrice < entryPrice;
+          const tpPrice = isLong ? entryPrice + risk * 2 : entryPrice - risk * 2;
+          if (risk > 0) {
+            addRiskReward({
+              id: crypto.randomUUID(),
+              symbol,
+              timeframe,
+              entryPrice,
+              stopLoss: slPrice,
+              takeProfit: tpPrice,
+              entryTime: rs.entryTime,
+              createdAt: Date.now(),
+            });
+          }
+        }
+        rrRef.current = EMPTY_RR;
+        setActiveTool('cursor');
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
     },
-    [pixelToCoords, addTrendline, symbol, timeframe, setActiveTool]
+    [pixelToCoords, addTrendline, addRiskReward, symbol, timeframe, setActiveTool]
   );
 
   // Keyboard
@@ -831,6 +956,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         drawRef.current = EMPTY_DRAW;
         measureRef.current = EMPTY_MEASURE;
         fibRef.current = EMPTY_FIB;
+        rrRef.current = EMPTY_RR;
         setActiveTool('cursor');
         setIsInteracting(false);
         bump((n) => n + 1);
@@ -845,7 +971,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || isInteracting || activeTool === 'cursor';
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor';
 
   return (
     <>
@@ -1115,4 +1241,99 @@ function renderFibPreview(
     ctx.stroke();
     ctx.setLineDash([]);
   }
+}
+
+function renderRiskReward(
+  ctx: CanvasRenderingContext2D,
+  rr: RiskRewardDrawing,
+  w: number,
+  _h: number,
+  series: ISeriesApi<'Candlestick'>,
+  timeToPixelFn: (t: number) => number | null,
+) {
+  const entryY = series.priceToCoordinate(rr.entryPrice);
+  const slY = series.priceToCoordinate(rr.stopLoss);
+  const tpY = series.priceToCoordinate(rr.takeProfit);
+  if (entryY === null || slY === null || tpY === null) return;
+
+  const x1 = timeToPixelFn(rr.entryTime);
+  if (x1 === null) return;
+
+  // Calculate box width (10 bars)
+  const { candles: c } = useChartStore.getState();
+  let boxW = 120;
+  if (c.length >= 2) {
+    const interval = c[c.length - 1].time - c[c.length - 2].time;
+    const x2 = timeToPixelFn(rr.entryTime + interval * 10);
+    if (x2 !== null) boxW = Math.max(80, x2 - x1);
+  }
+
+  const isLong = rr.stopLoss < rr.entryPrice;
+  const risk = Math.abs(rr.entryPrice - rr.stopLoss);
+  const reward = Math.abs(rr.takeProfit - rr.entryPrice);
+  const ratio = risk > 0 ? (reward / risk).toFixed(1) : '∞';
+  const pctRisk = ((risk / rr.entryPrice) * 100).toFixed(2);
+  const pctReward = ((reward / rr.entryPrice) * 100).toFixed(2);
+
+  // Profit zone (green)
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+  ctx.fillRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+
+  // Loss zone (red)
+  ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+  ctx.fillRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+
+  // Entry line (blue)
+  ctx.beginPath();
+  ctx.moveTo(x1, entryY as number);
+  ctx.lineTo(x1 + boxW, entryY as number);
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // TP line (green dashed)
+  ctx.beginPath();
+  ctx.moveTo(x1, tpY as number);
+  ctx.lineTo(x1 + boxW, tpY as number);
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // SL line (red dashed)
+  ctx.beginPath();
+  ctx.moveTo(x1, slY as number);
+  ctx.lineTo(x1 + boxW, slY as number);
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.font = '11px "JetBrains Mono", monospace';
+
+  // TP label
+  ctx.fillStyle = '#22c55e';
+  ctx.fillText(`TP ${rr.takeProfit.toFixed(2)} (+${pctReward}%)`, x1 + 4, (tpY as number) + (isLong ? -5 : 14));
+
+  // Entry label
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillText(`Entry ${rr.entryPrice.toFixed(2)}`, x1 + 4, (entryY as number) - 5);
+
+  // SL label
+  ctx.fillStyle = '#ef4444';
+  ctx.fillText(`SL ${rr.stopLoss.toFixed(2)} (-${pctRisk}%)`, x1 + 4, (slY as number) + (isLong ? 14 : -5));
+
+  // R:R ratio badge
+  ctx.fillStyle = '#e5e7eb';
+  ctx.font = 'bold 12px "JetBrains Mono", monospace';
+  ctx.fillText(`R:R 1:${ratio}`, x1 + boxW - 80, (entryY as number) - 5);
 }
