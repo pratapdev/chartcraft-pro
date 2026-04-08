@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline, FibonacciDrawing, AlertCondition } from '@/types/trading';
+import { Trendline, FibonacciDrawing, AlertCondition, RiskRewardDrawing } from '@/types/trading';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -29,6 +29,16 @@ interface FibDrawState {
   startTime: number; currentTime: number;
 }
 const EMPTY_FIB: FibDrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
+interface RRDrawState {
+  phase: 'idle' | 'drawing';
+  entryPrice: number;
+  entryTime: number;
+  currentPrice: number;
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+}
+const EMPTY_RR: RRDrawState = { phase: 'idle', entryPrice: 0, entryTime: 0, currentPrice: 0, startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const FIB_COLORS: Record<number, string> = {
@@ -67,6 +77,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const crosshairPrice = useRef<number | null>(null);
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
+  const rrRef = useRef<RRDrawState>(EMPTY_RR);
 
   const {
     activeTool,
@@ -83,6 +94,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     addFibonacci,
     removeFibonacci,
     addAlert,
+    riskRewardDrawings,
+    addRiskReward,
+    removeRiskReward,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
