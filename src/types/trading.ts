@@ -27,7 +27,18 @@ export interface Trendline {
   createdAt: number;
 }
 
-export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'vertical' | 'ray' | 'measure' | 'fibonacci';
+export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'vertical' | 'ray' | 'measure' | 'fibonacci' | 'riskreward';
+
+export interface RiskRewardDrawing {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  entryTime: number;
+  createdAt: number;
+}
 
 export interface FibonacciDrawing {
   id: string;
@@ -132,7 +143,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR';
 
 export interface IndicatorConfig {
   id: string;

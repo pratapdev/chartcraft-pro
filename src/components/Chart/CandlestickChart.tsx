@@ -281,9 +281,7 @@ export const CandlestickChart: React.FC = () => {
 
     // Preserve the user's current viewport — don't auto-scroll
     if (prevRange) {
-      requestAnimationFrame(() => {
-        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
-      });
+      try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
     }
 
     // Store initial range on first load
