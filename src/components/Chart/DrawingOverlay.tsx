@@ -1242,3 +1242,98 @@ function renderFibPreview(
     ctx.setLineDash([]);
   }
 }
+
+function renderRiskReward(
+  ctx: CanvasRenderingContext2D,
+  rr: RiskRewardDrawing,
+  w: number,
+  _h: number,
+  series: ISeriesApi<'Candlestick'>,
+  timeToPixelFn: (t: number) => number | null,
+) {
+  const entryY = series.priceToCoordinate(rr.entryPrice);
+  const slY = series.priceToCoordinate(rr.stopLoss);
+  const tpY = series.priceToCoordinate(rr.takeProfit);
+  if (entryY === null || slY === null || tpY === null) return;
+
+  const x1 = timeToPixelFn(rr.entryTime);
+  if (x1 === null) return;
+
+  // Calculate box width (10 bars)
+  const { candles: c } = useChartStore.getState();
+  let boxW = 120;
+  if (c.length >= 2) {
+    const interval = c[c.length - 1].time - c[c.length - 2].time;
+    const x2 = timeToPixelFn(rr.entryTime + interval * 10);
+    if (x2 !== null) boxW = Math.max(80, x2 - x1);
+  }
+
+  const isLong = rr.stopLoss < rr.entryPrice;
+  const risk = Math.abs(rr.entryPrice - rr.stopLoss);
+  const reward = Math.abs(rr.takeProfit - rr.entryPrice);
+  const ratio = risk > 0 ? (reward / risk).toFixed(1) : '∞';
+  const pctRisk = ((risk / rr.entryPrice) * 100).toFixed(2);
+  const pctReward = ((reward / rr.entryPrice) * 100).toFixed(2);
+
+  // Profit zone (green)
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+  ctx.fillRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x1, Math.min(entryY as number, tpY as number), boxW, Math.abs((tpY as number) - (entryY as number)));
+
+  // Loss zone (red)
+  ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+  ctx.fillRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x1, Math.min(entryY as number, slY as number), boxW, Math.abs((slY as number) - (entryY as number)));
+
+  // Entry line (blue)
+  ctx.beginPath();
+  ctx.moveTo(x1, entryY as number);
+  ctx.lineTo(x1 + boxW, entryY as number);
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // TP line (green dashed)
+  ctx.beginPath();
+  ctx.moveTo(x1, tpY as number);
+  ctx.lineTo(x1 + boxW, tpY as number);
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // SL line (red dashed)
+  ctx.beginPath();
+  ctx.moveTo(x1, slY as number);
+  ctx.lineTo(x1 + boxW, slY as number);
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.font = '11px "JetBrains Mono", monospace';
+
+  // TP label
+  ctx.fillStyle = '#22c55e';
+  ctx.fillText(`TP ${rr.takeProfit.toFixed(2)} (+${pctReward}%)`, x1 + 4, (tpY as number) + (isLong ? -5 : 14));
+
+  // Entry label
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillText(`Entry ${rr.entryPrice.toFixed(2)}`, x1 + 4, (entryY as number) - 5);
+
+  // SL label
+  ctx.fillStyle = '#ef4444';
+  ctx.fillText(`SL ${rr.stopLoss.toFixed(2)} (-${pctRisk}%)`, x1 + 4, (slY as number) + (isLong ? 14 : -5));
+
+  // R:R ratio badge
+  ctx.fillStyle = '#e5e7eb';
+  ctx.font = 'bold 12px "JetBrains Mono", monospace';
+  ctx.fillText(`R:R 1:${ratio}`, x1 + boxW - 80, (entryY as number) - 5);
+}
