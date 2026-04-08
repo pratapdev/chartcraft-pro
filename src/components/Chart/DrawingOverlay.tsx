@@ -631,11 +631,11 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       if (activeTool === 'riskreward') {
-        const coords = pixelToCoords(mx, my);
-        if (coords) {
+        const rrCoords = pixelToCoords(mx, my);
+        if (rrCoords) {
           rrRef.current = {
-            phase: 'drawing', entryPrice: coords.price, entryTime: coords.time,
-            currentPrice: coords.price, startX: mx, startY: my, currentX: mx, currentY: my,
+            phase: 'drawing', entryPrice: rrCoords.price, entryTime: rrCoords.time,
+            currentPrice: rrCoords.price, startX: mx, startY: my, currentX: mx, currentY: my,
           };
           setIsInteracting(true);
           bump((n) => n + 1);
@@ -643,12 +643,15 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         e.preventDefault();
         e.stopPropagation();
         return;
-        const coords = pixelToCoords(mx, my);
-        if (coords) {
+      }
+
+      if (activeTool === 'measure') {
+        const mCoords = pixelToCoords(mx, my);
+        if (mCoords) {
           measureRef.current = {
             phase: 'measuring', startX: mx, startY: my, currentX: mx, currentY: my,
-            startPrice: coords.price, currentPrice: coords.price,
-            startTime: coords.time, currentTime: coords.time,
+            startPrice: mCoords.price, currentPrice: mCoords.price,
+            startTime: mCoords.time, currentTime: mCoords.time,
           };
           setIsInteracting(true);
           bump((n) => n + 1);
