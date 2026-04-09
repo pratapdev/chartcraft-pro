@@ -173,6 +173,33 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               />
             </div>
           )}
+          {ind.type === 'IMBALANCE' && (
+            <>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Threshold (x)</label>
+                <input
+                  type="number"
+                  min={1.5}
+                  max={10}
+                  step={0.5}
+                  value={ind.threshold ?? 3}
+                  onChange={(e) => updateIndicator(ind.id, { threshold: Math.max(1.5, parseFloat(e.target.value) || 3) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Min Stack</label>
+                <input
+                  type="number"
+                  min={2}
+                  max={10}
+                  value={ind.minStack ?? 3}
+                  onChange={(e) => updateIndicator(ind.id, { minStack: Math.max(2, parseInt(e.target.value) || 3) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
