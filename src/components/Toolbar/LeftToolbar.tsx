@@ -89,14 +89,31 @@ export const LeftToolbar: React.FC = () => {
     }
   };
 
+  const handleToggleVPVR = () => {
+    const existing = indicators.find((i) => i.type === 'VPVR');
+    if (existing) {
+      setRightPanelTab('indicators');
+    } else {
+      addIndicator({
+        id: `vpvr-${Date.now()}`,
+        type: 'VPVR',
+        period: 1,
+        color: '#26a69a',
+        visible: true,
+      });
+    }
+  };
+
   const hasBBands = indicators.some((i) => i.type === 'BBANDS' && i.visible);
   const hasPivotHL = indicators.some((i) => i.type === 'PIVOT_HL' && i.visible);
+  const hasVPVR = indicators.some((i) => i.type === 'VPVR' && i.visible);
   const hasDrawings = trendlines.length > 0 || fibonacciDrawings.length > 0;
   const hasIndicators = indicators.length > 0;
 
   const actions: ToolButton[] = [
     { id: 'bbands', icon: <Activity size={18} />, label: 'Bollinger Bands', action: handleToggleBBands },
     { id: 'pivot-hl', icon: <Diamond size={18} />, label: 'Pivot Points H/L', action: handleTogglePivotHL },
+    { id: 'vpvr', icon: <BarChart size={18} />, label: 'Volume Profile (VPVR)', action: handleToggleVPVR },
     { id: 'alerts', icon: <Bell size={18} />, label: 'Alerts', action: () => setRightPanelTab('alerts') },
     { id: 'indicators', icon: <BarChart3 size={18} />, label: 'Indicators', action: () => setRightPanelTab('indicators') },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings', action: () => setRightPanelTab('settings') },
@@ -128,7 +145,7 @@ export const LeftToolbar: React.FC = () => {
           key={action.id}
           onClick={action.action}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL)
+            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL) || (action.id === 'vpvr' && hasVPVR)
               ? 'bg-primary/15 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}
