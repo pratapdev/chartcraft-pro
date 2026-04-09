@@ -147,16 +147,22 @@ export const VPVROverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     }
   }, [chartRef, seriesRef, candles, vpvrIndicator]);
 
+  // Render once when data changes
   useEffect(() => {
     if (!vpvrIndicator) return;
-    let raf: number;
-    const loop = () => {
-      render();
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    render();
   }, [render, vpvrIndicator]);
+
+  // Re-render on visible range changes (zoom/pan)
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !vpvrIndicator) return;
+    const handler = () => render();
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    return () => {
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler); } catch {}
+    };
+  }, [chartRef, vpvrIndicator, render]);
 
   if (!vpvrIndicator) return null;
 
