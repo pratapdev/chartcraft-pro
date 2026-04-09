@@ -24,6 +24,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'PCT_DIFF_DON', label: '% Diff Donchian', defaults: { period: 20, color: '#22c55e', color2: '#ef4444', lookbackWindow: 10, emaSmoothing: 5, donchianLength: 20, donLineDiff: 0.2 } },
   { type: 'MSB_OB', label: 'MSB & Order Blocks', defaults: { period: 9, color: '#22c55e', color2: '#ef4444', zigzagLength: 9, fibFactor: 0.33 } },
   { type: 'VPVR', label: 'Volume Profile (VPVR)', defaults: { period: 1, color: '#26a69a' } },
+  { type: 'IMBALANCE', label: 'Imbalance Detection', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
