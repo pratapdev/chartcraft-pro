@@ -350,6 +350,12 @@ export const CandlestickChart: React.FC = () => {
   );
 };
 
+function dedupeAndSort(candles: { time: number; open: number; high: number; low: number; close: number; volume: number }[]) {
+  const map = new Map<number, (typeof candles)[0]>();
+  for (const c of candles) map.set(c.time, c);
+  return Array.from(map.values()).sort((a, b) => a.time - b.time);
+}
+
 function ptLineDist(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
   const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1;
   const dot = A * C + B * D;
