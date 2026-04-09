@@ -97,6 +97,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     riskRewardDrawings,
     addRiskReward,
     removeRiskReward,
+    setSelectedRiskRewardId,
   } = useChartStore();
 
   // ---- Coordinate helpers ----
@@ -703,9 +704,32 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         }
       }
 
+      // Check risk/reward hit
+      if (series && riskRewardDrawings.length > 0) {
+        for (const rr of riskRewardDrawings) {
+          const entryY = series.priceToCoordinate(rr.entryPrice);
+          const slY = series.priceToCoordinate(rr.stopLoss);
+          const tpY = series.priceToCoordinate(rr.takeProfit);
+          if (entryY !== null && slY !== null && tpY !== null) {
+            const minY = Math.min(tpY as number, slY as number);
+            const maxY = Math.max(tpY as number, slY as number);
+            if (my >= minY - 5 && my <= maxY + 5) {
+              setSelectedRiskRewardId(rr.id);
+              setSelectedTrendlineId(null);
+              setSelectedFibId(null);
+              setFibDeletePos(null);
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          }
+        }
+      }
+
       setSelectedTrendlineId(null);
       setSelectedFibId(null);
       setFibDeletePos(null);
+      setSelectedRiskRewardId(null);
     },
     [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
   );
