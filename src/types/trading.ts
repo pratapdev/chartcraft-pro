@@ -143,7 +143,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE';
 
 export interface IndicatorConfig {
   id: string;
@@ -177,4 +177,8 @@ export interface IndicatorConfig {
   zigzagLength?: number;
   /** MSB_OB: Fib factor for breakout confirmation */
   fibFactor?: number;
+  /** IMBALANCE: ratio threshold (e.g. 3 = 300%) */
+  threshold?: number;
+  /** IMBALANCE: minimum consecutive levels for stacked zone */
+  minStack?: number;
 }
