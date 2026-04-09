@@ -113,6 +113,8 @@ interface ChartStore {
   addRiskReward: (rr: RiskRewardDrawing) => void;
   removeRiskReward: (id: string) => void;
   updateRiskReward: (id: string, updates: Partial<RiskRewardDrawing>) => void;
+  selectedRiskRewardId: string | null;
+  setSelectedRiskRewardId: (id: string | null) => void;
 
   // Crosshair
   crosshairData: CrosshairData | null;
