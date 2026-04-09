@@ -73,7 +73,7 @@ export const RiskRewardToolbar: React.FC = () => {
         <span className="text-destructive text-[10px]">-{pctRisk}%</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="text-green-500">TP:</span>
+        <span className="text-emerald-500 dark:text-emerald-400">TP:</span>
         <input
           className="w-20 bg-muted border border-border rounded px-1.5 py-0.5 text-foreground text-xs"
           value={tp}
@@ -81,7 +81,7 @@ export const RiskRewardToolbar: React.FC = () => {
           onBlur={applyChanges}
           onKeyDown={(e) => e.key === 'Enter' && applyChanges()}
         />
-        <span className="text-green-500 text-[10px]">+{pctReward}%</span>
+        <span className="text-emerald-500 dark:text-emerald-400 text-[10px]">+{pctReward}%</span>
       </div>
       <div className="h-4 w-px bg-border" />
       <div className="flex items-center gap-1">
