@@ -244,11 +244,12 @@ export const CandlestickChart: React.FC = () => {
   // Force re-render tick marks when timezone changes
   useEffect(() => {
     if (!chartRef.current || !candleSeriesRef.current || !volumeSeriesRef.current || candles.length === 0) return;
-    const candleData = candles.map((c) => ({
+    const sorted = dedupeAndSort(candles);
+    const candleData = sorted.map((c) => ({
       time: c.time as Time,
       open: c.open, high: c.high, low: c.low, close: c.close,
     }));
-    const volumeData = candles.map((c) => ({
+    const volumeData = sorted.map((c) => ({
       time: c.time as Time,
       value: c.volume,
       color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
@@ -264,7 +265,9 @@ export const CandlestickChart: React.FC = () => {
     const timeScale = chartRef.current.timeScale();
     const prevRange = timeScale.getVisibleLogicalRange();
 
-    const candleData: CandlestickData[] = candles.map((c) => ({
+    const sorted = dedupeAndSort(candles);
+
+    const candleData: CandlestickData[] = sorted.map((c) => ({
       time: c.time as Time,
       open: c.open,
       high: c.high,
@@ -272,7 +275,7 @@ export const CandlestickChart: React.FC = () => {
       close: c.close,
     }));
 
-    const volumeData: HistogramData[] = candles.map((c) => ({
+    const volumeData: HistogramData[] = sorted.map((c) => ({
       time: c.time as Time,
       value: c.volume,
       color: c.close >= c.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
