@@ -368,6 +368,8 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   addRiskReward: (rr) => set((s) => ({ riskRewardDrawings: [...s.riskRewardDrawings, rr] })),
   removeRiskReward: (id) => set((s) => ({ riskRewardDrawings: s.riskRewardDrawings.filter((r) => r.id !== id) })),
   updateRiskReward: (id, updates) => set((s) => ({ riskRewardDrawings: s.riskRewardDrawings.map((r) => r.id === id ? { ...r, ...updates } : r) })),
+  selectedRiskRewardId: null,
+  setSelectedRiskRewardId: (id) => set({ selectedRiskRewardId: id }),
 
   crosshairData: null,
   setCrosshairData: (crosshairData) => set({ crosshairData }),
