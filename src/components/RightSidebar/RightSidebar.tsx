@@ -23,6 +23,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'PIVOT_HL', label: 'Pivot Points H/L', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
   { type: 'PCT_DIFF_DON', label: '% Diff Donchian', defaults: { period: 20, color: '#22c55e', color2: '#ef4444', lookbackWindow: 10, emaSmoothing: 5, donchianLength: 20, donLineDiff: 0.2 } },
   { type: 'MSB_OB', label: 'MSB & Order Blocks', defaults: { period: 9, color: '#22c55e', color2: '#ef4444', zigzagLength: 9, fibFactor: 0.33 } },
+  { type: 'VPVR', label: 'Volume Profile (VPVR)', defaults: { period: 1, color: '#26a69a' } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {

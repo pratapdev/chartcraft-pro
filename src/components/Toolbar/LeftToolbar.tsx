@@ -16,6 +16,7 @@ import {
   Eraser,
   Diamond,
   Target,
+  BarChart,
 } from 'lucide-react';
 
 interface ToolButton {
