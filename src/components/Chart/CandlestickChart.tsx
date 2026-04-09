@@ -17,6 +17,7 @@ import { TrendlineToolbar } from './TrendlineToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
 import { VPVROverlay } from './VPVROverlay';
 import { RiskRewardToolbar } from './RiskRewardToolbar';
+import { ImbalanceOverlay } from './ImbalanceOverlay';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -319,6 +320,7 @@ export const CandlestickChart: React.FC = () => {
       <div ref={containerRef} className="w-full h-full" />
       <CrosshairLegend />
       <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
       <RiskRewardToolbar />

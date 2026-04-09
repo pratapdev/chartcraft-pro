@@ -24,6 +24,7 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'PCT_DIFF_DON', label: '% Diff Donchian', defaults: { period: 20, color: '#22c55e', color2: '#ef4444', lookbackWindow: 10, emaSmoothing: 5, donchianLength: 20, donLineDiff: 0.2 } },
   { type: 'MSB_OB', label: 'MSB & Order Blocks', defaults: { period: 9, color: '#22c55e', color2: '#ef4444', zigzagLength: 9, fibFactor: 0.33 } },
   { type: 'VPVR', label: 'Volume Profile (VPVR)', defaults: { period: 1, color: '#26a69a' } },
+  { type: 'IMBALANCE', label: 'Imbalance Detection', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
 ];
 
 const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
@@ -171,6 +172,33 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
               />
             </div>
+          )}
+          {ind.type === 'IMBALANCE' && (
+            <>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Threshold (x)</label>
+                <input
+                  type="number"
+                  min={1.5}
+                  max={10}
+                  step={0.5}
+                  value={ind.threshold ?? 3}
+                  onChange={(e) => updateIndicator(ind.id, { threshold: Math.max(1.5, parseFloat(e.target.value) || 3) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Min Stack</label>
+                <input
+                  type="number"
+                  min={2}
+                  max={10}
+                  value={ind.minStack ?? 3}
+                  onChange={(e) => updateIndicator(ind.id, { minStack: Math.max(2, parseInt(e.target.value) || 3) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+            </>
           )}
         </div>
       )}
