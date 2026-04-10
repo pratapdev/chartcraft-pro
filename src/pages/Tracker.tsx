@@ -201,18 +201,19 @@ export function Tracker() {
                 <label className="text-xs text-muted-foreground mb-1 block">Symbol</label>
                 <Input
                   value={newSymbol}
-                  onChange={(e) => setNewSymbol(e.target.value)}
+                  onChange={(e) => { setNewSymbol(e.target.value); setShowDropdown(true); }}
+                  onFocus={() => setShowDropdown(true)}
                   placeholder="BTC/USD or BTC"
                   className="bg-secondary border-border h-9"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSymbol()}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { setShowDropdown(false); handleAddSymbol(); } }}
                 />
-                {newSymbol && filteredSymbols.length > 0 && (
+                {showDropdown && newSymbol && filteredSymbols.length > 0 && (
                   <div className="absolute z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
                     {filteredSymbols.map((s) => (
                       <button
                         key={s}
                         className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent"
-                        onClick={() => setNewSymbol(s)}
+                        onClick={() => { setNewSymbol(s); setShowDropdown(false); }}
                       >
                         {s}
                       </button>
