@@ -35,7 +35,7 @@ const DEFAULT_STRATEGY: StrategyConfig = {
   source1: 'main',
   source2: 'ema',
   emaPeriod: 20,
-  lookbackWindow: 50,
+  lookbackWindow: 10,
   emaSmoothing: 9,
   donchianLength: 20,
   donLineDiff: 0.2,
