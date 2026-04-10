@@ -64,7 +64,7 @@ export function Tracker() {
   const [newSymbol, setNewSymbol] = useState('');
   const [newTimeframe, setNewTimeframe] = useState<Timeframe>('1h');
   const [strategy, setStrategy] = useState<StrategyConfig>({ ...DEFAULT_STRATEGY });
-  const [symbolSearch, setSymbolSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // In-memory current prices
   const [prices, setPrices] = useState<Record<string, number>>({});
