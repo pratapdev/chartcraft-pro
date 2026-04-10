@@ -64,7 +64,7 @@ export function Tracker() {
   const [newSymbol, setNewSymbol] = useState('');
   const [newTimeframe, setNewTimeframe] = useState<Timeframe>('1h');
   const [strategy, setStrategy] = useState<StrategyConfig>({ ...DEFAULT_STRATEGY });
-  const [symbolSearch, setSymbolSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // In-memory current prices
   const [prices, setPrices] = useState<Record<string, number>>({});
@@ -170,7 +170,7 @@ export function Tracker() {
   };
 
   const filteredSymbols = CRYPTO_SYMBOLS.filter((s) =>
-    s.toLowerCase().includes(symbolSearch.toLowerCase())
+    s.toLowerCase().includes(newSymbol.toLowerCase())
   ).slice(0, 8);
 
   const updateStrategyField = (field: string, value: any) => {
@@ -201,18 +201,19 @@ export function Tracker() {
                 <label className="text-xs text-muted-foreground mb-1 block">Symbol</label>
                 <Input
                   value={newSymbol}
-                  onChange={(e) => setNewSymbol(e.target.value)}
+                  onChange={(e) => { setNewSymbol(e.target.value); setShowDropdown(true); }}
+                  onFocus={() => setShowDropdown(true)}
                   placeholder="BTC/USD or BTC"
                   className="bg-secondary border-border h-9"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSymbol()}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { setShowDropdown(false); handleAddSymbol(); } }}
                 />
-                {newSymbol && filteredSymbols.length > 0 && (
+                {showDropdown && newSymbol && filteredSymbols.length > 0 && (
                   <div className="absolute z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
                     {filteredSymbols.map((s) => (
                       <button
                         key={s}
                         className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent"
-                        onClick={() => setNewSymbol(s)}
+                        onClick={() => { setNewSymbol(s); setShowDropdown(false); }}
                       >
                         {s}
                       </button>
