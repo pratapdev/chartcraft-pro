@@ -170,7 +170,7 @@ export function Tracker() {
   };
 
   const filteredSymbols = CRYPTO_SYMBOLS.filter((s) =>
-    s.toLowerCase().includes(symbolSearch.toLowerCase())
+    s.toLowerCase().includes(newSymbol.toLowerCase())
   ).slice(0, 8);
 
   const updateStrategyField = (field: string, value: any) => {
