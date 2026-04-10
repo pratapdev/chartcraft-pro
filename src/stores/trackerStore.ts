@@ -25,7 +25,7 @@ export const useTrackerStore = create<TrackerState>()(
 
       addSymbol: (symbol, timeframe, strategy) =>
         set((s) => {
-          if (s.watchlist.some((w) => w.symbol === symbol)) return s;
+          if (s.watchlist.some((w) => w.symbol === symbol && w.timeframe === timeframe)) return s;
           return { watchlist: [...s.watchlist, { symbol, timeframe, strategy }] };
         }),
 
