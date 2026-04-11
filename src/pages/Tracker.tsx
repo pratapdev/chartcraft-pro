@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { format } from 'date-fns';
 import { useTrackerStore } from '@/stores/trackerStore';
 import { TrackerSymbol, TrackedEntry, StrategyConfig, PctDiffDonSource } from '@/types/tracker';
 import { Timeframe } from '@/types/trading';
@@ -175,10 +176,16 @@ export function Tracker() {
           const age = now - entry.entryTime;
           const patch: Partial<TrackedEntry> = { currentPrice };
 
-          if (age >= 86400) patch.perf1D = currentPrice;
-          if (age >= 86400 * 3) patch.perf3D = currentPrice;
-          if (age >= 86400 * 7) patch.perf7D = currentPrice;
-          if (age >= 86400 * 30) patch.perf1M = currentPrice;
+          if (!entry.perf5m && age >= 300) patch.perf5m = currentPrice;
+          if (!entry.perf15m && age >= 900) patch.perf15m = currentPrice;
+          if (!entry.perf30m && age >= 1800) patch.perf30m = currentPrice;
+          if (!entry.perf1h && age >= 3600) patch.perf1h = currentPrice;
+          if (!entry.perf4h && age >= 14400) patch.perf4h = currentPrice;
+          if (!entry.perf12h && age >= 43200) patch.perf12h = currentPrice;
+          if (!entry.perf1D && age >= 86400) patch.perf1D = currentPrice;
+          if (!entry.perf3D && age >= 86400 * 3) patch.perf3D = currentPrice;
+          if (!entry.perf7D && age >= 86400 * 7) patch.perf7D = currentPrice;
+          if (!entry.perf1M && age >= 86400 * 30) patch.perf1M = currentPrice;
 
           updateEntry(entry.id, patch);
         }
@@ -398,10 +405,17 @@ export function Tracker() {
                   <TableHead>Symbol</TableHead>
                   <TableHead>TF</TableHead>
                   <TableHead>Direction</TableHead>
+                  <TableHead>Entry Time</TableHead>
                   <TableHead>Strategy</TableHead>
                   <TableHead className="text-right">Entry</TableHead>
                   <TableHead className="text-right">Current</TableHead>
                   <TableHead className="text-right">P&L %</TableHead>
+                  <TableHead className="text-right">5m</TableHead>
+                  <TableHead className="text-right">15m</TableHead>
+                  <TableHead className="text-right">30m</TableHead>
+                  <TableHead className="text-right">1h</TableHead>
+                  <TableHead className="text-right">4h</TableHead>
+                  <TableHead className="text-right">12h</TableHead>
                   <TableHead className="text-right">1D</TableHead>
                   <TableHead className="text-right">3D</TableHead>
                   <TableHead className="text-right">7D</TableHead>
@@ -413,7 +427,7 @@ export function Tracker() {
               <TableBody>
                 {entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={20} className="text-center text-muted-foreground py-8">
                       No entries yet. Add symbols and wait for crossover signals.
                     </TableCell>
                   </TableRow>
@@ -435,6 +449,9 @@ export function Tracker() {
                             </span>
                           )}
                         </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {format(new Date(entry.entryTime * 1000), 'MMM dd, HH:mm')}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {entry.strategy.type === 'pct_diff_don' && 
                             `%Diff ${(entry.strategy as any).source1}×${(entry.strategy as any).source2}`
@@ -446,6 +463,24 @@ export function Tracker() {
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           <PctBadge entry={entry.entryPrice} current={current} />
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {entry.perf5m ? <PctBadge entry={entry.entryPrice} current={entry.perf5m} /> : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {entry.perf15m ? <PctBadge entry={entry.entryPrice} current={entry.perf15m} /> : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {entry.perf30m ? <PctBadge entry={entry.entryPrice} current={entry.perf30m} /> : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {entry.perf1h ? <PctBadge entry={entry.entryPrice} current={entry.perf1h} /> : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {entry.perf4h ? <PctBadge entry={entry.entryPrice} current={entry.perf4h} /> : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {entry.perf12h ? <PctBadge entry={entry.entryPrice} current={entry.perf12h} /> : '—'}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">
                           {entry.perf1D ? <PctBadge entry={entry.entryPrice} current={entry.perf1D} /> : '—'}

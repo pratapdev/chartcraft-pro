@@ -35,7 +35,13 @@ export interface TrackedEntry {
   active: boolean;
   /** Current price (updated in memory) */
   currentPrice?: number;
-  /** Performance snapshots: price at entry + N days */
+  /** Performance snapshots: price at entry + N intervals */
+  perf5m?: number;
+  perf15m?: number;
+  perf30m?: number;
+  perf1h?: number;
+  perf4h?: number;
+  perf12h?: number;
   perf1D?: number;
   perf3D?: number;
   perf7D?: number;
