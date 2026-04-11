@@ -163,34 +163,78 @@ export function Tracker() {
     return () => clearInterval(interval);
   }, [watchlist, minCheckInterval, addEntry]);
 
-  // Update performance metrics periodically — use ref to avoid loop
+  // Timeframe to seconds mapping
+  const TF_SECONDS: Record<string, number> = {
+    '1m': 60, '3m': 180, '5m': 300, '15m': 900,
+    '1h': 3600, '4h': 14400, '1D': 86400, '1W': 604800,
+  };
+
+  // Performance slots: label, seconds, field name
+  const PERF_SLOTS: { seconds: number; field: keyof TrackedEntry }[] = [
+    { seconds: 300, field: 'perf5m' },
+    { seconds: 900, field: 'perf15m' },
+    { seconds: 1800, field: 'perf30m' },
+    { seconds: 3600, field: 'perf1h' },
+    { seconds: 14400, field: 'perf4h' },
+    { seconds: 43200, field: 'perf12h' },
+    { seconds: 86400, field: 'perf1D' },
+    { seconds: 86400 * 3, field: 'perf3D' },
+    { seconds: 86400 * 7, field: 'perf7D' },
+    { seconds: 86400 * 30, field: 'perf1M' },
+  ];
+
+  // Update current prices and fetch candle highs for perf snapshots
   useEffect(() => {
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       const currentEntries = entriesRef.current;
       const currentPrices = pricesRef.current;
       const activeEntries = currentEntries.filter((e) => e.active);
+      const now = Date.now() / 1000;
+
       for (const entry of activeEntries) {
         const currentPrice = currentPrices[entry.symbol];
-        if (currentPrice) {
-          const now = Date.now() / 1000;
-          const age = now - entry.entryTime;
-          const patch: Partial<TrackedEntry> = { currentPrice };
+        if (!currentPrice) continue;
 
-          if (!entry.perf5m && age >= 300) patch.perf5m = currentPrice;
-          if (!entry.perf15m && age >= 900) patch.perf15m = currentPrice;
-          if (!entry.perf30m && age >= 1800) patch.perf30m = currentPrice;
-          if (!entry.perf1h && age >= 3600) patch.perf1h = currentPrice;
-          if (!entry.perf4h && age >= 14400) patch.perf4h = currentPrice;
-          if (!entry.perf12h && age >= 43200) patch.perf12h = currentPrice;
-          if (!entry.perf1D && age >= 86400) patch.perf1D = currentPrice;
-          if (!entry.perf3D && age >= 86400 * 3) patch.perf3D = currentPrice;
-          if (!entry.perf7D && age >= 86400 * 7) patch.perf7D = currentPrice;
-          if (!entry.perf1M && age >= 86400 * 30) patch.perf1M = currentPrice;
+        const age = now - entry.entryTime;
+        const tfSec = TF_SECONDS[entry.timeframe] ?? 60;
+        const patch: Partial<TrackedEntry> = { currentPrice };
 
-          updateEntry(entry.id, patch);
+        // Collect slots that need filling
+        const slotsToFill = PERF_SLOTS.filter((slot) => {
+          const candleN = Math.round(slot.seconds / tfSec);
+          if (candleN < 1) return false; // perf interval smaller than timeframe
+          if (entry[slot.field]) return false; // already filled
+          // Need enough time elapsed: candleN candles + some buffer
+          return age >= slot.seconds + tfSec;
+        });
+
+        if (slotsToFill.length > 0) {
+          try {
+            // Fetch candles to find the specific candle highs
+            const candles = await fetchCandles(entry.symbol, entry.timeframe as Timeframe, 500);
+            for (const slot of slotsToFill) {
+              const candleN = Math.round(slot.seconds / tfSec);
+              // Find the entry candle index
+              const entryIdx = candles.findIndex((c) => c.time >= entry.entryTime);
+              if (entryIdx >= 0 && entryIdx + candleN < candles.length) {
+                const targetCandle = candles[entryIdx + candleN];
+                (patch as any)[slot.field] = targetCandle.high;
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to fetch candles for perf snapshot ${entry.symbol}:`, err);
+          }
         }
+
+        // Also fill 1D/3D/7D/1M with current price if no candle data available yet
+        if (!entry.perf1D && age >= 86400) patch.perf1D = patch.perf1D ?? currentPrice;
+        if (!entry.perf3D && age >= 86400 * 3) patch.perf3D = patch.perf3D ?? currentPrice;
+        if (!entry.perf7D && age >= 86400 * 7) patch.perf7D = patch.perf7D ?? currentPrice;
+        if (!entry.perf1M && age >= 86400 * 30) patch.perf1M = patch.perf1M ?? currentPrice;
+
+        updateEntry(entry.id, patch);
       }
-    }, 10000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [updateEntry]);
 
