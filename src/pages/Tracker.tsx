@@ -70,14 +70,20 @@ export function Tracker() {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const wsCleanups = useRef<(() => void)[]>([]);
 
+  // Stable symbol key for subscriptions
+  const activeSymbols = React.useMemo(() => {
+    const syms = new Set<string>();
+    watchlist.forEach((w) => syms.add(w.symbol));
+    entries.filter((e) => e.active).forEach((e) => syms.add(e.symbol));
+    return Array.from(syms).sort().join(',');
+  }, [watchlist, entries]);
+
   // Subscribe to live prices for all watchlist + active entries
   useEffect(() => {
     wsCleanups.current.forEach((fn) => fn());
     wsCleanups.current = [];
 
-    const symbols = new Set<string>();
-    watchlist.forEach((w) => symbols.add(w.symbol));
-    entries.filter((e) => e.active).forEach((e) => symbols.add(e.symbol));
+    const symbols = activeSymbols ? activeSymbols.split(',') : [];
 
     symbols.forEach((sym) => {
       const unsub = subscribeToCandles(sym, '1m', (candle) => {
@@ -89,62 +95,86 @@ export function Tracker() {
     return () => {
       wsCleanups.current.forEach((fn) => fn());
     };
-  }, [watchlist.length, entries.filter((e) => e.active).length]);
+  }, [activeSymbols]);
+
+  // Use refs for crossover check to avoid re-creating callback on every entries change
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  const pricesRef = useRef(prices);
+  pricesRef.current = prices;
+
+  // Determine minimum timeframe polling interval
+  const minCheckInterval = React.useMemo(() => {
+    const TF_INTERVALS: Record<string, number> = {
+      '1m': 60_000, '3m': 60_000, '5m': 60_000, '15m': 60_000,
+      '1h': 60_000, '4h': 120_000, '1D': 300_000, '1W': 600_000,
+    };
+    if (watchlist.length === 0) return 60_000;
+    let minInterval = Infinity;
+    for (const w of watchlist) {
+      const interval = TF_INTERVALS[w.timeframe] ?? 60_000;
+      if (interval < minInterval) minInterval = interval;
+    }
+    return minInterval;
+  }, [watchlist]);
 
   // Periodically check crossovers for watchlist symbols
-  const checkCrossovers = useCallback(async () => {
-    for (const item of watchlist) {
-      try {
-        const candles = await fetchCandles(item.symbol, item.timeframe, 500);
-        if (item.strategy.type === 'pct_diff_don') {
-          const cross = detectPctDiffDonCrossover(candles, item.strategy);
-          if (cross) {
-            // Check if we already have this entry (same symbol, same time)
-            const exists = entries.some(
-              (e) => e.symbol === item.symbol && e.entryTime === cross.time
-            );
-            if (!exists) {
-              const id = `${item.symbol}-${cross.time}-${Date.now()}`;
-              addEntry({
-                id,
-                symbol: item.symbol,
-                timeframe: item.timeframe,
-                strategy: item.strategy,
-                entryPrice: cross.price,
-                entryTime: cross.time,
-                direction: cross.direction,
-                active: true,
-              });
-              toast.success(`Crossover detected: ${item.symbol} ${cross.direction}`, {
-                description: `Entry @ ${cross.price.toFixed(2)}`,
-              });
+  useEffect(() => {
+    if (watchlist.length === 0) return;
+
+    const checkCrossovers = async () => {
+      for (const item of watchlist) {
+        try {
+          const candles = await fetchCandles(item.symbol, item.timeframe, 500);
+          if (item.strategy.type === 'pct_diff_don') {
+            const cross = detectPctDiffDonCrossover(candles, item.strategy);
+            if (cross) {
+              const currentEntries = entriesRef.current;
+              const exists = currentEntries.some(
+                (e) => e.symbol === item.symbol && e.entryTime === cross.time
+              );
+              if (!exists) {
+                const id = `${item.symbol}-${cross.time}-${Date.now()}`;
+                addEntry({
+                  id,
+                  symbol: item.symbol,
+                  timeframe: item.timeframe,
+                  strategy: item.strategy,
+                  entryPrice: cross.price,
+                  entryTime: cross.time,
+                  direction: cross.direction,
+                  active: true,
+                });
+                toast.success(`Crossover detected: ${item.symbol} ${cross.direction}`, {
+                  description: `Entry @ ${cross.price.toFixed(2)}`,
+                });
+              }
             }
           }
+        } catch (err) {
+          console.error(`Failed to check crossover for ${item.symbol}:`, err);
         }
-      } catch (err) {
-        console.error(`Failed to check crossover for ${item.symbol}:`, err);
       }
-    }
-  }, [watchlist, entries, addEntry]);
+    };
 
-  useEffect(() => {
     checkCrossovers();
-    const interval = setInterval(checkCrossovers, 30000); // every 30s
+    const interval = setInterval(checkCrossovers, minCheckInterval);
     return () => clearInterval(interval);
-  }, [checkCrossovers]);
+  }, [watchlist, minCheckInterval, addEntry]);
 
-  // Update performance metrics periodically
+  // Update performance metrics periodically — use ref to avoid loop
   useEffect(() => {
-    const updatePerf = async () => {
-      const activeEntries = entries.filter((e) => e.active);
+    const interval = setInterval(() => {
+      const currentEntries = entriesRef.current;
+      const currentPrices = pricesRef.current;
+      const activeEntries = currentEntries.filter((e) => e.active);
       for (const entry of activeEntries) {
-        const currentPrice = prices[entry.symbol];
+        const currentPrice = currentPrices[entry.symbol];
         if (currentPrice) {
           const now = Date.now() / 1000;
           const age = now - entry.entryTime;
           const patch: Partial<TrackedEntry> = { currentPrice };
 
-          // Calculate period performances based on current price
           if (age >= 86400) patch.perf1D = currentPrice;
           if (age >= 86400 * 3) patch.perf3D = currentPrice;
           if (age >= 86400 * 7) patch.perf7D = currentPrice;
@@ -153,11 +183,9 @@ export function Tracker() {
           updateEntry(entry.id, patch);
         }
       }
-    };
-    updatePerf();
-    const interval = setInterval(updatePerf, 10000);
+    }, 10000);
     return () => clearInterval(interval);
-  }, [entries, prices, updateEntry]);
+  }, [updateEntry]);
 
   const handleAddSymbol = () => {
     const sym = newSymbol.trim().toUpperCase();
