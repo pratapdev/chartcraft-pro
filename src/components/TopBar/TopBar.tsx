@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChartStore } from '@/stores/chartStore';
 import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch } from 'lucide-react';
+import { ChartLayoutMenu } from './ChartLayoutMenu';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
 import { checkSyncHealth, pushState, extractSyncPayload, getSyncServerUrl } from '@/lib/syncService';
@@ -327,6 +328,10 @@ export const TopBar: React.FC = () => {
       </div>
 
       <div className="flex-1" />
+
+      <ChartLayoutMenu />
+
+      <div className="w-px h-5 bg-border" />
 
       <SyncStatusIndicator />
 
