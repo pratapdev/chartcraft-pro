@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, PctDiffDonCrossAlert, LineStyleType, RiskRewardDrawing } from '@/types/trading';
 import { CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
+import { HTFOverlayState, HTFLayerConfig, DEFAULT_LAYERS } from '@/types/htfOverlay';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
@@ -170,6 +171,12 @@ interface ChartStore {
   // Favorites
   favorites: string[];
   toggleFavorite: (symbol: string) => void;
+
+  // HTF Overlay
+  htfOverlay: HTFOverlayState;
+  updateHTFLayer: (index: number, updates: Partial<HTFLayerConfig>) => void;
+  setHTFAutoMode: (auto: boolean) => void;
+  setHTFTrendAlignment: (enabled: boolean) => void;
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
@@ -469,6 +476,15 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       ? s.favorites.filter((f) => f !== symbol)
       : [...s.favorites, symbol]
   })),
+
+  htfOverlay: { layers: [...DEFAULT_LAYERS], autoMode: true, trendAlignment: false },
+  updateHTFLayer: (index, updates) => set((s) => {
+    const layers = [...s.htfOverlay.layers];
+    layers[index] = { ...layers[index], ...updates };
+    return { htfOverlay: { ...s.htfOverlay, layers } };
+  }),
+  setHTFAutoMode: (autoMode) => set((s) => ({ htfOverlay: { ...s.htfOverlay, autoMode } })),
+  setHTFTrendAlignment: (trendAlignment) => set((s) => ({ htfOverlay: { ...s.htfOverlay, trendAlignment } })),
 }), {
   name: 'chart-store',
   partialize: (state) => ({
@@ -491,5 +507,6 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     compoundAlerts: state.compoundAlerts,
     alertTemplates: state.alertTemplates,
     favorites: state.favorites,
+    htfOverlay: state.htfOverlay,
   }),
 }));
