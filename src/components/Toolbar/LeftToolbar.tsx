@@ -18,7 +18,9 @@ import {
   Target,
   BarChart,
   Zap,
+  Layers,
 } from 'lucide-react';
+import { HTFControls } from '@/components/Chart/HTFControls';
 
 interface ToolButton {
   id: DrawingTool | string;
@@ -44,6 +46,8 @@ export const LeftToolbar: React.FC = () => {
 
   const [confirmDrawings, setConfirmDrawings] = useState(false);
   const [confirmIndicators, setConfirmIndicators] = useState(false);
+  const [showHTF, setShowHTF] = useState(false);
+  const hasHTF = useChartStore((s) => s.htfOverlay.layers.some(l => l.enabled));
 
   const tools: ToolButton[] = [
     { id: 'cursor', icon: <MousePointer2 size={18} />, label: 'Cursor' },
@@ -134,6 +138,7 @@ export const LeftToolbar: React.FC = () => {
     { id: 'pivot-hl', icon: <Diamond size={18} />, label: 'Pivot Points H/L', action: handleTogglePivotHL },
     { id: 'vpvr', icon: <BarChart size={18} />, label: 'Volume Profile (VPVR)', action: handleToggleVPVR },
     { id: 'imbalance', icon: <Zap size={18} />, label: 'Imbalance Detection', action: handleToggleImbalance },
+    { id: 'htf-overlay', icon: <Layers size={18} />, label: 'HTF Overlay', action: () => setShowHTF(v => !v) },
     { id: 'alerts', icon: <Bell size={18} />, label: 'Alerts', action: () => setRightPanelTab('alerts') },
     { id: 'indicators', icon: <BarChart3 size={18} />, label: 'Indicators', action: () => setRightPanelTab('indicators') },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings', action: () => setRightPanelTab('settings') },
@@ -165,7 +170,7 @@ export const LeftToolbar: React.FC = () => {
           key={action.id}
           onClick={action.action}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL) || (action.id === 'vpvr' && hasVPVR) || (action.id === 'imbalance' && hasImbalance)
+            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL) || (action.id === 'vpvr' && hasVPVR) || (action.id === 'imbalance' && hasImbalance) || (action.id === 'htf-overlay' && hasHTF)
               ? 'bg-primary/15 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}
@@ -176,6 +181,8 @@ export const LeftToolbar: React.FC = () => {
       ))}
 
       <div className="flex-1" />
+
+      {showHTF && <HTFControls onClose={() => setShowHTF(false)} />}
 
       {/* Clear all drawings */}
       {hasDrawings && (
