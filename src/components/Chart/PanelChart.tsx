@@ -14,6 +14,10 @@ import { usePanelIndexRequired } from './PanelContext';
 import { useIndicatorRenderer } from './useIndicatorRenderer';
 import { PanelDrawingOverlay } from './PanelDrawingOverlay';
 import { PanelIndicatorPane } from './PanelIndicatorPane';
+import { PanelVPVROverlay } from './PanelVPVROverlay';
+import { PanelTPOOverlay } from './PanelTPOOverlay';
+import { PanelTrendlineToolbar } from './PanelTrendlineToolbar';
+import { PanelRiskRewardToolbar } from './PanelRiskRewardToolbar';
 import { Timeframe } from '@/types/trading';
 import { useChartStore } from '@/stores/chartStore';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
@@ -380,6 +384,10 @@ export const PanelChart: React.FC = () => {
       <div className="flex-1 relative min-h-[80px]">
         <div ref={containerRef} className="w-full h-full" />
         <PanelDrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+        <PanelVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+        <PanelTPOOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+        <PanelTrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+        <PanelRiskRewardToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
       </div>
 
       {/* Sub-chart indicator panes — each shrinkable, max 30% height of panel */}

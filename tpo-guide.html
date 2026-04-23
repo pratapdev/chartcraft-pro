@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Institutional TPO (Market Profile) Guide</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-orange: #f59e0b;
+            --border-color: #334155;
+            --poc-red: #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 4rem 0 2rem 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 3rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+            background: linear-gradient(to right, var(--accent-blue), var(--accent-orange));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.05em;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        h2 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.75rem;
+            color: var(--text-main);
+            margin-top: 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        h3 {
+            color: var(--accent-blue);
+            font-size: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        p {
+            color: var(--text-muted);
+        }
+
+        ul {
+            color: var(--text-muted);
+            padding-left: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .highlight {
+            color: var(--accent-orange);
+            font-weight: 600;
+        }
+
+        .poc-badge {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--poc-red);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .tpo-graphic {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, rgba(16, 185, 129, 0.2) 25%, rgba(245, 158, 11, 0.2) 50%, rgba(239, 68, 68, 0.2) 75%, rgba(139, 92, 246, 0.2) 100%);
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            position: relative;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            font-weight: bold;
+        }
+
+        .tpo-graphic::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            border-top: 2px dashed var(--poc-red);
+        }
+
+        .tpo-graphic span {
+            position: relative;
+            z-index: 10;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .strategy-card {
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-top: 3px solid var(--accent-orange);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Understanding TPO</h1>
+            <div class="subtitle">Institutional Market Profile & Time Price Opportunity</div>
+        </header>
+
+        <div class="card">
+            <h2>What is TPO?</h2>
+            <p><strong>Time Price Opportunity (TPO)</strong>, commonly known as Market Profile, is an institutional
+                charting technique developed by J. Peter Steidlmayer at the Chicago Board of Trade (CBOT). Unlike
+                traditional volume profiles that measure <em>how many contracts</em> traded at a price, TPO measures
+                <em>how much time</em> the market spent at a price.</p>
+            <p>Our dynamic implementation divides the visible chart session into chronological segments. Prices that
+                were heavily transacted accumulate horizontal graphical blocks. The thicker the block profile, the
+                higher the market "acceptance" of that price.</p>
+
+            <div class="tpo-graphic"><span>Price Acceptance vs Time</span></div>
+        </div>
+
+        <div class="card">
+            <h2>Core Concepts</h2>
+            <ul>
+                <li><span class="highlight">Value Area:</span> The range of prices where approximately 70% of the
+                    session's time was spent. This represents "fair value".</li>
+                <li><span class="highlight">Point of Control (POC):</span> <span class="poc-badge">Red Dashed
+                        Line</span> The single price level where the most blocks (time periods) occurred. This is the
+                    ultimate magnet for price.</li>
+                <li><span class="highlight">Gradient Heatmap:</span> Our TPO overlay colors blocks linearly (Blue &rarr;
+                    Green &rarr; Yellow &rarr; Red &rarr; Purple). The color tells you exactly <em>when</em> the volume
+                    came in during the session.</li>
+                <li><span class="highlight">Single Prints:</span> Areas on the profile where only a single horizontal
+                    block exists. These represent fast, emotional moves (imbalances) and often act as strong future
+                    support/resistance.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Institutional Trading Strategies</h2>
+            <p>Retail traders focus on indicators; institutional traders focus on market structure and auction
+                mechanics. TPO reveals the auction.</p>
+
+            <div class="strategy-grid">
+                <div class="strategy-card">
+                    <h3 style="margin-top: 0;">1. Value Area Rejection</h3>
+                    <p>If price opens outside the previous day's Value Area but quickly reverses and accepts back inside
+                        it, there is an 80% statistical probability it will traverse fully to the other side of the
+                        Value Area (The 80% Rule).</p>
+                </div>
+
+                <div class="strategy-card">
+                    <h3 style="margin-top: 0;">2. POC Magnetism</h3>
+                    <p>The <span class="poc-badge">POC</span> acts as gravity. In ranging, non-trending markets, fade
+                        moves away from the prominent POC. Use the POC as your primary take-profit target for
+                        mean-reversion trades.</p>
+                </div>
+
+                <div class="strategy-card">
+                    <h3 style="margin-top: 0;">3. Single Print Fills</h3>
+                    <p>Thin areas in the profile (Single Prints) are vacuums. When price retraces into a Single Print
+                        zone, it will typically move aggressively through it due to a lack of historical liquidity in
+                        that zone.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>How to Use it in ChartCraft Pro</h2>
+            <ol>
+                <li>Click the <strong>Align Left Icon</strong> in the left toolbar to toggle the TPO overlay.</li>
+                <li>The TPO dynamically recalculates based on your <strong>Visible Range</strong>. Zoom out to see
+                    weekly macroeconomic balance, or zoom in for intraday session balance.</li>
+                <li>Compare the TPO <span class="highlight">Time Profile</span> with the VPVR <span
+                        class="highlight">Volume Profile</span>. When the time POC and the volume POC perfectly align,
+                    you have a massive institutional baseline!</li>
+            </ol>
+        </div>
+    </div>
+
+</body>
+
+</html>

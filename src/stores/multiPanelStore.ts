@@ -81,11 +81,13 @@ interface MultiPanelStore {
   activePanelIndex: number;
   gridMode: 2 | 4;
   syncCrosshairTime: number | null;
+  syncDrawings: boolean;
 
   // Grid
   setGridMode: (mode: 2 | 4) => void;
   setActivePanelIndex: (index: number) => void;
   setSyncCrosshairTime: (time: number | null) => void;
+  toggleSyncDrawings: () => void;
 
   // Per-panel: symbol/timeframe
   setPanelSymbol: (index: number, symbol: string) => void;
@@ -156,10 +158,12 @@ export const useMultiPanelStore = create<MultiPanelStore>()(
       activePanelIndex: 0,
       gridMode: 4,
       syncCrosshairTime: null,
+      syncDrawings: true, // Default to true as it's the premium standard
 
       setGridMode: (gridMode) => set({ gridMode }),
       setActivePanelIndex: (activePanelIndex) => set({ activePanelIndex }),
       setSyncCrosshairTime: (syncCrosshairTime) => set({ syncCrosshairTime }),
+      toggleSyncDrawings: () => set((s) => ({ syncDrawings: !s.syncDrawings })),
 
       // ─── Symbol / Timeframe ─────────────────────────────────────
 
@@ -271,20 +275,34 @@ export const useMultiPanelStore = create<MultiPanelStore>()(
       },
 
       updatePanelTrendline: (index, id, updates) => {
-        const panel = get().panels[index];
+        const panels = get().panels;
+        let ownerIndex = index;
+        if (!panels[ownerIndex]?.trendlines.some(t => t.id === id)) {
+          for (const [idx, p] of Object.entries(panels)) {
+            if (p.trendlines.some(t => t.id === id)) { ownerIndex = Number(idx); break; }
+          }
+        }
+        const panel = panels[ownerIndex];
         if (!panel) return;
         set({
-          panels: updatePanel(get().panels, index, {
+          panels: updatePanel(panels, ownerIndex, {
             trendlines: panel.trendlines.map((t) => (t.id === id ? { ...t, ...updates } : t)),
           }),
         });
       },
 
       removePanelTrendline: (index, id) => {
-        const panel = get().panels[index];
+        const panels = get().panels;
+        let ownerIndex = index;
+        if (!panels[ownerIndex]?.trendlines.some(t => t.id === id)) {
+          for (const [idx, p] of Object.entries(panels)) {
+            if (p.trendlines.some(t => t.id === id)) { ownerIndex = Number(idx); break; }
+          }
+        }
+        const panel = panels[ownerIndex];
         if (!panel) return;
         set({
-          panels: updatePanel(get().panels, index, {
+          panels: updatePanel(panels, ownerIndex, {
             trendlines: panel.trendlines.filter((t) => t.id !== id),
             selectedTrendlineId: panel.selectedTrendlineId === id ? null : panel.selectedTrendlineId,
           }),
@@ -308,10 +326,17 @@ export const useMultiPanelStore = create<MultiPanelStore>()(
       },
 
       removePanelFibonacci: (index, id) => {
-        const panel = get().panels[index];
+        const panels = get().panels;
+        let ownerIndex = index;
+        if (!panels[ownerIndex]?.fibonacciDrawings.some(f => f.id === id)) {
+          for (const [idx, p] of Object.entries(panels)) {
+            if (p.fibonacciDrawings.some(f => f.id === id)) { ownerIndex = Number(idx); break; }
+          }
+        }
+        const panel = panels[ownerIndex];
         if (!panel) return;
         set({
-          panels: updatePanel(get().panels, index, {
+          panels: updatePanel(panels, ownerIndex, {
             fibonacciDrawings: panel.fibonacciDrawings.filter((f) => f.id !== id),
           }),
         });
@@ -330,20 +355,34 @@ export const useMultiPanelStore = create<MultiPanelStore>()(
       },
 
       removePanelRiskReward: (index, id) => {
-        const panel = get().panels[index];
+        const panels = get().panels;
+        let ownerIndex = index;
+        if (!panels[ownerIndex]?.riskRewardDrawings.some(r => r.id === id)) {
+          for (const [idx, p] of Object.entries(panels)) {
+            if (p.riskRewardDrawings.some(r => r.id === id)) { ownerIndex = Number(idx); break; }
+          }
+        }
+        const panel = panels[ownerIndex];
         if (!panel) return;
         set({
-          panels: updatePanel(get().panels, index, {
+          panels: updatePanel(panels, ownerIndex, {
             riskRewardDrawings: panel.riskRewardDrawings.filter((r) => r.id !== id),
           }),
         });
       },
 
       updatePanelRiskReward: (index, id, updates) => {
-        const panel = get().panels[index];
+        const panels = get().panels;
+        let ownerIndex = index;
+        if (!panels[ownerIndex]?.riskRewardDrawings.some(r => r.id === id)) {
+          for (const [idx, p] of Object.entries(panels)) {
+            if (p.riskRewardDrawings.some(r => r.id === id)) { ownerIndex = Number(idx); break; }
+          }
+        }
+        const panel = panels[ownerIndex];
         if (!panel) return;
         set({
-          panels: updatePanel(get().panels, index, {
+          panels: updatePanel(panels, ownerIndex, {
             riskRewardDrawings: panel.riskRewardDrawings.map((r) =>
               r.id === id ? { ...r, ...updates } : r
             ),
@@ -434,6 +473,7 @@ export const useMultiPanelStore = create<MultiPanelStore>()(
         ),
         gridMode: state.gridMode,
         activePanelIndex: state.activePanelIndex,
+        syncDrawings: state.syncDrawings,
       }),
     }
   )

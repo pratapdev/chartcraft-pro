@@ -88,11 +88,38 @@ export const PanelDrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, pane
   const setPanelSelectedRiskRewardId = useMultiPanelStore((s) => s.setPanelSelectedRiskRewardId);
 
   const activeTool = panel?.activeTool ?? 'cursor';
-  const trendlines = panel?.trendlines ?? [];
-  const fibonacciDrawings = panel?.fibonacciDrawings ?? [];
-  const riskRewardDrawings = panel?.riskRewardDrawings ?? [];
-  const selectedTrendlineId = panel?.selectedTrendlineId ?? null;
   const symbol = panel?.symbol ?? 'BTC/USD';
+  const syncDrawings = useMultiPanelStore((s) => s.syncDrawings);
+  const allPanels = useMultiPanelStore((s) => s.panels);
+
+  const trendlines = React.useMemo(() => {
+    if (!syncDrawings) return panel?.trendlines ?? [];
+    const aggregated: Trendline[] = [];
+    for (const p of Object.values(allPanels)) {
+      if (p.symbol === symbol) aggregated.push(...p.trendlines);
+    }
+    return Array.from(new Map(aggregated.map(t => [t.id, t])).values());
+  }, [syncDrawings, panel?.trendlines, allPanels, symbol]);
+
+  const fibonacciDrawings = React.useMemo(() => {
+    if (!syncDrawings) return panel?.fibonacciDrawings ?? [];
+    const aggregated: FibonacciDrawing[] = [];
+    for (const p of Object.values(allPanels)) {
+      if (p.symbol === symbol) aggregated.push(...p.fibonacciDrawings);
+    }
+    return Array.from(new Map(aggregated.map(f => [f.id, f])).values());
+  }, [syncDrawings, panel?.fibonacciDrawings, allPanels, symbol]);
+
+  const riskRewardDrawings = React.useMemo(() => {
+    if (!syncDrawings) return panel?.riskRewardDrawings ?? [];
+    const aggregated: RiskRewardDrawing[] = [];
+    for (const p of Object.values(allPanels)) {
+      if (p.symbol === symbol) aggregated.push(...p.riskRewardDrawings);
+    }
+    return Array.from(new Map(aggregated.map(r => [r.id, r])).values());
+  }, [syncDrawings, panel?.riskRewardDrawings, allPanels, symbol]);
+
+  const selectedTrendlineId = panel?.selectedTrendlineId ?? null;
   const timeframe = panel?.timeframe ?? '1h';
   const drawingDefaults = panel?.drawingDefaults;
   const panelCandles = panel?.candles ?? [];
@@ -657,30 +684,100 @@ export const PanelDrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, pane
     return () => window.removeEventListener('keydown', handleKey);
   }, [selectedTrendlineId, selectedFibId, panelIndex]);
 
-  const shouldPassThrough = activeTool === 'cursor' && !isInteracting && !hoveringLine;
+  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor';
 
   return (
     <>
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{ pointerEvents: 'none', zIndex: 10 }}
+        className="absolute inset-0 z-10 pointer-events-none"
       />
       <div
         ref={eventLayerRef}
-        className="absolute inset-0 w-full h-full"
+        className="absolute top-0 left-0 z-20"
         style={{
-          pointerEvents: shouldPassThrough ? 'none' : 'auto',
-          cursor: activeTool === 'cursor'
-            ? (hoveringLine ? 'pointer' : 'default')
-            : 'crosshair',
-          zIndex: 15,
+          right: 65, bottom: 28,
+          pointerEvents: shouldCapture ? 'auto' : 'none',
+          cursor: activeTool === 'cursor' ? (hoveringLine ? 'pointer' : 'default') : 'crosshair',
         }}
-        onMouseDown={handleMouseDown}
+        onMouseDown={(e) => {
+          const { mx, my } = getPos(e.nativeEvent);
+          if (activeTool === 'cursor' && !hitTest(mx, my)) {
+            let fibHit = false;
+            const series = seriesRef.current;
+            if (series) {
+              for (const fib of fibonacciDrawings) {
+                const diff = fib.endPrice - fib.startPrice;
+                for (const level of FIB_LEVELS) {
+                  const price = fib.endPrice - diff * level;
+                  const y = series.priceToCoordinate(price);
+                  if (y !== null && Math.abs(my - (y as number)) < 8) {
+                    fibHit = true;
+                    handleMouseDown(e);
+                    break;
+                  }
+                }
+                if (fibHit) break;
+              }
+            }
+            if (!fibHit) {
+              if (eventLayerRef.current) {
+                eventLayerRef.current.style.pointerEvents = 'none';
+                const el = document.elementFromPoint(e.clientX, e.clientY);
+                if (el) {
+                  el.dispatchEvent(new MouseEvent('mousedown', {
+                    clientX: e.clientX, clientY: e.clientY,
+                    bubbles: true, cancelable: true,
+                  }));
+                }
+                requestAnimationFrame(() => {
+                  if (eventLayerRef.current) {
+                    eventLayerRef.current.style.pointerEvents = shouldCapture ? 'auto' : 'none';
+                  }
+                });
+              }
+              setPanelSelectedTrendlineId(panelIndex, null);
+              setSelectedFibId(null);
+              setFibDeletePos(null);
+              return;
+            }
+          } else {
+            handleMouseDown(e);
+          }
+        }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => { setHoverY(null); setHoveringLine(false); }}
       />
+      
+      {/* Fibonacci delete button */}
+      {selectedFibId && fibDeletePos && (
+        <div
+          className="absolute z-30 flex items-center gap-1 rounded-md px-1.5 py-1 shadow-lg border"
+          style={{
+            left: `${fibDeletePos.x}px`,
+            top: `${fibDeletePos.y}px`,
+            transform: 'translate(-50%, -50%)',
+            background: 'hsl(var(--popover))',
+            borderColor: 'hsl(var(--border))',
+          }}
+        >
+          <button
+            className="flex items-center justify-center w-7 h-7 rounded transition-colors"
+            style={{ color: 'hsl(var(--destructive))' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            title="Delete Fibonacci"
+            onClick={() => {
+              removePanelFibonacci(panelIndex, selectedFibId);
+              setSelectedFibId(null);
+              setFibDeletePos(null);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          </button>
+        </div>
+      )}
     </>
   );
 };

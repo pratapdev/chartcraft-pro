@@ -20,6 +20,7 @@ import {
   BarChart,
   Zap,
   Layers,
+  AlignLeft,
 } from 'lucide-react';
 import { HTFControls } from '@/components/Chart/HTFControls';
 
@@ -176,6 +177,26 @@ export const LeftToolbar: React.FC = () => {
     }
   };
 
+  const handleToggleTPO = () => {
+    const existing = currentIndicators.find((i) => i.type === 'TPO');
+    if (existing) {
+      setRightPanelTab('indicators');
+    } else {
+      const ind = {
+        id: `tpo-${Date.now()}`,
+        type: 'TPO' as const,
+        period: 1, // Doesn't strictly need a period, but keeping schema happy
+        color: '#ff9800', // Orange color for TPO blocks
+        visible: true,
+      };
+      if (multiTfMode) {
+        addPanelIndicator(activePanelIndex, ind);
+      } else {
+        addIndicator(ind);
+      }
+    }
+  };
+
   const handleToggleImbalance = () => {
     const existing = currentIndicators.find((i) => i.type === 'IMBALANCE');
     if (existing) {
@@ -201,6 +222,7 @@ export const LeftToolbar: React.FC = () => {
   const hasBBands = currentIndicators.some((i) => i.type === 'BBANDS' && i.visible);
   const hasPivotHL = currentIndicators.some((i) => i.type === 'PIVOT_HL' && i.visible);
   const hasVPVR = currentIndicators.some((i) => i.type === 'VPVR' && i.visible);
+  const hasTPO = currentIndicators.some((i) => i.type === 'TPO' && i.visible);
   const hasImbalance = currentIndicators.some((i) => i.type === 'IMBALANCE' && i.visible);
   const hasDrawings = currentTrendlines.length > 0 || currentFibs.length > 0;
   const hasIndicators = currentIndicators.length > 0;
@@ -209,6 +231,7 @@ export const LeftToolbar: React.FC = () => {
     { id: 'bbands', icon: <Activity size={18} />, label: 'Bollinger Bands', action: handleToggleBBands },
     { id: 'pivot-hl', icon: <Diamond size={18} />, label: 'Pivot Points H/L', action: handleTogglePivotHL },
     { id: 'vpvr', icon: <BarChart size={18} />, label: 'Volume Profile (VPVR)', action: handleToggleVPVR },
+    { id: 'tpo', icon: <AlignLeft size={18} />, label: 'Market Profile (TPO)', action: handleToggleTPO },
     { id: 'imbalance', icon: <Zap size={18} />, label: 'Imbalance Detection', action: handleToggleImbalance },
     ...(!multiTfMode ? [{ id: 'htf-overlay', icon: <Layers size={18} />, label: 'HTF Overlay', action: () => setShowHTF(v => !v) }] : []),
     { id: 'alerts', icon: <Bell size={18} />, label: 'Alerts', action: () => setRightPanelTab('alerts') },
@@ -249,7 +272,7 @@ export const LeftToolbar: React.FC = () => {
           key={action.id}
           onClick={action.action}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL) || (action.id === 'vpvr' && hasVPVR) || (action.id === 'imbalance' && hasImbalance) || (action.id === 'htf-overlay' && hasHTF)
+            (action.id === 'bbands' && hasBBands) || (action.id === 'pivot-hl' && hasPivotHL) || (action.id === 'vpvr' && hasVPVR) || (action.id === 'tpo' && hasTPO) || (action.id === 'imbalance' && hasImbalance) || (action.id === 'htf-overlay' && hasHTF)
               ? 'bg-primary/15 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}

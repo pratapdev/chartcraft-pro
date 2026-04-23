@@ -143,7 +143,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'TPO';
 
 export interface IndicatorConfig {
   id: string;
