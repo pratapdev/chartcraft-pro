@@ -515,7 +515,32 @@ export const PanelDrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, pane
             if (y !== null && Math.abs(my - (y as number)) < 8) {
               setSelectedFibId(fib.id);
               setPanelSelectedTrendlineId(panelIndex, null);
+              setPanelSelectedRiskRewardId(panelIndex, null);
               e.preventDefault(); e.stopPropagation(); return;
+            }
+          }
+        }
+      }
+
+      // Check risk/reward hit
+      if (series && riskRewardDrawings.length > 0) {
+        const timeScale = chartRef.current?.timeScale();
+        for (const rr of riskRewardDrawings) {
+          const entryY = series.priceToCoordinate(rr.entryPrice);
+          const slY = series.priceToCoordinate(rr.stopLoss);
+          const tpY = series.priceToCoordinate(rr.takeProfit);
+          const x1 = timeScale ? timeScale.timeToCoordinate(rr.entryTime as Time) : null;
+          if (entryY !== null && slY !== null && tpY !== null && x1 !== null) {
+            const minY = Math.min(tpY as number, slY as number);
+            const maxY = Math.max(tpY as number, slY as number);
+            const boxW = 120;
+            if (my >= minY - 5 && my <= maxY + 5 && mx >= x1 && mx <= x1 + boxW) {
+              setPanelSelectedRiskRewardId(panelIndex, rr.id);
+              setPanelSelectedTrendlineId(panelIndex, null);
+              setSelectedFibId(null);
+              e.preventDefault();
+              e.stopPropagation();
+              return;
             }
           }
         }
@@ -525,7 +550,7 @@ export const PanelDrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, pane
       setSelectedFibId(null);
       setPanelSelectedRiskRewardId(panelIndex, null);
     },
-    [activeTool, hitTest, trendlines, lineToPixels, pixelToCoords, panelIndex, symbol, timeframe, panelCandles, drawingDefaults]
+    [activeTool, hitTest, trendlines, lineToPixels, pixelToCoords, panelIndex, symbol, timeframe, panelCandles, drawingDefaults, riskRewardDrawings, fibonacciDrawings, chartRef]
   );
 
   const handleMouseMove = useCallback(
@@ -704,6 +729,7 @@ export const PanelDrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, pane
           const { mx, my } = getPos(e.nativeEvent);
           if (activeTool === 'cursor' && !hitTest(mx, my)) {
             let fibHit = false;
+            let rrHit = false;
             const series = seriesRef.current;
             if (series) {
               for (const fib of fibonacciDrawings) {
@@ -719,8 +745,28 @@ export const PanelDrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, pane
                 }
                 if (fibHit) break;
               }
+              
+              if (!fibHit && riskRewardDrawings.length > 0) {
+                const timeScale = chartRef.current?.timeScale();
+                for (const rr of riskRewardDrawings) {
+                  const entryY = series.priceToCoordinate(rr.entryPrice);
+                  const slY = series.priceToCoordinate(rr.stopLoss);
+                  const tpY = series.priceToCoordinate(rr.takeProfit);
+                  const x1 = timeScale ? timeScale.timeToCoordinate(rr.entryTime as Time) : null;
+                  if (entryY !== null && slY !== null && tpY !== null && x1 !== null) {
+                    const minY = Math.min(tpY as number, slY as number);
+                    const maxY = Math.max(tpY as number, slY as number);
+                    const boxW = 120;
+                    if (my >= minY - 5 && my <= maxY + 5 && mx >= x1 && mx <= x1 + boxW) {
+                      rrHit = true;
+                      handleMouseDown(e);
+                      break;
+                    }
+                  }
+                }
+              }
             }
-            if (!fibHit) {
+            if (!fibHit && !rrHit) {
               if (eventLayerRef.current) {
                 eventLayerRef.current.style.pointerEvents = 'none';
                 const el = document.elementFromPoint(e.clientX, e.clientY);

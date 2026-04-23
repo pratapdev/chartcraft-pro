@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useMultiPanelStore } from '@/stores/multiPanelStore';
 import { RiskRewardDrawing } from '@/types/trading';
-import { Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Trash2, TrendingUp, TrendingDown, Settings2, X, Check } from 'lucide-react';
 
 interface Props {
   panelIndex: number;
@@ -20,6 +20,8 @@ export const PanelRiskRewardToolbar: React.FC<Props> = ({ panelIndex, chartRef, 
   const setPanelSelectedRiskRewardId = useMultiPanelStore((s) => s.setPanelSelectedRiskRewardId);
 
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState({ entry: 0, tp: 0, sl: 0 });
   
   if (!panel) return null;
 
@@ -102,6 +104,24 @@ export const PanelRiskRewardToolbar: React.FC<Props> = ({ panelIndex, chartRef, 
     setPanelSelectedRiskRewardId(panelIndex, null);
   };
 
+  const handleEditOpen = () => {
+    setEditValues({
+      entry: selectedRR.entryPrice,
+      tp: selectedRR.takeProfit,
+      sl: selectedRR.stopLoss,
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    updatePanelRiskReward(panelIndex, selectedRR.id, {
+      entryPrice: editValues.entry,
+      takeProfit: editValues.tp,
+      stopLoss: editValues.sl,
+    });
+    setIsEditing(false);
+  };
+
   return (
     <div
       className="absolute z-30 flex items-center gap-0.5 rounded-md px-1 py-0.5 shadow-lg border pointer-events-auto"
@@ -113,18 +133,60 @@ export const PanelRiskRewardToolbar: React.FC<Props> = ({ panelIndex, chartRef, 
         borderColor: 'hsl(var(--border))',
       }}
     >
-      <ToolbarBtn
-        icon={isLong ? <TrendingDown size={13} /> : <TrendingUp size={13} />}
-        tooltip={`Flip to ${isLong ? 'Short' : 'Long'}`}
-        onClick={flipSetup}
-      />
-      <div className="w-px h-4 mx-0.5" style={{ background: 'hsl(var(--border))' }} />
-      <ToolbarBtn
-        icon={<Trash2 size={13} />}
-        tooltip="Delete"
-        onClick={handleDelete}
-        destructive
-      />
+      {isEditing ? (
+        <div className="flex items-center gap-2 p-1 px-2 text-xs text-foreground">
+          <div className="flex flex-col gap-1 w-20">
+            <label className="text-[9px] text-muted-foreground uppercase">Entry</label>
+            <input 
+              type="number" step="0.01" 
+              className="bg-accent/50 rounded px-1 py-0.5 w-full outline-none no-spinners" 
+              value={editValues.entry} 
+              onChange={e => setEditValues(v => ({ ...v, entry: parseFloat(e.target.value) || 0 }))} 
+            />
+          </div>
+          <div className="flex flex-col gap-1 w-20">
+            <label className="text-[9px] text-green-500 uppercase">TP</label>
+            <input 
+              type="number" step="0.01" 
+              className="bg-green-500/10 text-green-400 rounded px-1 py-0.5 w-full outline-none no-spinners" 
+              value={editValues.tp} 
+              onChange={e => setEditValues(v => ({ ...v, tp: parseFloat(e.target.value) || 0 }))} 
+            />
+          </div>
+          <div className="flex flex-col gap-1 w-20">
+            <label className="text-[9px] text-red-500 uppercase">SL</label>
+            <input 
+              type="number" step="0.01" 
+              className="bg-red-500/10 text-red-400 rounded px-1 py-0.5 w-full outline-none no-spinners" 
+              value={editValues.sl} 
+              onChange={e => setEditValues(v => ({ ...v, sl: parseFloat(e.target.value) || 0 }))} 
+            />
+          </div>
+          <div className="w-px h-6 bg-border mx-1" />
+          <ToolbarBtn icon={<Check size={13} />} tooltip="Save" onClick={handleSave} className="text-green-500" />
+          <ToolbarBtn icon={<X size={13} />} tooltip="Cancel" onClick={() => setIsEditing(false)} />
+        </div>
+      ) : (
+        <>
+          <ToolbarBtn
+            icon={<Settings2 size={13} />}
+            tooltip="Settings"
+            onClick={handleEditOpen}
+          />
+          <ToolbarBtn
+            icon={isLong ? <TrendingDown size={13} /> : <TrendingUp size={13} />}
+            tooltip={`Flip to ${isLong ? 'Short' : 'Long'}`}
+            onClick={flipSetup}
+          />
+          <div className="w-px h-4 mx-0.5" style={{ background: 'hsl(var(--border))' }} />
+          <ToolbarBtn
+            icon={<Trash2 size={13} />}
+            tooltip="Delete"
+            onClick={handleDelete}
+            destructive
+          />
+        </>
+      )}
     </div>
   );
 };
@@ -134,13 +196,14 @@ const ToolbarBtn: React.FC<{
   tooltip: string;
   onClick: () => void;
   destructive?: boolean;
-}> = ({ icon, tooltip, onClick, destructive }) => (
+  className?: string;
+}> = ({ icon, tooltip, onClick, destructive, className }) => (
   <button
     onClick={onClick}
     title={tooltip}
-    className="flex items-center justify-center w-7 h-7 rounded transition-colors"
+    className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${className || ''}`}
     style={{
-      color: destructive ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))',
+      color: destructive ? 'hsl(var(--destructive))' : className ? undefined : 'hsl(var(--muted-foreground))',
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.background = 'hsl(var(--accent))';

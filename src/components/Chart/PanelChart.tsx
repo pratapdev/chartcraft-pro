@@ -18,6 +18,7 @@ import { PanelVPVROverlay } from './PanelVPVROverlay';
 import { PanelTPOOverlay } from './PanelTPOOverlay';
 import { PanelTrendlineToolbar } from './PanelTrendlineToolbar';
 import { PanelRiskRewardToolbar } from './PanelRiskRewardToolbar';
+import { PanelDOM } from './PanelDOM';
 import { Timeframe } from '@/types/trading';
 import { useChartStore } from '@/stores/chartStore';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
@@ -25,6 +26,7 @@ import {
   BarChart3,
   Activity,
   Zap,
+  ListTree,
 } from 'lucide-react';
 
 const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
@@ -55,7 +57,8 @@ export const PanelChart: React.FC = () => {
   const setPanelCrosshairData = useMultiPanelStore((s) => s.setPanelCrosshairData);
   const addPanelIndicator = useMultiPanelStore((s) => s.addPanelIndicator);
   const setSyncCrosshairTime = useMultiPanelStore((s) => s.setSyncCrosshairTime);
-
+  const setPanelMode = useMultiPanelStore((s) => s.setPanelMode);
+  
   const chartFontSize = useChartStore((s) => s.chartFontSize);
   const isActive = activePanelIndex === panelIndex;
 
@@ -63,6 +66,7 @@ export const PanelChart: React.FC = () => {
   const indicators = panel?.indicators ?? [];
   const symbol = panel?.symbol ?? 'BTC/USD';
   const timeframe = panel?.timeframe ?? '1h';
+  const mode = panel?.mode ?? 'chart';
 
   // Overlay indicators (EMA, SMA, BBands, etc.) — reuse the existing hook!
   const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, indicators);
@@ -355,6 +359,21 @@ export const PanelChart: React.FC = () => {
           >
             <Zap size={10} />
           </button>
+          
+          <div className="w-px h-3 bg-border mx-1" />
+          
+          <button
+            onClick={() => setPanelMode(panelIndex, mode === 'chart' ? 'dom' : 'chart')}
+            className={`text-[9px] px-1 py-0.5 rounded transition-colors flex items-center gap-1 ${
+              mode === 'dom'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+            title="Toggle DOM Ladder"
+          >
+            <ListTree size={10} />
+            <span className="sr-only">DOM</span>
+          </button>
         </div>
 
         {/* OHLCV legend */}
@@ -380,20 +399,28 @@ export const PanelChart: React.FC = () => {
         )}
       </div>
 
-      {/* Main chart area — flex-1 with min-h-[80px] so it always shrinks to make room for indicator panes */}
-      <div className="flex-1 relative min-h-[80px]">
-        <div ref={containerRef} className="w-full h-full" />
-        <PanelDrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
-        <PanelVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
-        <PanelTPOOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
-        <PanelTrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
-        <PanelRiskRewardToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
-      </div>
+      {mode === 'dom' ? (
+        <div className="flex-1 overflow-hidden">
+          <PanelDOM panelIndex={panelIndex} />
+        </div>
+      ) : (
+        <>
+          {/* Main chart area — flex-1 with min-h-[80px] so it always shrinks to make room for indicator panes */}
+          <div className="flex-1 relative min-h-[80px]">
+            <div ref={containerRef} className="w-full h-full" />
+            <PanelDrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+            <PanelVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+            <PanelTPOOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+            <PanelTrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+            <PanelRiskRewardToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+          </div>
 
-      {/* Sub-chart indicator panes — each shrinkable, max 30% height of panel */}
-      {subIndicators.map((ind) => (
-        <PanelIndicatorPane key={ind.id} indicator={ind} panelIndex={panelIndex} subCount={subIndicators.length} />
-      ))}
+          {/* Sub-chart indicator panes — each shrinkable, max 30% height of panel */}
+          {subIndicators.map((ind) => (
+            <PanelIndicatorPane key={ind.id} indicator={ind} panelIndex={panelIndex} subCount={subIndicators.length} />
+          ))}
+        </>
+      )}
     </div>
   );
 };

@@ -115,6 +115,65 @@ export function subscribeToCandles(
   };
 }
 
+export interface OrderBookLevel {
+  price: number;
+  quantity: number;
+}
+
+export interface OrderBookDepth {
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+  lastUpdateId: number;
+}
+
+export function subscribeToOrderBook(
+  symbol: string,
+  onUpdate: (depth: OrderBookDepth) => void
+): () => void {
+  const binanceSymbol = toBinanceSymbol(symbol).toLowerCase();
+  const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@depth20@100ms`;
+
+  let ws: WebSocket | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout>;
+  let alive = true;
+
+  function connect() {
+    if (!alive) return;
+    ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.lastUpdateId && msg.bids && msg.asks) {
+          onUpdate({
+            lastUpdateId: msg.lastUpdateId,
+            bids: msg.bids.map((b: string[]) => ({ price: parseFloat(b[0]), quantity: parseFloat(b[1]) })),
+            asks: msg.asks.map((a: string[]) => ({ price: parseFloat(a[0]), quantity: parseFloat(a[1]) })),
+          });
+        }
+      } catch {}
+    };
+
+    ws.onclose = () => {
+      if (alive) {
+        reconnectTimeout = setTimeout(connect, 2000);
+      }
+    };
+
+    ws.onerror = () => {
+      ws?.close();
+    };
+  }
+
+  connect();
+
+  return () => {
+    alive = false;
+    clearTimeout(reconnectTimeout);
+    ws?.close();
+  };
+}
+
 // Fallback data generator
 function generateFallbackData(count: number): Candle[] {
   const candles: Candle[] = [];

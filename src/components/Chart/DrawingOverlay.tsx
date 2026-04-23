@@ -706,14 +706,17 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
       // Check risk/reward hit
       if (series && riskRewardDrawings.length > 0) {
+        const timeScale = chartRef.current?.timeScale();
         for (const rr of riskRewardDrawings) {
           const entryY = series.priceToCoordinate(rr.entryPrice);
           const slY = series.priceToCoordinate(rr.stopLoss);
           const tpY = series.priceToCoordinate(rr.takeProfit);
-          if (entryY !== null && slY !== null && tpY !== null) {
+          const x1 = timeScale ? timeScale.timeToCoordinate(rr.entryTime as Time) : null;
+          if (entryY !== null && slY !== null && tpY !== null && x1 !== null) {
             const minY = Math.min(tpY as number, slY as number);
             const maxY = Math.max(tpY as number, slY as number);
-            if (my >= minY - 5 && my <= maxY + 5) {
+            const boxW = 120;
+            if (my >= minY - 5 && my <= maxY + 5 && mx >= x1 && mx <= x1 + boxW) {
               setSelectedRiskRewardId(rr.id);
               setSelectedTrendlineId(null);
               setSelectedFibId(null);
@@ -731,7 +734,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       setFibDeletePos(null);
       setSelectedRiskRewardId(null);
     },
-    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
+    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool, riskRewardDrawings, fibonacciDrawings, chartRef]
   );
 
   const handleMouseMove = useCallback(
@@ -1014,6 +1017,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
             // Check if clicking on a fib level
             const series = seriesRef.current;
             let fibHit = false;
+            let rrHit = false;
             if (series) {
               for (const fib of fibonacciDrawings) {
                 const diff = fib.endPrice - fib.startPrice;
@@ -1028,8 +1032,28 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
                 }
                 if (fibHit) break;
               }
+              
+              if (!fibHit && riskRewardDrawings.length > 0) {
+                const timeScale = chartRef.current?.timeScale();
+                for (const rr of riskRewardDrawings) {
+                  const entryY = series.priceToCoordinate(rr.entryPrice);
+                  const slY = series.priceToCoordinate(rr.stopLoss);
+                  const tpY = series.priceToCoordinate(rr.takeProfit);
+                  const x1 = timeScale ? timeScale.timeToCoordinate(rr.entryTime as Time) : null;
+                  if (entryY !== null && slY !== null && tpY !== null && x1 !== null) {
+                    const minY = Math.min(tpY as number, slY as number);
+                    const maxY = Math.max(tpY as number, slY as number);
+                    const boxW = 120;
+                    if (my >= minY - 5 && my <= maxY + 5 && mx >= x1 && mx <= x1 + boxW) {
+                      rrHit = true;
+                      handleMouseDown(e);
+                      break;
+                    }
+                  }
+                }
+              }
             }
-            if (!fibHit) {
+            if (!fibHit && !rrHit) {
               // Temporarily disable pointer events so the chart gets this click
               if (eventLayerRef.current) {
                 eventLayerRef.current.style.pointerEvents = 'none';

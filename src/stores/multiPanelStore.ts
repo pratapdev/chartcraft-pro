@@ -38,6 +38,7 @@ export interface PanelState {
     trendline: { color: string; thickness: number; lineStyle: LineStyleType };
     horizontal: { color: string; thickness: number; lineStyle: LineStyleType };
   };
+  mode?: 'chart' | 'dom';
 }
 
 const DEFAULT_DRAWING_DEFAULTS = {
@@ -97,6 +98,7 @@ interface MultiPanelStore {
   setPanelCandles: (index: number, candles: Candle[]) => void;
   updatePanelLastCandle: (index: number, candle: Candle) => void;
   setPanelLoading: (index: number, loading: boolean) => void;
+  setPanelMode: (index: number, mode: 'chart' | 'dom') => void;  
   loadPanelCandles: (index: number) => Promise<void>;
 
   // Per-panel: indicators
@@ -200,6 +202,10 @@ export const useMultiPanelStore = create<MultiPanelStore>()(
 
       setPanelLoading: (index, loading) => {
         set({ panels: updatePanel(get().panels, index, { loading }) });
+      },
+
+      setPanelMode: (index, mode) => {
+        set({ panels: updatePanel(get().panels, index, { mode }) });
       },
 
       loadPanelCandles: async (index) => {
