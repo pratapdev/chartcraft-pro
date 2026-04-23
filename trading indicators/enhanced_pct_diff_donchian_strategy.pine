@@ -1,0 +1,453 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © techsavvypratap — Enhanced by quant analysis
+
+//@version=5
+indicator("Enhanced Pct Diff + Dual Donchian Strategy", timeframe='', timeframe_gaps=false, max_lines_count=500, max_labels_count=500)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ INPUT CONFIGURATION ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// --- Core Oscillator ---
+grp1 = "═══ Core Oscillator ═══"
+src           = input.source(close, "Source", group=grp1)
+emaLength     = input.int(20, "EMA Length", minval=1, group=grp1)
+lookback      = input.int(10, "Lookback Window", minval=1, group=grp1)
+signalEmaLen  = input.int(5, "Signal EMA Length", minval=1, group=grp1)
+useZScore     = input.bool(true, "Use Z-Score Normalization", tooltip="Normalizes the oscillator to a standard distribution — makes thresholds comparable across all assets and timeframes", group=grp1)
+
+// --- Dual Donchian Channels ---
+grp2 = "═══ Dual Donchian Channels ═══"
+donLength     = input.int(20, "Channel Length", minval=1, group=grp2)
+offsetVal     = input.int(0, "Offset", group=grp2)
+innerPct      = input.float(20.0, "Inner Channel % of Range", minval=1, maxval=49, step=1, tooltip="How far inward the inner channel sits (as % of Donchian range). Lower = tighter inner band", group=grp2)
+outerPct      = input.float(80.0, "Outer Extreme % of Range", minval=51, maxval=100, step=1, tooltip="How far outward the extreme zone extends (as % of Donchian range). Higher = wider extreme band", group=grp2)
+
+// --- Trend Filter ---
+grp3 = "═══ Trend Filter ═══"
+useTrendFilter  = input.bool(true, "Enable Trend Filter", group=grp3)
+fastTrendLen    = input.int(50, "Fast Trend EMA", minval=1, group=grp3)
+slowTrendLen    = input.int(200, "Slow Trend EMA", minval=1, group=grp3)
+trendMode       = input.string("Dual EMA", "Trend Method", options=["Dual EMA", "Single EMA", "Off"], group=grp3)
+
+// --- Regime Filter (ADX) ---
+grp4 = "═══ Regime Filter ═══"
+useRegimeFilter = input.bool(true, "Enable Regime Filter", group=grp4)
+adxLength       = input.int(14, "ADX Length", minval=1, group=grp4)
+adxThreshold    = input.int(20, "Trending Threshold", minval=1, group=grp4)
+regimeMode      = input.string("Both", "Allowed Regimes", options=["Both", "Trending Only", "Ranging Only"], tooltip="Trending Only: signals only when ADX > threshold. Ranging Only: signals only when ADX < threshold", group=grp4)
+
+// --- Volume Filter ---
+grp5 = "═══ Volume Filter ═══"
+useVolFilter    = input.bool(true, "Enable Volume Filter", group=grp5)
+volMaLen        = input.int(20, "Volume MA Length", minval=1, group=grp5)
+volThreshold    = input.float(1.0, "Volume Ratio Threshold", step=0.1, tooltip="Breakout signals require volume > threshold * average", group=grp5)
+
+// --- Divergence Detection ---
+grp6 = "═══ Divergence ═══"
+useDivergence   = input.bool(true, "Enable Divergence", group=grp6)
+divLookback     = input.int(5, "Pivot Lookback Bars", minval=2, group=grp6)
+
+// --- Signal Types ---
+grp7 = "═══ Signal Configuration ═══"
+useMeanRevSig   = input.bool(true, "Mean Reversion Signals", tooltip="Counter-trend entry at channel extremes with reversal confirmation", group=grp7)
+useBreakoutSig  = input.bool(true, "Momentum Breakout Signals", tooltip="Trend-continuation entry when oscillator breaks inner channel", group=grp7)
+useZeroCrossSig = input.bool(true, "Zero-Cross Signals", tooltip="Momentum shift entry when oscillator crosses zero line", group=grp7)
+useBasisCrossSig= input.bool(true, "Basis-Cross Signals", tooltip="Entry when signal line crosses Donchian basis", group=grp7)
+minQuality      = input.int(2, "Minimum Signal Quality (1-4)", minval=1, maxval=4, tooltip="Higher = fewer but higher-quality signals. Score is based on trend + volume + momentum alignment", group=grp7)
+
+// --- Exit Configuration ---
+grp8 = "═══ Exit Logic ═══"
+useExitSignals  = input.bool(true, "Enable Exit Signals", group=grp8)
+exitOnBasis     = input.bool(true, "Exit on Basis Cross", tooltip="Close position when oscillator crosses back to Donchian basis", group=grp8)
+exitOnOpposite  = input.bool(true, "Exit on Opposite Signal", tooltip="Close long on short signal and vice versa", group=grp8)
+
+// --- Visual Settings ---
+grp9 = "═══ Visual Settings ═══"
+invertPlot      = input.bool(false, "Invert Plot", group=grp9)
+showBarColor    = input.bool(true, "Color Price Bars", group=grp9)
+showSignals     = input.bool(true, "Show Signal Markers", group=grp9)
+showZones       = input.bool(true, "Show Zone Fills", group=grp9)
+showDivergence  = input.bool(true, "Show Divergence Markers", group=grp9)
+showInfoTable   = input.bool(true, "Show Info Table", group=grp9)
+showTrendArrows = input.bool(true, "Show Trend Filter Status", group=grp9)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ CORE OSCILLATOR CALCULATION ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// EMA of the source price
+emaSrc = ta.ema(src, emaLength)
+
+// Rolling average of the EMA over the lookback window
+emaSum = 0.0
+for i = 0 to lookback - 1
+    emaSum := emaSum + nz(emaSrc[i], 0)
+emaAvg = emaSum / lookback
+
+// Raw percentage difference
+pctDiffRaw = ((emaSrc - emaAvg) / emaAvg) * 100
+
+// Z-Score Normalization — makes the oscillator statistically comparable across all instruments
+// Without this, a 2% move on BTC and a 2% move on SPY have very different meanings
+pctDiffStd = ta.stdev(pctDiffRaw, lookback * 3)
+pctDiffMean = ta.sma(pctDiffRaw, lookback * 3)
+pctDiff = useZScore and pctDiffStd > 0 ? (pctDiffRaw - pctDiffMean) / pctDiffStd : pctDiffRaw
+
+// Signal line — smoothed version of the oscillator for crossover logic
+signalLine = ta.ema(pctDiff, signalEmaLen)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ DUAL DONCHIAN CHANNELS ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Outer Donchian — the full channel
+donLower  = ta.lowest(pctDiff, donLength)
+donUpper  = ta.highest(pctDiff, donLength)
+donBasis  = math.avg(donUpper, donLower)
+donRange  = donUpper - donLower
+
+// Inner Channel — tighter band for momentum breakouts
+// Uses percentage of the Donchian range (symmetric, unlike the original)
+innerUpper = donBasis + (donRange * innerPct / 100) / 2
+innerLower = donBasis - (donRange * innerPct / 100) / 2
+
+// Extreme Zones — outside the standard Donchian for mean reversion
+extUpper = donBasis + (donRange * outerPct / 100) / 2
+extLower = donBasis - (donRange * outerPct / 100) / 2
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ TREND FILTER ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fastEma = ta.ema(close, fastTrendLen)
+slowEma = ta.ema(close, slowTrendLen)
+
+isUptrend = trendMode == "Off" ? true : trendMode == "Single EMA" ? close > fastEma :close > fastEma and fastEma > slowEma  // Dual EMA — strongest filter
+
+isDowntrend = trendMode == "Off" ? true : trendMode == "Single EMA" ? close < fastEma :close < fastEma and fastEma < slowEma
+
+trendDirection = isUptrend ? 1 : isDowntrend ? -1 : 0
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ REGIME FILTER (ADX) ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+[diPlus, diMinus, adxValue] = ta.dmi(adxLength, adxLength)
+isTrending = adxValue > adxThreshold
+isRanging  = adxValue < adxThreshold
+
+regimeAllowed = not useRegimeFilter ? true : regimeMode == "Both" ? true : regimeMode == "Trending Only" ? isTrending : regimeMode == "Ranging Only" ? isRanging : true
+
+// Mean reversion works best in ranging markets, breakouts in trending
+regimeForSignal(signalType) =>
+    if not useRegimeFilter
+        true
+    else if signalType == "meanrev"
+        regimeMode == "Trending Only" ? isRanging : true  // Override: mean rev better in ranges
+    else if signalType == "breakout"
+        regimeMode == "Ranging Only" ? isTrending : true  // Override: breakouts better in trends
+    else
+        regimeAllowed
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ VOLUME FILTER ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+volMa = ta.sma(volume, volMaLen)
+volRatio = volume / volMa
+volConfirmed = not useVolFilter or (volRatio > volThreshold)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ DIVERGENCE DETECTION ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Pivot detection on both price and oscillator
+pivotHighOsc   = ta.pivothigh(pctDiff, divLookback, divLookback)
+pivotLowOsc    = ta.pivotlow(pctDiff, divLookback, divLookback)
+pivotHighPrice = ta.pivothigh(close, divLookback, divLookback)
+pivotLowPrice  = ta.pivotlow(close, divLookback, divLookback)
+
+lookbackIdx = divLookback
+
+// Bearish Divergence: Price makes higher high but oscillator makes lower high → weakening momentum
+bearishDiv = useDivergence and not na(pivotHighOsc) and not na(pivotHighPrice) and close > nz(close[lookbackIdx], close) and  pctDiff < nz(pctDiff[lookbackIdx], pctDiff) and close[lookbackIdx] > nz(close[lookbackIdx * 2], close[lookbackIdx])
+
+// Bullish Divergence: Price makes lower low but oscillator makes higher low → selling exhaustion
+bullishDiv = useDivergence and not na(pivotLowOsc) and not na(pivotLowPrice) and close < nz(close[lookbackIdx], close) and  pctDiff > nz(pctDiff[lookbackIdx], pctDiff) and close[lookbackIdx] < nz(close[lookbackIdx * 2], close[lookbackIdx])
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ SIGNAL QUALITY SCORING ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Score from 0 to 4 based on confluence of factors
+qualityScore(isLong) =>
+    score = 0
+    // 1) Trend alignment — most important factor
+    score += (isLong and isUptrend) or (not isLong and isDowntrend) ? 1 : 0
+    // 2) Volume confirmation
+    score += volConfirmed ? 1 : 0
+    // 3) Signal line direction confirms momentum
+    score += (isLong and signalLine > signalLine[1]) or (not isLong and signalLine < signalLine[1]) ? 1 : 0
+    // 4) Oscillator position relative to basis confirms direction
+    score += (isLong and pctDiff > donBasis) or (not isLong and pctDiff < donBasis) ? 1 : 0
+    score
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ SIGNAL GENERATION ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// --- Mean Reversion Signals ---
+// Oscillator is at extreme (beyond outer channel) and starts reversing back
+// This is the highest-probability signal — extremes revert to mean
+meanRevLong  = useMeanRevSig and pctDiff < extLower and ta.crossover(pctDiff, extLower) and (not useTrendFilter or isUptrend) and qualityScore(true) >= minQuality
+
+meanRevShort = useMeanRevSig and pctDiff > extUpper and ta.crossunder(pctDiff, extUpper) and (not useTrendFilter or isDowntrend) and qualityScore(false) >= minQuality
+
+// --- Momentum Breakout Signals ---
+// Oscillator breaks above inner channel with volume and trend confirmation
+// Strong momentum continuation signal
+breakoutLong  = useBreakoutSig and ta.crossover(pctDiff, innerUpper) and volConfirmed and (not useTrendFilter or isUptrend) and qualityScore(true) >= minQuality
+
+breakoutShort = useBreakoutSig and ta.crossunder(pctDiff, innerLower) and volConfirmed and (not useTrendFilter or isDowntrend) and qualityScore(false) >= minQuality
+
+// --- Zero-Cross Signals ---
+// Oscillator crosses zero — momentum direction change
+// Good for catching early trend shifts
+zeroCrossLong  = useZeroCrossSig and ta.crossover(pctDiff, 0) and (not useTrendFilter or isUptrend) and qualityScore(true) >= minQuality
+
+zeroCrossShort = useZeroCrossSig and ta.crossunder(pctDiff, 0) and (not useTrendFilter or isDowntrend) and qualityScore(false) >= minQuality
+
+// --- Basis-Cross Signals ---
+// Signal line crosses the Donchian basis — mid-channel momentum shift
+basisCrossLong  = useBasisCrossSig and ta.crossover(signalLine, donBasis) and pctDiff > 0 and (not useTrendFilter or isUptrend) and qualityScore(true) >= minQuality
+
+basisCrossShort = useBasisCrossSig and ta.crossunder(signalLine, donBasis) and pctDiff < 0 and (not useTrendFilter or isDowntrend) and qualityScore(false) >= minQuality
+
+// --- Divergence Signals ---
+// Divergence is a leading indicator — early warning of potential reversal
+divLong  = bullishDiv and (not useTrendFilter or isUptrend)
+divShort = bearishDiv and (not useTrendFilter or isDowntrend)
+
+// --- Combined Entry Signals ---
+longSignal  = (meanRevLong or breakoutLong or zeroCrossLong or basisCrossLong) and regimeAllowed
+shortSignal = (meanRevShort or breakoutShort or zeroCrossShort or basisCrossShort) and regimeAllowed
+
+// --- Signal Type Labels ---
+longType = meanRevLong ? "MR" : breakoutLong ? "BO" : zeroCrossLong ? "ZC" : basisCrossLong ? "BC" : divLong ? "DIV" : ""
+shortType = meanRevShort ? "MR" : breakoutShort ? "BO" : zeroCrossShort ? "ZC" : basisCrossShort ? "BC" : divShort ? "DIV" : ""
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ EXIT SIGNAL LOGIC ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Track position state
+var int posDirection = 0  // 0 = flat, 1 = long, -1 = short
+var float entryPctDiff = na
+
+if longSignal
+    posDirection := 1
+    entryPctDiff := pctDiff
+if shortSignal
+    posDirection := -1
+    entryPctDiff := pctDiff
+
+// Exit conditions
+exitLong  = useExitSignals and posDirection == 1 and ( (exitOnBasis and ta.crossunder(pctDiff, donBasis)) or (exitOnOpposite and shortSignal))
+
+exitShort = useExitSignals and posDirection == -1 and ( (exitOnBasis and ta.crossover(pctDiff, donBasis)) or (exitOnOpposite and longSignal))
+
+if exitLong or exitShort
+    posDirection := 0
+    entryPctDiff := na
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ ZONE DETERMINATION ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+zone = pctDiff > extUpper ? 3 :    pctDiff > donUpper ? 2 :    pctDiff > innerUpper ? 1 :    pctDiff > donBasis ? 0.5 :    pctDiff < extLower ? -3 :    pctDiff < donLower ? -2 :    pctDiff < innerLower ? -1 :    pctDiff < donBasis ? -0.5 : 0
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ PLOTTING ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Apply invert if needed
+plotOsc  = invertPlot ? -pctDiff : pctDiff
+plotSig  = invertPlot ? -signalLine : signalLine
+plotBasis = invertPlot ? -donBasis : donBasis
+plotIUpper = invertPlot ? -innerUpper : innerUpper
+plotILower = invertPlot ? -innerLower : innerLower
+plotOUpper = invertPlot ? -donUpper : donUpper
+plotOLower = invertPlot ? -donLower : donLower
+plotEUpper = invertPlot ? -extUpper : extUpper
+plotELower = invertPlot ? -extLower : extLower
+plotZero = 0
+
+// --- Main Oscillator Line ---
+oscColor = invertPlot ? (pctDiff > 0 ? color.red : pctDiff < 0 ? color.green : color.gray) : (pctDiff > 0 ? color.green : pctDiff < 0 ? color.red : color.gray)
+plot(plotOsc, "Oscillator", color=oscColor, linewidth=2, style=plot.style_line)
+
+// --- Signal Line ---
+plot(plotSig, "Signal Line", color=color.new(color.white, 30), linewidth=2, style=plot.style_line)
+
+// --- Zero Line ---
+hline(0, "Zero Line", color=color.new(color.gray, 60), linestyle=hline.style_dotted)
+
+// --- Donchian Basis ---
+plot(plotBasis, "Basis", color=#FF6D00, linewidth=1, offset=offsetVal, title="Donchian Basis")
+
+// --- Inner Channel ---
+pIUpper = plot(plotIUpper, "Inner Upper", color=color.new(color.white, 40), linewidth=1, offset=offsetVal)
+pILower = plot(plotILower, "Inner Lower", color=color.new(color.white, 40), linewidth=1, offset=offsetVal)
+
+// --- Outer Donchian ---
+pOUpper = plot(plotOUpper, "Upper", color=color.new(color.white, 70), linewidth=1, offset=offsetVal)
+pOLower = plot(plotOLower, "Lower", color=color.new(color.white, 70), linewidth=1, offset=offsetVal)
+
+// --- Extreme Zones ---
+pEUpper = plot(plotEUpper, "Extreme Upper", color=color.new(color.gray, 50), linewidth=1, style=plot.style_stepline, offset=offsetVal)
+pELower = plot(plotELower, "Extreme Lower", color=color.new(color.gray, 50), linewidth=1, style=plot.style_stepline, offset=offsetVal)
+
+// --- Zone Fills ---
+// Extreme zones (outermost — strongest signal)
+fill(pEUpper, pOUpper, color=showZones ? color.new(color.green, 82) : na, title="Extreme Bull Zone")
+fill(pELower, pOLower, color=showZones ? color.new(color.red, 82) : na, title="Extreme Bear Zone")
+
+// Momentum zones (between outer and inner)
+fill(pOUpper, pIUpper, color=showZones ? color.new(color.green, 90) : na, title="Bull Momentum Zone")
+fill(pOLower, pILower, color=showZones ? color.new(color.red, 90) : na, title="Bear Momentum Zone")
+
+// Neutral zone (between inner bands)
+fill(pIUpper, pILower, color=showZones ? color.new(color.blue, 93) : na, title="Neutral Zone")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ BAR COLORING ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+barColorLogic = not showBarColor ? na : zone == 3 ? color.new(color.green, 0) :    zone == 2 ? color.new(color.green, 30) :    zone == 1 ? color.new(color.green, 55) :    zone == 0.5 ? color.new(color.teal, 60) :    zone == -3 ? color.new(color.red, 0) :    zone == -2 ? color.new(color.red, 30) :    zone == -1 ? color.new(color.red, 55) :    zone == -0.5 ? color.new(color.maroon, 60) :    color.new(color.gray, 70)
+
+barcolor(barColorLogic)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ SIGNAL MARKERS ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Entry signals with type labels
+plotshape(showSignals and longSignal, title="Long Signal", location=location.bottom, style=shape.triangleup, size=size.small, color=color.green, text=longType, textcolor=color.green, textsize=size.small)
+
+plotshape(showSignals and shortSignal, title="Short Signal", location=location.top, style=shape.triangledown, size=size.small, color=color.red, text=shortType, textcolor=color.red, textsize=size.small)
+
+// Exit signals
+plotshape(showSignals and exitLong, title="Exit Long", location=location.top, style=shape.xcross, size=size.tiny, color=color.new(color.orange, 0))
+
+plotshape(showSignals and exitShort, title="Exit Short", location=location.bottom, style=shape.xcross, size=size.tiny, color=color.new(color.orange, 0))
+
+// Divergence markers
+plotshape(showDivergence and bullishDiv and not longSignal, title="Bullish Divergence", location=location.bottom, style=shape.circle, size=size.tiny, color=color.new(color.lime, 30), text="D+", textcolor=color.new(color.lime, 30), textsize=size.tiny)
+
+plotshape(showDivergence and bearishDiv and not shortSignal, title="Bearish Divergence", location=location.top, style=shape.circle, size=size.tiny, color=color.new(color.fuchsia, 30), text="D-", textcolor=color.new(color.fuchsia, 30), textsize=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ INFORMATION TABLE ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showInfoTable and barstate.islast
+    var table infoTbl = table.new(position.top_right, 2, 8, bgcolor=color.new(color.black, 80), border_width=1, border_color=color.new(color.gray, 80))
+    
+    table.cell(infoTbl, 0, 0, "Metric", text_color=color.white, text_size=size.small, bgcolor=color.new(color.gray, 70))
+    table.cell(infoTbl, 1, 0, "Value", text_color=color.white, text_size=size.small, bgcolor=color.new(color.gray, 70))
+    
+    table.cell(infoTbl, 0, 1, "Oscillator", text_color=color.white, text_size=size.tiny)
+    table.cell(infoTbl, 1, 1, str.tostring(pctDiff, "#.##"), text_color=oscColor, text_size=size.tiny)
+    
+    table.cell(infoTbl, 0, 2, "Zone", text_color=color.white, text_size=size.tiny)
+    zoneStr = zone == 3 ? "EXT BULL" : zone == 2 ? "STR BULL" : zone == 1 ? "MILD BULL" : zone == 0.5 ? "SL BULL" : zone == -3 ? "EXT BEAR" : zone == -2 ? "STR BEAR" : zone == -1 ? "MILD BEAR" : zone == -0.5 ? "SL BEAR" : "NEUTRAL"
+    zoneClr = zone > 0 ? color.green : zone < 0 ? color.red : color.gray
+    table.cell(infoTbl, 1, 2, zoneStr, text_color=zoneClr, text_size=size.tiny)
+    
+    table.cell(infoTbl, 0, 3, "Trend", text_color=color.white, text_size=size.tiny)
+    trendStr = isUptrend ? "BULLISH" : isDowntrend ? "BEARISH" : "NEUTRAL"
+    trendClr = isUptrend ? color.green : isDowntrend ? color.red : color.gray
+    table.cell(infoTbl, 1, 3, trendStr, text_color=trendClr, text_size=size.tiny)
+    
+    table.cell(infoTbl, 0, 4, "ADX", text_color=color.white, text_size=size.tiny)
+    adxStr = isTrending ? "TRENDING" : "RANGING"
+    adxClr = isTrending ? color.orange : color.aqua
+    table.cell(infoTbl, 1, 4, str.tostring(adxValue, "#.#") + " " + adxStr, text_color=adxClr, text_size=size.tiny)
+    
+    table.cell(infoTbl, 0, 5, "Vol Ratio", text_color=color.white, text_size=size.tiny)
+    volClr = volConfirmed ? color.green : color.gray
+    table.cell(infoTbl, 1, 5, str.tostring(volRatio, "#.##") + "x", text_color=volClr, text_size=size.tiny)
+    
+    table.cell(infoTbl, 0, 6, "Position", text_color=color.white, text_size=size.tiny)
+    posStr = posDirection == 1 ? "LONG" : posDirection == -1 ? "SHORT" : "FLAT"
+    posClr = posDirection == 1 ? color.green : posDirection == -1 ? color.red : color.gray
+    table.cell(infoTbl, 1, 6, posStr, text_color=posClr, text_size=size.tiny)
+    
+    table.cell(infoTbl, 0, 7, "Quality", text_color=color.white, text_size=size.tiny)
+    qScore = posDirection != 0 ? qualityScore(posDirection == 1) : 0
+    qClr = qScore >= 3 ? color.green : qScore >= 2 ? color.yellow : color.gray
+    table.cell(infoTbl, 1, 7, str.tostring(qScore) + "/4", text_color=qClr, text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ ALERTS ███
+// ═══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(longSignal, title="🟢 Long Entry", message="Enhanced PctDiff: LONG signal — {{ticker}} {{interval}} | Type: {{plot_0}}")
+alertcondition(shortSignal, title="🔴 Short Entry", message="Enhanced PctDiff: SHORT signal — {{ticker}} {{interval}}")
+alertcondition(exitLong, title="🟠 Exit Long", message="Enhanced PctDiff: EXIT LONG — {{ticker}} {{interval}}")
+alertcondition(exitShort, title="🟠 Exit Short", message="Enhanced PctDiff: EXIT SHORT — {{ticker}} {{interval}}")
+alertcondition(bullishDiv, title="🟡 Bullish Divergence", message="Enhanced PctDiff: BULLISH DIVERGENCE — {{ticker}} {{interval}}")
+alertcondition(bearishDiv, title="🟡 Bearish Divergence", message="Enhanced PctDiff: BEARISH DIVERGENCE — {{ticker}} {{interval}}")
+alertcondition(pctDiff > extUpper, title="⚠️ Extreme Bull Zone", message="Enhanced PctDiff: EXTREME BULL ZONE — {{ticker}} {{interval}}")
+alertcondition(pctDiff < extLower, title="⚠️ Extreme Bear Zone", message="Enhanced PctDiff: EXTREME BEAR ZONE — {{ticker}} {{interval}}")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ███ STRATEGY LOGIC SUMMARY (for reference / conversion to strategy) ███
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// ENTRY SIGNALS (prioritized by expected edge):
+//
+// 1. MEAN REVERSION (MR) — Highest probability
+//    When: Oscillator enters extreme zone and reverses back
+//    Edge: Statistical mean reversion at Donchian extremes
+//    Filter: Trend alignment required (long in uptrend, short in downtrend)
+//    Best in: Ranging markets (ADX < 20)
+//
+// 2. MOMENTUM BREAKOUT (BO) — Strongest momentum
+//    When: Oscillator breaks above inner channel with volume
+//    Edge: Momentum continuation with volume confirmation
+//    Filter: Volume > threshold AND trend alignment
+//    Best in: Trending markets (ADX > 20)
+//
+// 3. ZERO-CROSS (ZC) — Earliest momentum shift
+//    When: Oscillator crosses zero line
+//    Edge: Early trend change detection
+//    Filter: Trend alignment
+//    Risk: More false signals, needs quality filter
+//
+// 4. BASIS-CROSS (BC) — Mid-channel momentum
+//    When: Signal line crosses Donchian basis
+//    Edge: Momentum acceleration within the channel
+//    Filter: Direction alignment + trend
+//
+// 5. DIVERGENCE (DIV) — Leading reversal signal
+//    When: Price-oscillator divergence detected
+//    Edge: Early warning of potential reversal
+//    Use: As confirmation for other signals or standalone with strict quality
+//
+// SIGNAL QUALITY SCORE (0-4):
+//    +1: Trend alignment (price vs fast/slow EMA)
+//    +1: Volume above average
+//    +1: Signal line direction confirms
+//    +1: Oscillator on correct side of basis
+//    Minimum threshold configurable (default: 2/4)
+//
+// EXIT LOGIC:
+//    - Basis cross: Oscillator crosses back to Donchian basis (mean reversion complete)
+//    - Opposite signal: Counter-signal triggered
+//
+// TO CONVERT TO STRATEGY:
+//    Change "indicator()" to "strategy()" and replace signal tracking
+//    with strategy.entry() / strategy.close() calls
+//
+// ═══════════════════════════════════════════════════════════════════════════════

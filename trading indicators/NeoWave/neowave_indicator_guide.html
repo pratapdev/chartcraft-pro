@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEoWave Indicator — How to Use It</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c14;--sur:#0f1724;--sur2:#161f30;--bor:#1c2d48;
+  --teal:#00c9a7;--teal2:rgba(0,201,167,0.12);
+  --red:#ff3d5a;--red2:rgba(255,61,90,0.1);
+  --amber:#f5a623;--amber2:rgba(245,166,35,0.1);
+  --green:#00e48c;--green2:rgba(0,228,140,0.1);
+  --purple:#a78bfa;--purple2:rgba(167,139,250,0.1);
+  --blue:#38bdf8;
+  --txt:#dde6f0;--muted:#4e657e;--dim:#263445;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Outfit',sans-serif;
+}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:14px;line-height:1.6}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+/* LAYOUT */
+.shell{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;flex-shrink:0;background:var(--sur);border-right:1px solid var(--bor);display:flex;flex-direction:column;overflow-y:auto}
+.main{flex:1;overflow-y:auto}
+
+/* SIDEBAR */
+.brand{padding:20px 16px 12px;border-bottom:1px solid var(--bor)}
+.brand-label{font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;font-family:var(--mono)}
+.brand-name{font-size:16px;font-weight:700;color:var(--teal);margin-top:4px}
+.nav-section{padding:12px 8px 4px}
+.nav-section-label{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;padding:0 8px 6px;font-family:var(--mono)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:13px;font-weight:600;border:none;background:transparent;width:100%;text-align:left}
+.nav-item:hover{background:var(--sur2);color:var(--txt)}
+.nav-item.active{background:var(--teal2);color:var(--teal)}
+.nav-item .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.nav-item .badge{margin-left:auto;font-size:9px;padding:2px 6px;border-radius:10px;font-family:var(--mono)}
+.badge-valid{background:var(--green2);color:var(--green)}
+.badge-invalid{background:var(--red2);color:var(--red)}
+.badge-key{background:var(--amber2);color:var(--amber)}
+
+/* CONTENT AREA */
+.page{display:none;padding:28px 32px 60px;max-width:900px}
+.page.active{display:block}
+
+/* TYPOGRAPHY */
+.page-eyebrow{font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;font-family:var(--mono);margin-bottom:8px}
+.page-title{font-size:26px;font-weight:700;line-height:1.2;margin-bottom:8px}
+.page-sub{color:var(--muted);font-size:14px;line-height:1.6;max-width:640px;margin-bottom:24px}
+h3{font-size:14px;font-weight:600;margin-bottom:12px}
+p{color:var(--txt);line-height:1.7;margin-bottom:12px}
+
+/* CARDS */
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:18px}
+.card+.card{margin-top:12px}
+.card.green{border-left:3px solid var(--green)}
+.card.red{border-left:3px solid var(--red)}
+.card.amber{border-left:3px solid var(--amber)}
+.card.teal{border-left:3px solid var(--teal)}
+.card.purple{border-left:3px solid var(--purple)}
+.card-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:16px 0}
+@media(max-width:700px){.g2,.g3{grid-template-columns:1fr}}
+
+/* STAT */
+.stat{text-align:center;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:14px}
+.stat-n{font-family:var(--mono);font-size:24px;font-weight:700;margin-bottom:2px}
+.stat-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+
+/* CODE BLOCK */
+.code{background:#060b12;border:1px solid var(--bor);border-radius:8px;padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.8;overflow-x:auto;margin:12px 0}
+.code .c-teal{color:var(--teal)}
+.code .c-amber{color:var(--amber)}
+.code .c-red{color:var(--red)}
+.code .c-muted{color:var(--muted)}
+.code .c-green{color:var(--green)}
+.code .c-purple{color:var(--purple)}
+
+/* RULE LIST */
+.rule-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.rule-list li{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5}
+.rule-list li .icon{flex-shrink:0;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px}
+.icon-ok{background:var(--green2);color:var(--green)}
+.icon-no{background:var(--red2);color:var(--red)}
+.icon-key{background:var(--amber2);color:var(--amber)}
+.icon-info{background:var(--teal2);color:var(--teal)}
+
+/* SIGNAL ROW */
+.signal-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;margin:8px 0}
+.signal-row .sig-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--mono);flex-shrink:0}
+.sig-long{background:var(--green2);color:var(--green);border:1px solid rgba(0,228,140,0.25)}
+.sig-short{background:var(--red2);color:var(--red);border:1px solid rgba(255,61,90,0.25)}
+.sig-neutral{background:var(--sur);color:var(--muted);border:1px solid var(--bor)}
+.signal-row .sig-main{font-size:13px;font-weight:600}
+.signal-row .sig-sub{font-size:12px;color:var(--muted);margin-top:1px}
+
+/* INTERACTIVE CHART */
+.chart-box{background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:0;overflow:hidden;margin:16px 0}
+.chart-toolbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bor);background:var(--sur2)}
+.chart-toolbar-label{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;font-family:var(--mono);margin-right:auto}
+.chart-btn{padding:4px 12px;border:1px solid var(--bor);border-radius:20px;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.chart-btn:hover,.chart-btn.active{background:var(--teal2);color:var(--teal);border-color:rgba(0,201,167,0.3)}
+.chart-svg-wrap{padding:16px}
+.chart-svg-wrap svg{width:100%;display:block}
+
+/* STEPS */
+.steps{display:flex;flex-direction:column;gap:0;margin:16px 0}
+.step{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid var(--bor)}
+.step:last-child{border-bottom:none}
+.step-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--teal);background:var(--teal2);width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-body h4{font-size:13px;font-weight:600;margin-bottom:4px}
+.step-body p{font-size:12px;color:var(--muted);margin:0;line-height:1.5}
+
+/* PANEL SIM */
+.panel-sim{background:#060b12;border:1px solid var(--teal);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:11px;line-height:2;max-width:220px;margin:12px 0}
+.panel-row{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid var(--dim);padding-bottom:2px}
+.panel-row:last-child{border-bottom:none}
+.p-key{color:var(--muted)}
+.p-val-green{color:var(--green)}
+.p-val-red{color:var(--red)}
+.p-val-amber{color:var(--amber)}
+.p-val-teal{color:var(--teal)}
+.p-val-white{color:var(--txt)}
+
+/* ALERT SIM */
+.alert-row{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:8px;margin:8px 0;font-size:12px}
+.alert-row.red{background:var(--red2);border:1px solid rgba(255,61,90,0.2)}
+.alert-row.green{background:var(--green2);border:1px solid rgba(0,228,140,0.2)}
+.alert-row.amber{background:var(--amber2);border:1px solid rgba(245,166,35,0.2)}
+.alert-row .a-icon{font-size:14px;flex-shrink:0}
+.alert-row .a-txt{line-height:1.4}
+.alert-row .a-title{font-weight:700;margin-bottom:2px}
+.alert-row .a-body{color:var(--muted)}
+
+/* DIVIDER */
+hr{border:none;border-top:1px solid var(--bor);margin:20px 0}
+
+/* TAGS */
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--mono);margin-right:4px}
+.tag-g{background:var(--green2);color:var(--green)}
+.tag-r{background:var(--red2);color:var(--red)}
+.tag-a{background:var(--amber2);color:var(--amber)}
+.tag-t{background:var(--teal2);color:var(--teal)}
+.tag-p{background:var(--purple2);color:var(--purple)}
+
+/* SETTINGS TABLE */
+.set-table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0}
+.set-table th{text-align:left;padding:7px 12px;background:var(--sur2);border:1px solid var(--bor);font-weight:600;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.set-table td{padding:9px 12px;border:1px solid var(--bor);vertical-align:top;line-height:1.5}
+.set-table .rec{color:var(--teal);font-family:var(--mono)}
+.set-table .note{color:var(--muted)}
+
+/* CALLOUT */
+.callout{border-radius:8px;padding:14px 16px;margin:12px 0;font-size:13px;line-height:1.6}
+.callout.info{background:var(--teal2);border:1px solid rgba(0,201,167,0.2)}
+.callout.warn{background:var(--amber2);border:1px solid rgba(245,166,35,0.2)}
+.callout.danger{background:var(--red2);border:1px solid rgba(255,61,90,0.2)}
+.callout strong{display:block;margin-bottom:4px}
+
+/* FLOW */
+.flow{display:flex;gap:0;align-items:center;flex-wrap:wrap;margin:14px 0}
+.flow-box{background:var(--sur2);border:1px solid var(--bor);border-radius:6px;padding:8px 12px;font-size:12px;font-weight:600}
+.flow-arrow{padding:0 8px;color:var(--muted);font-size:12px}
+
+/* MOBILE */
+@media(max-width:600px){
+  .shell{flex-direction:column;height:auto}
+  .sidebar{width:100%;flex-direction:row;overflow-x:auto;border-right:none;border-bottom:1px solid var(--bor)}
+  .sidebar{flex-direction:column}
+  .main{height:auto}
+  .page{padding:20px 16px 40px}
+}
+</style>
+</head>
+<body>
+<h2 class="sr-only">NEoWave Indicator — Complete practical usage guide covering setup, validation, invalidation and trading signals</h2>
+
+<div class="shell">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-label">Pine Script v5</div>
+    <div class="brand-name">NEoWave<br>Analyzer</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">Getting Started</div>
+    <button class="nav-item active" onclick="go(0)"><span class="dot"></span>Overview</button>
+    <button class="nav-item" onclick="go(1)"><span class="dot"></span>Settings</button>
+    <button class="nav-item" onclick="go(2)"><span class="dot"></span>Info Panel</button>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">Pattern Signals</div>
+    <button class="nav-item" onclick="go(3)"><span class="dot"></span>Flat Correction <span class="badge badge-valid">LONG</span></button>
+    <button class="nav-item" onclick="go(4)"><span class="dot"></span>Diametric <span class="badge badge-valid">BOTH</span></button>
+    <button class="nav-item" onclick="go(5)"><span class="dot"></span>Expanding Triangle <span class="badge badge-valid">LONG</span></button>
+    <button class="nav-item" onclick="go(6)"><span class="dot"></span>Terminal <span class="badge badge-invalid">REVERSAL</span></button>
+    <button class="nav-item" onclick="go(7)"><span class="dot"></span>X-Wave <span class="badge badge-key">LABEL</span></button>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">Using It</div>
+    <button class="nav-item" onclick="go(8)"><span class="dot"></span>Key Level</button>
+    <button class="nav-item" onclick="go(9)"><span class="dot"></span>Fibonacci Lines</button>
+    <button class="nav-item" onclick="go(10)"><span class="dot"></span>Alerts</button>
+    <button class="nav-item" onclick="go(11)"><span class="dot"></span>Trade Checklist</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- PAGE 0: OVERVIEW -->
+<div class="page active" id="p0">
+  <div class="page-eyebrow">Start Here</div>
+  <h1 class="page-title">How the indicator works</h1>
+  <p class="page-sub">The indicator has 5 detection engines running simultaneously on every bar. Each engine scans the last N pivot points for its pattern. When all rules pass → label appears. When any rule fails → nothing appears.</p>
+
+  <div class="g3">
+    <div class="stat"><div class="stat-n" style="color:var(--teal)">5</div><div class="stat-l">Pattern detectors</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--amber)">3</div><div class="stat-l">Alert conditions</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--purple)">9</div><div class="stat-l">Fibonacci levels</div></div>
+  </div>
+
+  <div class="chart-box">
+    <div class="chart-toolbar">
+      <span class="chart-toolbar-label">What appears on chart</span>
+    </div>
+    <div class="chart-svg-wrap">
+      <svg viewBox="0 0 780 260" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="a0" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#00c9a7" stroke-width="1.5"/></marker></defs>
+        <!-- price bars rough -->
+        <polyline points="30,200 60,170 50,185 85,145 75,158 110,118 98,130 135,95 122,108 160,75 148,88 192,52 178,65 225,38" fill="none" stroke="#1c2d48" stroke-width="12" stroke-linecap="round"/>
+        <polyline points="30,200 60,170 50,185 85,145 75,158 110,118 98,130 135,95 122,108 160,75 148,88 192,52 178,65 225,38" fill="none" stroke="#263445" stroke-width="8" stroke-linecap="round"/>
+        <polyline points="30,200 60,170 50,185 85,145 75,158 110,118 98,130 135,95 122,108 160,75 148,88 192,52 178,65 225,38" fill="none" stroke="#2d4a6b" stroke-width="3" stroke-linecap="round"/>
+
+        <!-- Pivot diamonds -->
+        <polygon points="60,170 65,176 60,182 55,176" fill="#00e48c"/>
+        <polygon points="50,185 55,191 50,197 45,191" fill="#ff3d5a"/>
+        <polygon points="85,145 90,151 85,157 80,151" fill="#00e48c"/>
+        <polygon points="75,158 80,164 75,170 70,164" fill="#ff3d5a"/>
+        <polygon points="110,118 115,124 110,130 105,124" fill="#00e48c"/>
+        <polygon points="135,95 140,101 135,107 130,101" fill="#00e48c"/>
+        <polygon points="160,75 165,81 160,87 155,81" fill="#00e48c"/>
+
+        <!-- Labels: 1 Pivot Diamonds -->
+        <circle cx="68" cy="155" r="10" fill="#0f1724" stroke="#1c2d48" stroke-width="1"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="68" y="158" text-anchor="middle">1</text>
+        <line x1="62" y1="163" x2="64" y2="173" stroke="#263445" stroke-width="0.5"/>
+        <text font-family="Outfit,sans-serif" font-size="11" fill="#4e657e" x="70" y="180">Pivot high/low diamonds</text>
+
+        <!-- Wave labels -->
+        <rect x="88" y="136" width="26" height="14" rx="3" fill="rgba(0,228,140,0.1)" stroke="rgba(0,228,140,0.3)" stroke-width="0.5"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="101" y="146" text-anchor="middle">a:3</text>
+        <rect x="60" y="200" width="26" height="14" rx="3" fill="rgba(255,61,90,0.1)" stroke="rgba(255,61,90,0.3)" stroke-width="0.5"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="73" y="210" text-anchor="middle">b:3</text>
+        <rect x="162" y="42" width="26" height="14" rx="3" fill="rgba(0,201,167,0.15)" stroke="rgba(0,201,167,0.4)" stroke-width="0.5"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="175" y="52" text-anchor="middle">c:5</text>
+
+        <!-- Label 2: FLAT box -->
+        <rect x="28" y="32" width="200" height="180" rx="6" fill="none" stroke="#f5a623" stroke-width="1" stroke-dasharray="6 4" opacity="0.4"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#f5a623" x="128" y="22" text-anchor="middle" opacity="0.7">FLAT</text>
+        <circle cx="280" cy="40" r="10" fill="#0f1724" stroke="#1c2d48" stroke-width="1"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="280" y="43" text-anchor="middle">2</text>
+        <line x1="228" y1="35" x2="272" y2="38" stroke="#263445" stroke-width="0.5"/>
+        <text font-family="Outfit,sans-serif" font-size="11" fill="#4e657e" x="295" y="36">Pattern box + label (FLAT)</text>
+        <text font-family="Outfit,sans-serif" font-size="11" fill="#4e657e" x="295" y="50">Wave labels: a:3 b:3 c:5</text>
+
+        <!-- Key level -->
+        <line x1="28" y1="218" x2="420" y2="218" stroke="#ff3d5a" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.7"/>
+        <rect x="280" y="208" width="140" height="14" rx="3" fill="rgba(255,61,90,0.1)"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="350" y="218" text-anchor="middle">$66,800 BEARISH BELOW</text>
+        <circle cx="440" cy="220" r="10" fill="#0f1724" stroke="#1c2d48" stroke-width="1"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="440" y="223" text-anchor="middle">3</text>
+        <text font-family="Outfit,sans-serif" font-size="11" fill="#4e657e" x="454" y="223">Invalidation level line</text>
+
+        <!-- Fibonacci levels -->
+        <line x1="230" y1="80" x2="430" y2="80" stroke="#a78bfa" stroke-width="0.8" stroke-dasharray="4 4" opacity="0.6"/>
+        <line x1="230" y1="100" x2="430" y2="100" stroke="#f5a623" stroke-width="1.2" opacity="0.7"/>
+        <line x1="230" y1="125" x2="430" y2="125" stroke="#a78bfa" stroke-width="0.8" stroke-dasharray="4 4" opacity="0.5"/>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#a78bfa" x="432" y="83">61.8%</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#f5a623" x="432" y="103">100%</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#a78bfa" x="432" y="128">127.2%</text>
+        <circle cx="530" cy="100" r="10" fill="#0f1724" stroke="#1c2d48" stroke-width="1"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="530" y="103" text-anchor="middle">4</text>
+        <text font-family="Outfit,sans-serif" font-size="11" fill="#4e657e" x="545" y="103">Fibonacci retrace/extension lines</text>
+
+        <!-- Info panel box -->
+        <rect x="600" y="28" width="165" height="110" rx="6" fill="#060b12" stroke="#00c9a7" stroke-width="0.8"/>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#4e657e" x="608" y="42">NEoWave Analyzer</text>
+        <line x1="600" y1="46" x2="765" y2="46" stroke="#1c2d48" stroke-width="0.5"/>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#4e657e" x="608" y="60">RSI(14)</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#00e48c" x="755" y="60" text-anchor="end">58.2</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#4e657e" x="608" y="74">Key Level</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#00c9a7" x="755" y="74" text-anchor="end">$66,800</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#4e657e" x="608" y="88">Bias</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#00e48c" x="755" y="88" text-anchor="end">✓ BULLISH</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#4e657e" x="608" y="102">System</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#f5a623" x="755" y="102" text-anchor="end">NEoWave</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#4e657e" x="608" y="116">Flat</text>
+        <text font-family="JetBrains Mono,monospace" font-size="8" fill="#00c9a7" x="755" y="116" text-anchor="end">Scanning</text>
+        <circle cx="590" cy="72" r="10" fill="#0f1724" stroke="#1c2d48" stroke-width="1"/>
+        <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="590" y="75" text-anchor="middle">5</text>
+        <text font-family="Outfit,sans-serif" font-size="11" fill="#4e657e" x="605" y="150">Info panel (top right)</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div>
+      <h3>5 things drawn on chart</h3>
+      <ul class="rule-list">
+        <li><span class="icon icon-info">1</span>Green/red diamonds at every pivot high/low</li>
+        <li><span class="icon icon-info">2</span>Dashed pattern boxes (FLAT, TERMINAL, etc.) with wave labels (a:3, b:3, c:5)</li>
+        <li><span class="icon icon-info">3</span>Red dashed key invalidation level line</li>
+        <li><span class="icon icon-info">4</span>Fibonacci retrace/extension lines from last swing</li>
+        <li><span class="icon icon-info">5</span>Info panel showing RSI, bias, active patterns</li>
+      </ul>
+    </div>
+    <div>
+      <h3>What it does NOT do</h3>
+      <ul class="rule-list">
+        <li><span class="icon icon-no">✗</span>Does NOT repaint — labels appear only when all rules confirm</li>
+        <li><span class="icon icon-no">✗</span>Does NOT give buy/sell arrows — you read the pattern context</li>
+        <li><span class="icon icon-no">✗</span>Does NOT predict — it identifies current pattern state</li>
+        <li><span class="icon icon-no">✗</span>Does NOT work on 1m/5m — designed for Weekly/Daily/4H</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 1: SETTINGS -->
+<div class="page" id="p1">
+  <div class="page-eyebrow">Configuration</div>
+  <h1 class="page-title">Settings explained</h1>
+  <p class="page-sub">Open Settings → Inputs in TradingView. Every parameter and what it actually changes.</p>
+
+  <table class="set-table">
+    <thead><tr><th>Setting</th><th>Default</th><th>Recommended</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Pivot Strength</strong></td>
+        <td class="rec">5</td>
+        <td class="rec">Weekly: 5–8<br>Daily: 3–5<br>4H: 2–4</td>
+        <td class="note">Controls how many bars to the left/right a point must be the highest/lowest to count as a pivot. Higher = fewer but more significant pivots detected. Most important setting.</td>
+      </tr>
+      <tr>
+        <td><strong>Detect Flat</strong></td>
+        <td class="rec">ON</td>
+        <td class="rec">ON always</td>
+        <td class="note">Scans last 4 pivots for a:3 / b:3 / c:5 structure where B retraces 61.8–138.2% of A.</td>
+      </tr>
+      <tr>
+        <td><strong>Flat B-wave Tolerance</strong></td>
+        <td class="rec">15%</td>
+        <td class="rec">10–20%</td>
+        <td class="note">Padding around the 61.8–138.2% retrace rule. Lower = stricter (fewer signals). Higher = more signals, more false positives.</td>
+      </tr>
+      <tr>
+        <td><strong>Detect Diametric</strong></td>
+        <td class="rec">ON</td>
+        <td class="rec">ON on Weekly/Daily</td>
+        <td class="note">Scans last 8 pivots. Needs enough data — turn OFF on very short charts with few candles.</td>
+      </tr>
+      <tr>
+        <td><strong>Detect Terminal</strong></td>
+        <td class="rec">ON</td>
+        <td class="rec">ON always</td>
+        <td class="note">Most valuable detector. Finds the exhaustion wedge. W3 smaller than W1, W5 smaller than W3, W4 overlaps W1 zone.</td>
+      </tr>
+      <tr>
+        <td><strong>Key Level ($)</strong></td>
+        <td class="rec">66800</td>
+        <td class="rec">Set to your invalidation price</td>
+        <td class="note">Change this for your asset. Below this price: candles turn red tint. At ±1.5% of this level: candles turn yellow as warning.</td>
+      </tr>
+      <tr>
+        <td><strong>Auto Fibonacci</strong></td>
+        <td class="rec">ON</td>
+        <td class="rec">ON</td>
+        <td class="note">Draws 9 Fibonacci levels from the last completed swing. Updates on each new bar.</td>
+      </tr>
+      <tr>
+        <td><strong>Wave Channel</strong></td>
+        <td class="rec">ON</td>
+        <td class="rec">ON</td>
+        <td class="note">Draws channel lines through last 4 pivots. Useful for visualizing which patterns are currently possible.</td>
+      </tr>
+      <tr>
+        <td><strong>RSI Length</strong></td>
+        <td class="rec">14</td>
+        <td class="rec">14 (standard)</td>
+        <td class="note">RSI ≥70 = orange background (overbought warning). RSI ≤30 = green background (oversold support). Used to confirm pattern signals.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <strong>⚠ Most common mistake: wrong Pivot Strength</strong>
+    If you see too many labels cluttering the chart → increase Pivot Strength. If you see no labels at all → decrease it. On BTC Weekly, start with 5. On BTC Daily, start with 3.
+  </div>
+</div>
+
+<!-- PAGE 2: INFO PANEL -->
+<div class="page" id="p2">
+  <div class="page-eyebrow">Reading the Panel</div>
+  <h1 class="page-title">Info panel — what each row means</h1>
+  <p class="page-sub">The panel appears in the top right corner. Here is what each row tells you and how to act on it.</p>
+
+  <div class="g2">
+    <div>
+      <h3>Bullish scenario (above key level)</h3>
+      <div class="panel-sim">
+        <div class="panel-row"><span class="p-key">NEoWave Analyzer</span></div>
+        <div class="panel-row"><span class="p-key">RSI(14)</span><span class="p-val-white">58.2</span></div>
+        <div class="panel-row"><span class="p-key">Key Level</span><span class="p-val-teal">$66,800</span></div>
+        <div class="panel-row"><span class="p-key">Bias</span><span class="p-val-green">✓ BULLISH</span></div>
+        <div class="panel-row"><span class="p-key">Pivots</span><span class="p-val-white">22</span></div>
+        <div class="panel-row"><span class="p-key">System</span><span class="p-val-amber">NEoWave</span></div>
+        <div class="panel-row"><span class="p-key">Flat</span><span class="p-val-teal">Scanning</span></div>
+        <div class="panel-row"><span class="p-key">Terminal</span><span class="p-val-teal">Scanning</span></div>
+        <div class="panel-row"><span class="p-key">Diametric</span><span class="p-val-teal">Scanning</span></div>
+      </div>
+    </div>
+    <div>
+      <h3>Bearish scenario (below key level)</h3>
+      <div class="panel-sim">
+        <div class="panel-row"><span class="p-key">NEoWave Analyzer</span></div>
+        <div class="panel-row"><span class="p-key">RSI(14)</span><span class="p-val-red">28.4 OS</span></div>
+        <div class="panel-row"><span class="p-key">Key Level</span><span class="p-val-teal">$66,800</span></div>
+        <div class="panel-row"><span class="p-key">Bias</span><span class="p-val-red">✗ BEARISH</span></div>
+        <div class="panel-row"><span class="p-key">Pivots</span><span class="p-val-white">18</span></div>
+        <div class="panel-row"><span class="p-key">System</span><span class="p-val-amber">NEoWave</span></div>
+        <div class="panel-row"><span class="p-key">Flat</span><span class="p-val-teal">Scanning</span></div>
+        <div class="panel-row"><span class="p-key">Terminal</span><span class="p-val-teal">Scanning</span></div>
+        <div class="panel-row"><span class="p-key">Diametric</span><span class="p-val-teal">Scanning</span></div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+  <h3>Row-by-row meaning</h3>
+  <ul class="rule-list">
+    <li><span class="icon icon-info">R</span><strong>RSI(14)</strong> — Shows current RSI value. "OB" appended means ≥70 (overbought). "OS" means ≤30 (oversold). Confirm patterns: Flat c:5 entry is best when RSI is NOT overbought.</li>
+    <li><span class="icon icon-info">K</span><strong>Key Level</strong> — Your configured invalidation price. Color matches whether price is above (teal) or below (red) this level.</li>
+    <li><span class="icon icon-key">B</span><strong>Bias</strong> — Simple: <span style="color:var(--green)">✓ BULLISH</span> = price above key level. <span style="color:var(--red)">✗ BEARISH</span> = price below. Do NOT take longs when bias shows bearish.</li>
+    <li><span class="icon icon-info">P</span><strong>Pivots</strong> — How many pivots the indicator has detected. Below 8 pivots → Diametric cannot detect. Below 6 → Terminal cannot detect. Need at least 20+ pivots for reliable scanning.</li>
+    <li><span class="icon icon-info">S</span><strong>System</strong> — Always "NEoWave". Confirms indicator is loaded correctly.</li>
+    <li><span class="icon icon-info">F</span><strong>Flat / Terminal / Diametric</strong> — "Scanning" = detector is ON. "Off" = you disabled it in settings. The panel shows detector STATUS only — the pattern labels on the chart show actual detections.</li>
+  </ul>
+
+  <div class="callout info">
+    <strong>💡 Key insight about "Scanning"</strong>
+    The panel always shows "Scanning" when enabled — it does not say "Detected" or "Active." Look at the CHART for actual pattern labels (the boxes and wave letter labels). The panel is just your dashboard for bias and RSI confirmation.
+  </div>
+</div>
+
+<!-- PAGE 3: FLAT -->
+<div class="page" id="p3">
+  <div class="page-eyebrow">Pattern Signal</div>
+  <h1 class="page-title">Flat Correction signal</h1>
+  <p class="page-sub">Detected when the last 4 pivots form a:3 → b:3 → c:5. The green dashed box appears with "FLAT" label and three wave labels. This is what Bitcoin is currently doing.</p>
+
+  <div class="chart-box">
+    <div class="chart-toolbar">
+      <span class="chart-toolbar-label">Flat detection — what appears on chart</span>
+      <button class="chart-btn active" onclick="setFlat('bull')">Bullish Flat</button>
+      <button class="chart-btn" onclick="setFlat('bear')">Bearish Flat</button>
+    </div>
+    <div class="chart-svg-wrap">
+      <svg id="flat-svg" viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
+        <!-- drawn by JS -->
+      </svg>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div>
+      <div class="card green">
+        <div class="card-label" style="color:var(--green)">What VALIDATES the signal</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-ok">✓</span>Wave A is a clear 3-wave structure (up-down-up for bullish flat)</li>
+          <li><span class="icon icon-ok">✓</span>Wave B retraces between 61.8% and 138.2% of Wave A</li>
+          <li><span class="icon icon-ok">✓</span>Wave C begins a 5-wave impulse structure beyond A's end</li>
+          <li><span class="icon icon-ok">✓</span>Price is above the key level ($66,800 for BTC)</li>
+          <li><span class="icon icon-ok">✓</span>RSI is NOT overbought (below 70) when entering c:5</li>
+          <li><span class="icon icon-ok">✓</span>C-wave impulse fits in an expanding channel</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card red">
+        <div class="card-label" style="color:var(--red)">What INVALIDATES the signal</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-no">✗</span>Wave B retraces MORE than 138.2% of Wave A → not a flat</li>
+          <li><span class="icon icon-no">✗</span>Wave B retraces LESS than 61.8% of Wave A → it's a Zigzag instead</li>
+          <li><span class="icon icon-no">✗</span>Wave C fails to extend beyond Wave A's end</li>
+          <li><span class="icon icon-no">✗</span>Price closes below the key level (b:3 goes too deep)</li>
+          <li><span class="icon icon-no">✗</span>Wave C shows only 3 sub-waves (would make it a different pattern)</li>
+          <li><span class="icon icon-no">✗</span>RSI hits 70+ at c:5 start with divergence (terminal risk)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:16px">How to trade around the Flat signal</h3>
+  <div class="signal-row">
+    <div class="sig-badge sig-long">LONG</div>
+    <div>
+      <div class="sig-main">Enter long at the end of b:3 wave</div>
+      <div class="sig-sub">When b:3 label appears and price is above key level → this is the c:5 launch point. Fibonacci: look for b:3 to end near 61.8–100% retrace of a:3.</div>
+    </div>
+  </div>
+  <div class="signal-row">
+    <div class="sig-badge sig-neutral">STOP</div>
+    <div>
+      <div class="sig-main">Stop loss: just below the key invalidation level</div>
+      <div class="sig-sub">For BTC Flat: stop below $66,800. If b:3 closes below this → the flat is invalid, exit immediately.</div>
+    </div>
+  </div>
+  <div class="signal-row">
+    <div class="sig-badge sig-long">TARGET</div>
+    <div>
+      <div class="sig-main">Target: 127.2% or 161.8% extension of Wave a beyond b:3 end</div>
+      <div class="sig-sub">Use the Fibonacci extension lines the indicator draws. The 161.8% line is the primary c:5 target (Bitcoin ~$160k area).</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 4: DIAMETRIC -->
+<div class="page" id="p4">
+  <div class="page-eyebrow">Pattern Signal</div>
+  <h1 class="page-title">Diametric signal</h1>
+  <p class="page-sub">Detected when last 8 pivots form 7 swings where odd waves progressively grow (expanding) or shrink (contracting). Labels: a b c d e f g. Title: "EXPANDING DIAMETRIC ◇" or "CONTRACTING DIAMETRIC ◇".</p>
+
+  <div class="g2">
+    <div>
+      <div class="card green">
+        <div class="card-label" style="color:var(--green)">EXPANDING — validates when</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-ok">✓</span>Wave c is larger than wave a (same direction)</li>
+          <li><span class="icon icon-ok">✓</span>Wave e is larger than wave c</li>
+          <li><span class="icon icon-ok">✓</span>Wave g is larger than wave e</li>
+          <li><span class="icon icon-ok">✓</span>Even waves (b, d, f) are smaller than adjacent odd waves</li>
+          <li><span class="icon icon-ok">✓</span>All 7 segments alternate direction cleanly</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card red">
+        <div class="card-label" style="color:var(--red)">INVALIDATES when</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-no">✗</span>Any odd wave is smaller than the previous odd wave</li>
+          <li><span class="icon icon-no">✗</span>Any even wave is larger than its adjacent odd waves</li>
+          <li><span class="icon icon-no">✗</span>Pattern has fewer or more than 7 segments</li>
+          <li><span class="icon icon-no">✗</span>Waves do not alternate direction cleanly</li>
+          <li><span class="icon icon-no">✗</span>Chart doesn't have enough pivots (need Pivots ≥ 8)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:4px">Trading the Diametric</h3>
+  <div class="signal-row">
+    <div class="sig-badge sig-long">WAIT</div>
+    <div>
+      <div class="sig-main">Do not trade inside the Diametric — wait for g-wave completion</div>
+      <div class="sig-sub">The pattern is complex and corrective. Enter AFTER g-wave completes. The move following a Diametric is typically a strong impulse.</div>
+    </div>
+  </div>
+  <div class="signal-row">
+    <div class="sig-badge sig-long">ENTRY</div>
+    <div>
+      <div class="sig-main">Enter in the direction of the prior trend after g-wave label appears</div>
+      <div class="sig-sub">If prior trend was up (as in Bitcoin) → go long after g completes. If prior trend was down → go short. Use X-wave label as additional confirmation.</div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <strong>💡 Low pivot count warning</strong>
+    If the Pivots row shows fewer than 12, the Diametric scanner may produce false signals. Increase Pivot Strength in settings until you have 15+ meaningful pivots on the chart.
+  </div>
+</div>
+
+<!-- PAGE 5: EXPANDING TRIANGLE -->
+<div class="page" id="p5">
+  <div class="page-eyebrow">Pattern Signal</div>
+  <h1 class="page-title">Expanding Triangle signal</h1>
+  <p class="page-sub">Detected when last 7 pivots show 6 swings where same-direction waves grow progressively (c&gt;a, e&gt;c). Draws diverging trendlines. Labels: i a b c d e. After completion → expect a major trend impulse.</p>
+
+  <div class="g2">
+    <div>
+      <div class="card green">
+        <div class="card-label" style="color:var(--green)">Validates when</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-ok">✓</span>Wave c price range is larger than wave a</li>
+          <li><span class="icon icon-ok">✓</span>Wave e price range is larger than wave c</li>
+          <li><span class="icon icon-ok">✓</span>The two trendlines (upper, lower) are diverging — moving apart</li>
+          <li><span class="icon icon-ok">✓</span>At least 5–6 clear pivots form the pattern</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card red">
+        <div class="card-label" style="color:var(--red)">Invalidates when</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-no">✗</span>Wave c is smaller than wave a (converging = regular triangle)</li>
+          <li><span class="icon icon-no">✗</span>Trendlines are parallel (symmetrical triangle, not expanding)</li>
+          <li><span class="icon icon-no">✗</span>Wave e fails to extend beyond c's extreme</li>
+          <li><span class="icon icon-no">✗</span>Pattern has only 4–5 pivots (need 6 for full structure)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:4px">Trading the Expanding Triangle</h3>
+  <div class="signal-row">
+    <div class="sig-badge sig-long">KEY MOMENT</div>
+    <div>
+      <div class="sig-main">e-wave completion is the signal</div>
+      <div class="sig-sub">When the "e" label appears at the end of the fifth swing → the pattern is complete. The next move is typically the largest and fastest impulse in the prior trend direction.</div>
+    </div>
+  </div>
+  <div class="signal-row">
+    <div class="sig-badge sig-neutral">STOP</div>
+    <div>
+      <div class="sig-main">Stop: below the e-wave low (for bullish triangle)</div>
+      <div class="sig-sub">If price returns below e-wave's end → triangle is invalid. The breakout failed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 6: TERMINAL -->
+<div class="page" id="p6">
+  <div class="page-eyebrow">Reversal Signal — MOST IMPORTANT</div>
+  <h1 class="page-title">Terminal Impulse signal</h1>
+  <p class="page-sub">When the indicator detects a Terminal, it places a red box labeled "⚠ TERMINAL IMPULSE — Expect Reversal" with dashed converging channel lines. Sub-waves are labeled 1:3 2:3 3:3 4:3 5:3. This is the STRONGEST reversal signal in the indicator.</p>
+
+  <div class="callout danger">
+    <strong>🔴 This pattern ends trends</strong>
+    A confirmed Terminal means the current trend is exhausted. The reversal that follows is typically sharp and fast. On Bitcoin's chart, "TERMINAL?" near the top of c:5 means the entire bull run from b:3 low may be ending at that level.
+  </div>
+
+  <div class="chart-box">
+    <div class="chart-toolbar">
+      <span class="chart-toolbar-label">Terminal — validation vs invalidation</span>
+      <button class="chart-btn active" onclick="setTerm('valid')">Valid Terminal</button>
+      <button class="chart-btn" onclick="setTerm('invalid')">Invalid (Normal Impulse)</button>
+    </div>
+    <div class="chart-svg-wrap">
+      <svg id="term-svg" viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div>
+      <div class="card green">
+        <div class="card-label" style="color:var(--green)">Terminal VALIDATES when ALL of these:</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-ok">✓</span>Wave 3 price range is SMALLER than Wave 1</li>
+          <li><span class="icon icon-ok">✓</span>Wave 5 price range is SMALLER than Wave 3</li>
+          <li><span class="icon icon-ok">✓</span>Wave 4 overlaps into Wave 1's price territory</li>
+          <li><span class="icon icon-ok">✓</span>Wave 4 range is larger than Wave 2 range</li>
+          <li><span class="icon icon-ok">✓</span>All 5 waves fit inside a converging wedge channel</li>
+          <li><span class="icon icon-ok">✓</span>RSI shows divergence (making lower highs while price makes higher highs)</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card red">
+        <div class="card-label" style="color:var(--red)">INVALIDATES — it's a normal impulse when:</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-no">✗</span>Wave 3 is LARGER than Wave 1 (normal impulse rule)</li>
+          <li><span class="icon icon-no">✗</span>Wave 4 does NOT overlap Wave 1 (normal impulse territory)</li>
+          <li><span class="icon icon-no">✗</span>The channel lines are parallel or expanding (not converging)</li>
+          <li><span class="icon icon-no">✗</span>Any sub-wave has a 5-wave structure (Terminal = all 3-wave sub-waves)</li>
+          <li><span class="icon icon-no">✗</span>Price breaks out above the upper channel line strongly</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:8px">How to trade the Terminal signal</h3>
+  <div class="signal-row">
+    <div class="sig-badge sig-short">SHORT</div>
+    <div>
+      <div class="sig-main">Enter short after 5:3 wave completes and price breaks the lower channel line</div>
+      <div class="sig-sub">Wait for the converging wedge to break down. Do not short prematurely — the 5:3 wave can extend. Confirmation = close below the lower channel line.</div>
+    </div>
+  </div>
+  <div class="signal-row">
+    <div class="sig-badge sig-neutral">STOP</div>
+    <div>
+      <div class="sig-main">Stop: above the 5:3 wave high</div>
+      <div class="sig-sub">If price makes a new high above the 5:3 label → Terminal is invalid, trend continues. Exit immediately.</div>
+    </div>
+  </div>
+  <div class="signal-row">
+    <div class="sig-badge sig-short">TARGET</div>
+    <div>
+      <div class="sig-main">Minimum target: retrace to origin of the Terminal (where 1:3 started)</div>
+      <div class="sig-sub">After a Terminal, price typically retraces 100% of the entire Terminal pattern quickly. Extended targets: 127.2% and 161.8% of Terminal length.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 7: X-WAVE -->
+<div class="page" id="p7">
+  <div class="page-eyebrow">Pattern Label</div>
+  <h1 class="page-title">X-Wave label</h1>
+  <p class="page-sub">When the indicator finds a 50–79% shallow retracement of the prior swing, it places a small "x" label. This is a LABEL, not a trade signal by itself — it tells you that two corrective patterns are being connected.</p>
+
+  <div class="g2">
+    <div>
+      <div class="card teal">
+        <div class="card-label" style="color:var(--teal)">X-Wave validates (labeled) when</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-ok">✓</span>Prior corrective pattern (Flat, Zigzag, Triangle) has completed</li>
+          <li><span class="icon icon-ok">✓</span>Retracement is 50% to 79% of the prior pattern's total size</li>
+          <li><span class="icon icon-ok">✓</span>The retracement is a 3-wave structure internally</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card red">
+        <div class="card-label" style="color:var(--red)">X-Wave invalidates when</div>
+        <ul class="rule-list">
+          <li><span class="icon icon-no">✗</span>Retracement exceeds 100% of the prior pattern → it's a new pattern</li>
+          <li><span class="icon icon-no">✗</span>Retracement is less than 50% → probably part of the next pattern</li>
+          <li><span class="icon icon-no">✗</span>The "x" label appears without a preceding complete pattern (false pivot)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3>What to do when you see "x"</h3>
+  <ul class="rule-list">
+    <li><span class="icon icon-info">→</span>Do NOT trade the X-wave itself — it is too small and ambiguous</li>
+    <li><span class="icon icon-info">→</span>Expect ANOTHER corrective pattern after the X-wave ends (equal or larger than the first)</li>
+    <li><span class="icon icon-info">→</span>The overall correction is not done yet — this is "complex correction" territory</li>
+    <li><span class="icon icon-info">→</span>On BTC chart: the "g·x" label means after the Diametric's g-wave, a shallow bounce (x) connected to the Flat correction that followed</li>
+  </ul>
+</div>
+
+<!-- PAGE 8: KEY LEVEL -->
+<div class="page" id="p8">
+  <div class="page-eyebrow">Key Level</div>
+  <h1 class="page-title">Using the Key Invalidation Level</h1>
+  <p class="page-sub">The most important single line in the indicator. Default: $66,800 for Bitcoin. Change it to your asset's critical structural level. Everything revolves around this price.</p>
+
+  <div class="g3">
+    <div class="stat"><div class="stat-n" style="color:var(--green)">ABOVE</div><div class="stat-l">Panel shows BULLISH · Take longs</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--amber)">NEAR</div><div class="stat-l">±1.5% → Yellow candles · Caution zone</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--red)">BELOW</div><div class="stat-l">Panel shows BEARISH · No longs</div></div>
+  </div>
+
+  <hr>
+  <h3>What the key level actually invalidates</h3>
+
+  <div class="card amber">
+    <div class="card-label" style="color:var(--amber)">For BTC Flat Correction ($66,800)</div>
+    <ul class="rule-list" style="margin:0">
+      <li><span class="icon icon-key">!</span>If b:3 wave closes BELOW $66,800 → the Expanded Flat is invalid. The b:3 wave has retraced too much (more than the a:3 origin). Cannot be a Flat anymore.</li>
+      <li><span class="icon icon-key">!</span>The pattern becomes either a Double Zigzag or a new bear market count → flip to short bias</li>
+      <li><span class="icon icon-key">!</span>All active LONG positions should be closed or stopped immediately on this break</li>
+    </ul>
+  </div>
+
+  <hr>
+  <h3>Setting the key level for your asset</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Find the origin of the corrective pattern</h4><p>The key level should be the price where Wave A started (for Flat) or the last major swing low (for Impulse). This is the point that if crossed means the pattern is structurally impossible.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Open Settings and enter the price</h4><p>Settings → Key Level ($) → Enter your price. Settings → Key Level Label → Enter a short label like "Flat Invalidation" or "Bull Invalid".</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Watch for the candle color change</h4><p>When price closes below: entire bar turns red tint. When within ±1.5%: bar turns yellow. These are your visual alerts on the chart itself.</p></div></div>
+  </div>
+
+  <div class="callout danger">
+    <strong>🔴 Never place a long stop BELOW the key level</strong>
+    If price is heading to the key level, set your stop JUST below it (1–2%). If it breaks, the entire bullish wave count is wrong — not just the trade, the entire thesis.
+  </div>
+</div>
+
+<!-- PAGE 9: FIBONACCI -->
+<div class="page" id="p9">
+  <div class="page-eyebrow">Fibonacci Lines</div>
+  <h1 class="page-title">Reading the Fibonacci lines</h1>
+  <p class="page-sub">The indicator draws 9 Fibonacci levels automatically from the last completed swing high to swing low (or vice versa). They update on every new bar. Here is exactly what to do with each level.</p>
+
+  <div class="code">
+    <span class="c-muted">// 9 levels drawn, in order from shallow to deep:</span><br>
+    <span class="c-amber">23.6%</span>  — Very shallow. Rarely significant. Strong trend continuation.<br>
+    <span class="c-purple">38.2%</span>  — Wave 4 of impulse typically ends here. Flat A-wave support.<br>
+    <span class="c-muted">50.0%</span>  — Psychological level. No NEoWave rule but often traded.<br>
+    <span class="c-amber">61.8%</span>  <span class="c-green">★ KEY</span> — Wave 2 of impulse, X-wave max, Flat B min. Most important.<br>
+    <span class="c-purple">78.6%</span>  — Deep correction. Sometimes Wave 2 in strong trends.<br>
+    <span class="c-teal">100.0%</span> — Flat B-wave maximum for Regular Flat. Equal-leg target.<br>
+    <span class="c-amber">127.2%</span> — Minimum C-wave extension beyond A. First target after Flat.<br>
+    <span class="c-red">161.8%</span> <span class="c-green">★ KEY</span> — Wave 3 target, C-wave primary target. Golden ratio extension.<br>
+    <span class="c-red">261.8%</span> — Extended Wave 3. Only in very strong trending markets.
+  </div>
+
+  <div class="g2">
+    <div>
+      <h3>Which level to use per scenario</h3>
+      <ul class="rule-list">
+        <li><span class="icon icon-info">F</span><strong>Entering Flat c:5 wave:</strong> Target 127.2% first, then 161.8% extension of the a:3 wave beyond b:3 end.</li>
+        <li><span class="icon icon-info">F</span><strong>Wave 2 stop:</strong> If Wave 2 breaks below 61.8% retrace, wave count may be wrong. If below 100% → definitely wrong.</li>
+        <li><span class="icon icon-info">F</span><strong>Wave 3 target:</strong> 161.8% of Wave 1 is the primary target. Plot this before entering.</li>
+        <li><span class="icon icon-info">F</span><strong>Terminal reversal target:</strong> After Terminal completes, first target is 61.8% retrace of the entire Terminal, then 100% retrace.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="callout info">
+        <strong>The Fibonacci lines update dynamically</strong>
+        They are drawn from the last 2 pivots (swing high to swing low). As new pivots form, the lines shift. Use them as confluences — when a pattern rule AND a Fibonacci level align at the same price → high probability turning point.
+      </div>
+      <div class="callout warn" style="margin-top:8px">
+        <strong>Turn off extensions if chart is cluttered</strong>
+        Settings → Fibonacci Extensions → OFF. This hides 127.2%, 161.8%, 261.8% lines. Keep retracements on to identify support/resistance.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 10: ALERTS -->
+<div class="page" id="p10">
+  <div class="page-eyebrow">Alerts</div>
+  <h1 class="page-title">Setting up and using alerts</h1>
+  <p class="page-sub">The indicator has 3 built-in alert conditions. To enable: click the alarm bell on any indicator label in TradingView, or go to Create Alert and select this indicator.</p>
+
+  <h3>The 3 alert conditions</h3>
+
+  <div class="alert-row red">
+    <div class="a-icon">🔴</div>
+    <div class="a-txt">
+      <div class="a-title">NEoWave: Price Broke Below Key Level</div>
+      <div class="a-body">Fires ONCE when price closes below $66,800 (or your key level). This is your highest priority alert. Means the bullish Flat count is OVER. Action: close longs, reassess the full wave count from scratch.</div>
+    </div>
+  </div>
+
+  <div class="alert-row red">
+    <div class="a-icon">⚠️</div>
+    <div class="a-txt">
+      <div class="a-title">NEoWave: RSI Overbought — Terminal Warning</div>
+      <div class="a-body">Fires when RSI ≥ 70. Does not mean sell immediately — but signals you're in the zone where a Terminal Impulse could be forming. Start watching for 5 shrinking sub-waves in the c:5 wave. Tighten stops.</div>
+    </div>
+  </div>
+
+  <div class="alert-row green">
+    <div class="a-icon">🟢</div>
+    <div class="a-txt">
+      <div class="a-title">NEoWave: RSI Oversold — Wave C Entry Zone</div>
+      <div class="a-body">Fires when RSI ≤ 30. Coinciding with a b:3 wave label on chart → this is the ideal entry zone for the c:5 wave launch. Best alert for entries.</div>
+    </div>
+  </div>
+
+  <hr>
+  <h3>Recommended alert setup for BTC Flat trade</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Alert 1 (mandatory): Key Level break</h4><p>Condition: "NEoWave: Price Broke Below Key Level" → Once Per Bar Close → Notify on app + email. This protects your capital.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Alert 2 (entry): RSI Oversold</h4><p>Condition: "NEoWave: RSI Oversold" → Once Per Bar → Notify on app. When this fires AND b:3 label is visible on chart → consider entering long.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Alert 3 (caution): RSI Overbought</h4><p>Condition: "NEoWave: RSI Overbought" → Once Per Bar → Push notification. When this fires AND you see 5 small sub-waves forming in c:5 → possible Terminal forming, tighten stop.</p></div></div>
+  </div>
+</div>
+
+<!-- PAGE 11: CHECKLIST -->
+<div class="page" id="p11">
+  <div class="page-eyebrow">Trade Process</div>
+  <h1 class="page-title">Complete trade checklist</h1>
+  <p class="page-sub">Run through every item before taking any trade based on indicator signals. All items must be YES for a high-confidence entry.</p>
+
+  <div id="checklist"></div>
+
+  <hr>
+  <h3>Decision flow</h3>
+  <div class="flow">
+    <div class="flow-box" style="color:var(--teal)">Pattern label<br>appears on chart</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Price above<br>key level?</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">RSI confirms?<br>(not overbought)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Fibonacci<br>confluence?</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="color:var(--green)">Enter with<br>defined stop</div>
+  </div>
+
+  <div class="callout warn" style="margin-top:20px">
+    <strong>⚠ The indicator cannot confirm sub-wave structure in real-time</strong>
+    The pattern detectors work on completed pivots. The most recent pivot may shift as more candles form. Always wait for a bar CLOSE to confirm a pivot — never trade on intra-bar pivot labels. Use the Weekly timeframe as the primary read, Daily for entry precision.
+  </div>
+
+  <hr>
+  <h3 style="margin-bottom:12px">Timeframe guide</h3>
+  <table class="set-table">
+    <thead><tr><th>Timeframe</th><th>Use for</th><th>Pivot Strength</th><th>Best patterns</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Weekly</strong></td><td>Big picture wave count (Flat, Diametric, Triangle)</td><td class="rec">5–8</td><td class="rec">All 5 patterns</td></tr>
+      <tr><td><strong>Daily</strong></td><td>Entry timing within Weekly pattern</td><td class="rec">3–5</td><td class="rec">Flat c:5 sub-waves, Terminal</td></tr>
+      <tr><td><strong>4H</strong></td><td>Fine-tune entry, stop placement</td><td class="rec">2–4</td><td class="rec">Terminal, X-Wave</td></tr>
+      <tr><td><strong>1H or less</strong></td><td class="note">Not recommended — too much noise for NEoWave</td><td class="note">—</td><td class="note">—</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</main>
+</div>
+
+<script>
+// Navigation
+function go(n) {
+  document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('active', i===n));
+  document.querySelectorAll('.nav-item').forEach((b,i) => b.classList.toggle('active', i===n));
+  document.querySelector('.main').scrollTop = 0;
+}
+
+// ─── FLAT SVG ───────────────────────────────────────────────────────
+function drawFlat(mode) {
+  const svg = document.getElementById('flat-svg');
+  const bull = mode === 'bull';
+  const baseColor = bull ? '#00e48c' : '#ff3d5a';
+  const revColor = bull ? '#ff3d5a' : '#00e48c';
+  const dir = bull ? 1 : -1;
+  const cy = 110;
+
+  // Simple schematic approach
+  const pts_a = bull
+    ? [[40,170],[65,148],[58,158],[82,132],[74,140],[100,112]]
+    : [[40,50],[65,72],[58,62],[82,88],[74,80],[100,108]];
+  const pts_b = bull
+    ? [[100,112],[118,130],[110,120],[138,148],[128,136],[160,168]]
+    : [[100,108],[118,90],[110,100],[138,72],[128,84],[160,52]];
+  const pts_c = bull
+    ? [[160,168],[180,145],[170,156],[202,118],[192,130],[225,90],[215,100],[250,68],[238,78],[278,45]]
+    : [[160,52],[180,75],[170,62],[202,100],[192,88],[225,128],[215,118],[250,150],[238,140],[278,172]];
+
+  const toPath = pts => pts.map((p,i)=> (i===0?'M':i%2===0?'L':'L')+p[0]+','+p[1]).join(' ');
+
+  const endA = pts_a[pts_a.length-1];
+  const endB = pts_b[pts_b.length-1];
+  const endC = pts_c[pts_c.length-1];
+  const startA = pts_a[0];
+
+  svg.innerHTML = `
+    <defs><marker id="af" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="${baseColor}" stroke-width="1.5"/></marker></defs>
+    <!-- Key level -->
+    <line x1="20" y1="${startA[1]}" x2="680" y2="${startA[1]}" stroke="#ff3d5a" stroke-width="1" stroke-dasharray="8 4" opacity="0.5"/>
+    <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="540" y="${startA[1]-4}">Key level / origin of A</text>
+    <!-- Flat box -->
+    <rect x="35" y="${Math.min(endA[1],startA[1],endB[1])-15}" width="${endC[0]-30}" height="${Math.abs(Math.min(endA[1],startA[1],endB[1])-Math.max(endA[1],startA[1],endB[1]))+60}" rx="6" fill="none" stroke="#f5a623" stroke-width="1" stroke-dasharray="7 4" opacity="0.4"/>
+    <text font-family="JetBrains Mono,monospace" font-size="10" fill="#f5a623" x="50" y="${Math.min(endA[1],startA[1],endB[1])-20}" opacity="0.8">FLAT</text>
+    <!-- Wave A -->
+    <path d="${toPath(pts_a)}" fill="none" stroke="${bull?'#00e48c':'#ff3d5a'}" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${endA[0]}" cy="${endA[1]}" r="5" fill="${bull?'#00e48c':'#ff3d5a'}"/>
+    <rect x="${endA[0]-13}" y="${endA[1]+(bull?-24:8)}" width="28" height="14" rx="3" fill="rgba(0,228,140,0.1)" stroke="rgba(0,228,140,0.3)" stroke-width="0.5"/>
+    <text font-family="JetBrains Mono,monospace" font-size="9" fill="${bull?'#00e48c':'#ff3d5a'}" x="${endA[0]}" y="${endA[1]+(bull?-13:18)}" text-anchor="middle">a:3</text>
+    <!-- Wave B -->
+    <path d="${toPath(pts_b)}" fill="none" stroke="${bull?'#ff3d5a':'#00e48c'}" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${endB[0]}" cy="${endB[1]}" r="5" fill="${bull?'#ff3d5a':'#00e48c'}"/>
+    <rect x="${endB[0]-13}" y="${endB[1]+(bull?8:-24)}" width="28" height="14" rx="3" fill="rgba(255,61,90,0.1)" stroke="rgba(255,61,90,0.3)" stroke-width="0.5"/>
+    <text font-family="JetBrains Mono,monospace" font-size="9" fill="${bull?'#ff3d5a':'#00e48c'}" x="${endB[0]}" y="${endB[1]+(bull?19:-13)}" text-anchor="middle">b:3</text>
+    <!-- Wave C (5 waves) -->
+    <path d="${toPath(pts_c)}" fill="none" stroke="${bull?'#00c9a7':'#ff3d5a'}" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="${endC[0]}" cy="${endC[1]}" r="6" fill="${bull?'#00c9a7':'#ff3d5a'}"/>
+    <rect x="${endC[0]-13}" y="${endC[1]+(bull?-24:8)}" width="28" height="14" rx="3" fill="rgba(0,201,167,0.15)" stroke="rgba(0,201,167,0.4)" stroke-width="0.8"/>
+    <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00c9a7" x="${endC[0]}" y="${endC[1]+(bull?-13:19)}" text-anchor="middle">c:5</text>
+    <!-- B retrace arrow -->
+    <line x1="${endA[0]+20}" y1="${endA[1]}" x2="${endA[0]+20}" y2="${endB[1]}" stroke="rgba(245,166,35,0.5)" stroke-width="1"/>
+    <text font-family="JetBrains Mono,monospace" font-size="8" fill="#f5a623" x="${endA[0]+25}" y="${(endA[1]+endB[1])/2+4}">61.8–138%</text>
+    <!-- Validate note -->
+    <rect x="310" y="8" width="200" height="30" rx="5" fill="rgba(0,228,140,0.08)" stroke="rgba(0,228,140,0.2)" stroke-width="0.5"/>
+    <text font-family="Outfit,sans-serif" font-size="11" fill="#00e48c" x="410" y="20" text-anchor="middle">✓ c:5 extends beyond a:3 end</text>
+    <text font-family="Outfit,sans-serif" font-size="11" fill="${bull?'#00e48c':'#ff3d5a'}" x="410" y="32" text-anchor="middle">${bull ? '✓ Bullish Flat — long at b:3 end' : '✓ Bearish Flat — short at b:3 end'}</text>
+  `;
+}
+
+function setFlat(mode) {
+  document.querySelectorAll('#p3 .chart-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  drawFlat(mode);
+}
+
+// ─── TERMINAL SVG ───────────────────────────────────────────────────
+function drawTerm(mode) {
+  const svg = document.getElementById('term-svg');
+  const valid = mode === 'valid';
+
+  if (valid) {
+    // Converging, shrinking waves, 4 overlaps 1
+    svg.innerHTML = `
+      <text font-family="JetBrains Mono,monospace" font-size="10" fill="#ff3d5a" x="350" y="18" text-anchor="middle" letter-spacing="1">TERMINAL — W3 &lt; W1 · W5 &lt; W3 · W4 overlaps W1</text>
+      <!-- W1 up (large) -->
+      <polyline points="40,160 58,138 50,148 72,118 64,128 88,98 80,108 108,72" fill="none" stroke="#00e48c" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="108" cy="72" r="4" fill="#00e48c"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="108" y="62" text-anchor="middle">1:3</text>
+      <!-- W2 down -->
+      <polyline points="108,72 122,90 115,80 138,108 130,98 155,128" fill="none" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="155" cy="128" r="4" fill="#ff3d5a"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="155" y="140" text-anchor="middle">2:3</text>
+      <!-- W3 up (SMALLER than W1) -->
+      <polyline points="155,128 170,112 162,120 186,95 178,104 205,78" fill="none" stroke="#00e48c" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="205" cy="78" r="4" fill="#00e48c"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="205" y="68" text-anchor="middle">3:3</text>
+      <text font-family="JetBrains Mono,monospace" font-size="8" fill="#ff3d5a" x="168" y="60">3 &lt; 1 ✓</text>
+      <!-- W4 down (OVERLAPS W1 territory) -->
+      <polyline points="205,78 218,92 212,84 232,105 225,96 248,120 242,110 265,135" fill="none" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="265" cy="135" r="4" fill="#ff3d5a"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="265" y="148" text-anchor="middle">4:3</text>
+      <!-- Overlap indicator -->
+      <rect x="100" y="95" width="170" height="42" rx="3" fill="rgba(255,61,90,0.06)" stroke="rgba(255,61,90,0.2)" stroke-width="0.5"/>
+      <text font-family="Outfit,sans-serif" font-size="9" fill="#ff3d5a" x="185" y="122" text-anchor="middle">W4 overlaps W1 zone ✓</text>
+      <!-- W5 up (smallest) -->
+      <polyline points="265,135 278,120 272,128 295,108 288,116 310,95" fill="none" stroke="#00e48c" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="310" cy="95" r="4" fill="#00e48c"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="310" y="84" text-anchor="middle">5:3</text>
+      <text font-family="JetBrains Mono,monospace" font-size="8" fill="#ff3d5a" x="310" y="72">5 &lt; 3 ✓</text>
+      <!-- Converging channel -->
+      <line x1="40" y1="160" x2="265" y2="135" stroke="#f5a623" stroke-width="1.2" stroke-dasharray="7 4" opacity="0.7"/>
+      <line x1="108" y1="72" x2="310" y2="95" stroke="#f5a623" stroke-width="1.2" stroke-dasharray="7 4" opacity="0.7"/>
+      <!-- Terminal label -->
+      <rect x="330" y="50" width="150" height="36" rx="6" fill="rgba(255,61,90,0.1)" stroke="rgba(255,61,90,0.4)" stroke-width="1"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="405" y="64" text-anchor="middle">⚠ TERMINAL</text>
+      <text font-family="Outfit,sans-serif" font-size="9" fill="#ff3d5a" x="405" y="78" text-anchor="middle">Expect Reversal</text>
+      <!-- Reversal arrow -->
+      <polyline points="315,95 360,120 420,155 490,175" fill="none" stroke="#ff3d5a" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 3"/>
+      <text font-family="Outfit,sans-serif" font-size="10" fill="#ff3d5a" x="500" y="178">REVERSAL ↓</text>
+      <!-- Wedge converge label -->
+      <text font-family="Outfit,sans-serif" font-size="9" fill="#f5a623" x="185" y="185" text-anchor="middle">← Converging wedge — lines getting closer →</text>
+    `;
+  } else {
+    // Normal impulse — wave 3 is longest, no overlap
+    svg.innerHTML = `
+      <text font-family="JetBrains Mono,monospace" font-size="10" fill="#00e48c" x="350" y="18" text-anchor="middle" letter-spacing="1">NORMAL IMPULSE — W3 &gt; W1 · No overlap · NOT a terminal</text>
+      <!-- W1 up -->
+      <polyline points="40,160 58,140 50,150 75,120 66,130 98,92" fill="none" stroke="#00e48c" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="98" cy="92" r="4" fill="#00e48c"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="98" y="82" text-anchor="middle">①</text>
+      <!-- W2 -->
+      <polyline points="98,92 112,106 105,98 130,122 122,112 148,135" fill="none" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="148" cy="135" r="4" fill="#ff3d5a"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="148" y="148" text-anchor="middle">②</text>
+      <!-- W3 (LONGER than W1) -->
+      <polyline points="148,135 168,110 158,122 192,82 182,94 218,50 208,62 245,25" fill="none" stroke="#00e48c" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="245" cy="25" r="5" fill="#00e48c"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="245" y="16" text-anchor="middle">③</text>
+      <text font-family="JetBrains Mono,monospace" font-size="8" fill="#00e48c" x="192" y="40">3 &gt; 1 ✓</text>
+      <!-- W4 (no overlap with W1) -->
+      <polyline points="245,25 260,42 252,32 278,60 268,50 298,75" fill="none" stroke="#ff3d5a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="298" cy="75" r="4" fill="#ff3d5a"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#ff3d5a" x="298" y="88" text-anchor="middle">④</text>
+      <!-- No-overlap zone -->
+      <line x1="240" y1="92" x2="320" y2="92" stroke="rgba(0,228,140,0.25)" stroke-width="1" stroke-dasharray="4 4"/>
+      <text font-family="Outfit,sans-serif" font-size="9" fill="#00e48c" x="330" y="95">W1 top — W4 stays above ✓</text>
+      <!-- W5 -->
+      <polyline points="298,75 315,55 306,65 336,38 326,48 358,18" fill="none" stroke="#00e48c" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="358" cy="18" r="4" fill="#00e48c"/>
+      <text font-family="JetBrains Mono,monospace" font-size="9" fill="#00e48c" x="358" y="10" text-anchor="middle">⑤</text>
+      <!-- Parallel channel -->
+      <line x1="40" y1="160" x2="298" y2="75" stroke="#1c2d48" stroke-width="1" stroke-dasharray="6 4"/>
+      <line x1="98" y1="92" x2="358" y2="18" stroke="#1c2d48" stroke-width="1" stroke-dasharray="6 4"/>
+      <!-- Trend continues -->
+      <polyline points="362,18 410,10 470,5 530,2" fill="none" stroke="#00e48c" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 3"/>
+      <text font-family="Outfit,sans-serif" font-size="10" fill="#00e48c" x="540" y="8">Trend continues →</text>
+      <text font-family="Outfit,sans-serif" font-size="9" fill="#4e657e" x="185" y="185" text-anchor="middle">← Expanding/parallel channel — trend is healthy, NOT a terminal →</text>
+    `;
+  }
+}
+
+function setTerm(mode) {
+  document.querySelectorAll('#p6 .chart-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  drawTerm(mode);
+}
+
+// ─── CHECKLIST ──────────────────────────────────────────────────────
+const checks = [
+  { cat:'Pattern', text:'A pattern label is visible on the chart (FLAT, TERMINAL, DIAMETRIC, or wave labels a:3/b:3/c:5)', key:'pattern' },
+  { cat:'Bias', text:'Info panel shows ✓ BULLISH (for longs) or ✗ BEARISH (for shorts)', key:'bias' },
+  { cat:'Key Level', text:'Price is NOT within ±1.5% of the key invalidation level (yellow candle zone)', key:'keylevel' },
+  { cat:'RSI', text:'RSI is below 70 for long entries, above 30 for short entries', key:'rsi' },
+  { cat:'Fibonacci', text:'Entry price aligns with a Fibonacci level (61.8% retrace, or 127.2%/161.8% extension)', key:'fib' },
+  { cat:'Pivots', text:'Pivots count in panel is ≥ 12 (at least 12 pivots for reliable detection)', key:'pivots' },
+  { cat:'Timeframe', text:'Reading Weekly or Daily chart (not sub-4H)', key:'tf' },
+  { cat:'Stop', text:'Stop loss is defined BEFORE entry, placed below key level or pattern invalidation price', key:'stop' },
+  { cat:'Bar Close', text:'Waiting for bar CLOSE to confirm pivot/pattern, not intra-bar', key:'close' },
+];
+
+const clDiv = document.getElementById('checklist');
+checks.forEach(c => {
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--bor)';
+  row.innerHTML = `
+    <input type="checkbox" id="chk_${c.key}" style="width:16px;height:16px;flex-shrink:0;margin-top:2px;accent-color:var(--teal);cursor:pointer">
+    <label for="chk_${c.key}" style="flex:1;cursor:pointer">
+      <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:2px">${c.cat}</span>
+      <span style="font-size:13px;line-height:1.5">${c.text}</span>
+    </label>
+    <span id="chk_icon_${c.key}" style="font-size:16px;flex-shrink:0;margin-top:2px">⬜</span>
+  `;
+  const cb = row.querySelector('input');
+  cb.addEventListener('change', () => {
+    document.getElementById('chk_icon_'+c.key).textContent = cb.checked ? '✅' : '⬜';
+    updateScore();
+  });
+  clDiv.appendChild(row);
+});
+
+const scoreDiv = document.createElement('div');
+scoreDiv.style.cssText = 'margin-top:16px;padding:14px 16px;border-radius:8px;background:var(--sur2);border:1px solid var(--bor);font-family:var(--mono);font-size:13px';
+scoreDiv.id = 'score-div';
+scoreDiv.innerHTML = 'Score: <span id="score-val" style="color:var(--muted)">0 / 9</span> — <span id="score-verdict" style="color:var(--muted)">Check all items before entering</span>';
+clDiv.appendChild(scoreDiv);
+
+function updateScore() {
+  const checked = document.querySelectorAll('#checklist input:checked').length;
+  const val = document.getElementById('score-val');
+  const verd = document.getElementById('score-verdict');
+  val.textContent = `${checked} / 9`;
+  if (checked === 9) { val.style.color = 'var(--green)'; verd.style.color = 'var(--green)'; verd.textContent = '✓ All clear — high confidence trade'; }
+  else if (checked >= 7) { val.style.color = 'var(--amber)'; verd.style.color = 'var(--amber)'; verd.textContent = '⚠ Almost — check remaining items'; }
+  else { val.style.color = 'var(--muted)'; verd.style.color = 'var(--muted)'; verd.textContent = 'Keep checking before entering'; }
+}
+
+// Initial renders
+drawFlat('bull');
+drawTerm('valid');
+</script>
+</body>
+</html>

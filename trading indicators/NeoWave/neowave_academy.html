@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEoWave Academy — Complete Trading Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0f1a;
+  --surface:#111827;
+  --surface2:#1a2332;
+  --border:#1e3050;
+  --teal:#00d4aa;
+  --teal-dim:#007a62;
+  --amber:#f0a500;
+  --red:#ff4d6a;
+  --green:#00e096;
+  --purple:#9d7fff;
+  --text:#e8eef6;
+  --text-muted:#6b7fa0;
+  --text-dim:#3a4f6e;
+}
+body{background:var(--bg);color:var(--text);font-family:'Sora',sans-serif;min-height:100vh;overflow-x:hidden}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+
+/* HEADER */
+.header{text-align:center;padding:40px 20px 20px;position:relative}
+.header::before{content:'';position:absolute;top:0;left:0;right:0;height:200px;background:radial-gradient(ellipse at 50% 0%, rgba(0,212,170,0.08) 0%,transparent 70%);pointer-events:none}
+.logo{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--teal);margin-bottom:12px;text-transform:uppercase}
+.title{font-size:clamp(28px,5vw,52px);font-weight:700;line-height:1.1;margin-bottom:12px}
+.title span{color:var(--teal)}
+.subtitle{color:var(--text-muted);font-size:15px;max-width:600px;margin:0 auto 24px;line-height:1.6}
+
+/* MODE TOGGLE */
+.mode-bar{display:inline-flex;align-items:center;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:30px;padding:4px;margin-bottom:32px}
+.mode-btn{padding:8px 20px;border-radius:24px;border:none;cursor:pointer;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;transition:all .25s;background:transparent;color:var(--text-muted)}
+.mode-btn.active{background:var(--teal);color:#000}
+
+/* NAV */
+.nav-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 20px;margin-bottom:0}
+.nav{display:flex;gap:4px;min-width:max-content;padding:0 0 0 0;border-bottom:1px solid var(--border)}
+.nav-btn{padding:10px 18px;border:none;background:transparent;color:var(--text-muted);font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap;border-radius:6px 6px 0 0}
+.nav-btn:hover{color:var(--text);background:rgba(0,212,170,0.05)}
+.nav-btn.active{color:var(--teal);border-bottom-color:var(--teal);background:rgba(0,212,170,0.06)}
+.nav-btn .icon{margin-right:6px;font-size:15px}
+
+/* CONTENT */
+.content{padding:0 20px 60px;max-width:1100px;margin:0 auto}
+.tab-pane{display:none;animation:fadeIn .3s ease}
+.tab-pane.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.pane-header{padding:28px 0 20px}
+.concept-tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.tag-key{background:rgba(240,165,0,0.15);color:var(--amber);border:1px solid rgba(240,165,0,0.3)}
+.tag-basic{background:rgba(0,212,170,0.1);color:var(--teal);border:1px solid rgba(0,212,170,0.2)}
+.tag-core{background:rgba(157,127,255,0.1);color:var(--purple);border:1px solid rgba(157,127,255,0.2)}
+.pane-title{font-size:clamp(22px,3vw,32px);font-weight:700;line-height:1.2;margin-bottom:8px}
+.pane-sub{color:var(--text-muted);font-size:14px;line-height:1.7;max-width:700px}
+
+/* LAYOUT GRID */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:20px 0}
+@media(max-width:768px){.two-col{grid-template-columns:1fr}}
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+@media(max-width:768px){.three-col{grid-template-columns:1fr}}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-title{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+.card.kid{border-left:3px solid var(--amber)}
+.card.pro{border-left:3px solid var(--teal)}
+.card.rule{border-left:3px solid var(--red)}
+.card.stat{border-left:3px solid var(--purple);text-align:center}
+.stat-num{font-family:'Space Mono',monospace;font-size:28px;font-weight:700;color:var(--teal);margin-bottom:4px}
+.stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+
+/* KID EXPLAIN BOX */
+.kid-box{background:linear-gradient(135deg,rgba(240,165,0,0.06),rgba(240,165,0,0.02));border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:20px;margin-bottom:20px}
+.kid-box h3{color:var(--amber);font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.kid-box p{font-size:14px;line-height:1.7;color:var(--text);font-weight:300}
+
+/* PRO BOX */
+.pro-box{background:rgba(0,212,170,0.04);border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:20px;margin-bottom:20px}
+.pro-box h3{color:var(--teal);font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+.pro-box ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+.pro-box li{font-size:13px;line-height:1.6;padding-left:18px;position:relative;color:var(--text)}
+.pro-box li::before{content:'›';position:absolute;left:0;color:var(--teal);font-weight:700}
+.pro-box li strong{color:var(--teal)}
+
+/* RULES LIST */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+@media(max-width:600px){.rules-grid{grid-template-columns:1fr}}
+.rule-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.rule-num{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--teal);margin-bottom:4px}
+.rule-text{font-size:12px;color:var(--text-muted);line-height:1.5}
+.rule-text strong{color:var(--text);display:block;font-size:13px;margin-bottom:2px}
+
+/* SVG CHART CONTAINER */
+.chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin:20px 0;overflow:hidden}
+.chart-title{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px}
+.chart-wrap svg{width:100%;display:block}
+
+/* LEGEND */
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)}
+.leg-dot{width:24px;height:3px;border-radius:2px}
+
+/* WAVE BADGE */
+.wave-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;flex-shrink:0}
+.wb-green{background:rgba(0,224,150,0.15);color:var(--green);border:1px solid rgba(0,224,150,0.3)}
+.wb-red{background:rgba(255,77,106,0.15);color:var(--red);border:1px solid rgba(255,77,106,0.3)}
+.wb-amber{background:rgba(240,165,0,0.15);color:var(--amber);border:1px solid rgba(240,165,0,0.3)}
+.wb-purple{background:rgba(157,127,255,0.15);color:var(--purple);border:1px solid rgba(157,127,255,0.3)}
+
+/* WAVE STEP LIST */
+.wave-steps{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.wave-step{display:flex;align-items:flex-start;gap:12px}
+.ws-text{font-size:13px;line-height:1.6}
+.ws-text strong{color:var(--text);display:block}
+.ws-text span{color:var(--text-muted);font-size:12px}
+
+/* FIBONACCI TABLE */
+.fib-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+.fib-table th{text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);border-bottom:1px solid var(--border);font-weight:600}
+.fib-table td{padding:10px 12px;border-bottom:1px solid rgba(30,48,80,0.5)}
+.fib-table tr:last-child td{border-bottom:none}
+.fib-table .key-ratio{color:var(--teal);font-family:'Space Mono',monospace;font-weight:700}
+.fib-table .use{color:var(--text-muted);font-size:12px}
+
+/* INVALIDATION */
+.inval-box{background:rgba(255,77,106,0.06);border:1px solid rgba(255,77,106,0.2);border-radius:12px;padding:20px;margin:16px 0}
+.inval-box h3{color:var(--red);font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.inval-box p{font-size:13px;line-height:1.6;color:var(--text)}
+
+/* COMPARISON TABLE */
+.cmp-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+.cmp-table th{padding:10px 14px;background:var(--surface2);border:1px solid var(--border);font-size:12px;font-weight:600;text-align:left}
+.cmp-table td{padding:10px 14px;border:1px solid var(--border);vertical-align:top;line-height:1.5}
+.cmp-table .good{color:var(--green)}
+.cmp-table .bad{color:var(--red)}
+
+/* DIVIDER */
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{height:4px;width:4px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+</style>
+</head>
+<body>
+
+<h2 class="sr-only">NEoWave Academy — Complete Interactive Guide to Glenn Neely's NEoWave Trading System</h2>
+
+<div class="header">
+  <div class="logo">Glenn Neely's System</div>
+  <h1 class="title">NEo<span>Wave</span> Academy</h1>
+  <p class="subtitle">The world's most precise wave theory. Every concept explained simply — from kids to top traders.</p>
+  <div class="mode-bar">
+    <button class="mode-btn active" id="btn-simple" onclick="setMode('simple')">🧒 Simple Mode</button>
+    <button class="mode-btn" id="btn-pro" onclick="setMode('pro')">📈 Pro Mode</button>
+  </div>
+</div>
+
+<div class="nav-wrap">
+  <div class="nav">
+    <button class="nav-btn active" onclick="showTab(0)"><span class="icon">🌐</span>Overview</button>
+    <button class="nav-btn" onclick="showTab(1)"><span class="icon">🚀</span>Impulse Wave</button>
+    <button class="nav-btn" onclick="showTab(2)"><span class="icon">⚡</span>Zigzag</button>
+    <button class="nav-btn" onclick="showTab(3)"><span class="icon">📦</span>Flat Correction</button>
+    <button class="nav-btn" onclick="showTab(4)"><span class="icon">💎</span>Diametric</button>
+    <button class="nav-btn" onclick="showTab(5)"><span class="icon">▽</span>Expanding Triangle</button>
+    <button class="nav-btn" onclick="showTab(6)"><span class="icon">🔺</span>Terminal Impulse</button>
+    <button class="nav-btn" onclick="showTab(7)"><span class="icon">🔗</span>X-Wave</button>
+    <button class="nav-btn" onclick="showTab(8)"><span class="icon">📐</span>Fibonacci Ratios</button>
+    <button class="nav-btn" onclick="showTab(9)"><span class="icon">📋</span>NEoWave Rules</button>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ======================== TAB 0: OVERVIEW ======================== -->
+<div class="tab-pane active" id="tab-0">
+  <div class="pane-header">
+    <div class="concept-tag tag-basic">Foundation</div>
+    <h2 class="pane-title">What is NEoWave? Elliott's Upgraded System</h2>
+    <p class="pane-sub">Developed by Glenn Neely in the 1990s, NEoWave transforms classical Elliott Wave from an art into a precise science. Every pattern has strict rules. No guesswork.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of it Like Lego Rules</h3>
+    <p>Imagine price charts are like ocean waves. Elliott Wave says "waves follow patterns" but was very loose about the rules — like saying "build anything with Lego." NEoWave is like having <strong>exact instructions</strong> for each Lego set. Glenn Neely spent years studying thousands of real charts and wrote down <strong>exact rules</strong> that every wave MUST follow. If a wave breaks even one rule, it's not that pattern — you move to the next possibility. This makes it far more accurate for predicting where price will go next!</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">NEoWave vs Classical Elliott Wave — Bitcoin Weekly (conceptual)</div>
+    <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/></marker>
+        <marker id="arr-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#ff4d6a" stroke-width="1.5" stroke-linecap="round"/></marker>
+      </defs>
+      <!-- Left side: Classical Elliott -->
+      <text font-family="Space Mono,monospace" font-size="10" fill="#6b7fa0" x="200" y="24" text-anchor="middle" letter-spacing="2">CLASSICAL ELLIOTT WAVE</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#ff4d6a" x="200" y="38" text-anchor="middle">Subjective · Many valid interpretations</text>
+      <!-- Draw a "messy" wave pattern -->
+      <polyline points="40,230 80,170 65,190 105,130 90,150 130,90 115,110 160,70 145,85 200,55 185,70 230,90" fill="none" stroke="#3a4f6e" stroke-width="1.5"/>
+      <!-- Multiple conflicting labels (messy) -->
+      <text font-family="Sora,sans-serif" font-size="11" fill="#ff4d6a" x="160" y="62">①?</text>
+      <text font-family="Sora,sans-serif" font-size="11" fill="#f0a500" x="90" y="82">③?</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="178" y="50">or ③?</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="85" y="68">or ①?</text>
+      <!-- Multiple arrows pointing different directions -->
+      <line x1="230" y1="85" x2="290" y2="60" stroke="#ff4d6a" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr-red)"/>
+      <line x1="230" y1="95" x2="290" y2="130" stroke="#f0a500" stroke-width="1" stroke-dasharray="4 3"/>
+      <text font-family="Sora,sans-serif" font-size="10" fill="#ff4d6a" x="295" y="58">Target A?</text>
+      <text font-family="Sora,sans-serif" font-size="10" fill="#f0a500" x="295" y="132">Target B?</text>
+      <text font-family="Sora,sans-serif" font-size="10" fill="#6b7fa0" x="295" y="95">Target C?</text>
+      <!-- Confusion marker -->
+      <text font-size="24" x="200" y="200" text-anchor="middle">😵</text>
+      <text font-family="Sora,sans-serif" font-size="11" fill="#6b7fa0" x="200" y="218" text-anchor="middle">Multiple valid counts possible</text>
+
+      <!-- Divider -->
+      <line x1="440" y1="20" x2="440" y2="260" stroke="#1e3050" stroke-width="1" stroke-dasharray="6 4"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#3a4f6e" x="440" y="145" text-anchor="middle" transform="rotate(-90,440,145)">UPGRADED</text>
+
+      <!-- Right side: NEoWave -->
+      <text font-family="Space Mono,monospace" font-size="10" fill="#6b7fa0" x="680" y="24" text-anchor="middle" letter-spacing="2">NEoWAVE (NEELY)</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#00d4aa" x="680" y="38" text-anchor="middle">Objective · One valid interpretation</text>
+      <!-- Clean precise wave -->
+      <polyline points="480,230 530,155 505,175 560,120 540,140 600,75 580,90 640,50 620,65 680,40" fill="none" stroke="#00d4aa" stroke-width="2"/>
+      <!-- Precise labels -->
+      <circle cx="530" cy="155" r="4" fill="#00e096"/>
+      <circle cx="505" cy="175" r="4" fill="#ff4d6a"/>
+      <circle cx="560" cy="120" r="4" fill="#00e096"/>
+      <circle cx="540" cy="140" r="4" fill="#ff4d6a"/>
+      <circle cx="600" cy="75" r="4" fill="#00e096"/>
+      <circle cx="580" cy="90" r="4" fill="#ff4d6a"/>
+      <circle cx="640" cy="50" r="4" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="533" y="148">①</text>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#ff4d6a" x="496" y="192">②</text>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="563" y="114">③</text>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#ff4d6a" x="530" y="154">④</text>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="598" y="68">⑤</text>
+      <!-- One precise target -->
+      <line x1="680" y1="38" x2="750" y2="25" stroke="#00d4aa" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text font-family="Sora,sans-serif" font-size="11" fill="#00d4aa" x="755" y="28">Exact Target</text>
+      <text font-family="Sora,sans-serif" font-size="10" fill="#6b7fa0" x="755" y="40">Fibonacci confirmed</text>
+      <!-- Happy marker -->
+      <text font-size="24" x="680" y="200" text-anchor="middle">🎯</text>
+      <text font-family="Sora,sans-serif" font-size="11" fill="#00d4aa" x="680" y="218" text-anchor="middle">ONE definitive wave count</text>
+    </svg>
+  </div>
+
+  <div class="two-col">
+    <div class="card pro">
+      <div class="card-title" style="color:var(--teal)">What makes NEoWave different?</div>
+      <div class="wave-steps">
+        <div class="wave-step"><div class="wave-badge wb-green">1</div><div class="ws-text"><strong>Strict Rules — Zero Subjectivity</strong><span>Each pattern has MANDATORY rules. If any rule is violated, it's NOT that pattern.</span></div></div>
+        <div class="wave-step"><div class="wave-badge wb-green">2</div><div class="ws-text"><strong>New Pattern Types</strong><span>Diametric, Symmetrical patterns not in classical Elliott. Captures real market behaviour.</span></div></div>
+        <div class="wave-step"><div class="wave-badge wb-green">3</div><div class="ws-text"><strong>Position Logic</strong><span>Where a pattern appears in the larger structure determines which sub-patterns are valid.</span></div></div>
+        <div class="wave-step"><div class="wave-badge wb-green">4</div><div class="ws-text"><strong>Terminal Detection</strong><span>Identifies exhaustion patterns (Terminal Impulses) with high precision before reversal.</span></div></div>
+      </div>
+    </div>
+    <div>
+      <table class="cmp-table">
+        <thead><tr><th>Feature</th><th>Elliott Wave</th><th>NEoWave</th></tr></thead>
+        <tbody>
+          <tr><td>Subjectivity</td><td class="bad">High</td><td class="good">Very Low</td></tr>
+          <tr><td>Rules per pattern</td><td>~3-5</td><td class="good">10-30+</td></tr>
+          <tr><td>Pattern types</td><td>~9</td><td class="good">15+</td></tr>
+          <tr><td>Accuracy</td><td>Moderate</td><td class="good">High</td></tr>
+          <tr><td>Difficulty</td><td>Moderate</td><td class="bad">Hard</td></tr>
+          <tr><td>Book</td><td>Elliott Wave Principle</td><td>Mastering Elliott Wave</td></tr>
+        </tbody>
+      </table>
+      <div class="inval-box">
+        <h3>⚠️ Key NEoWave Concept</h3>
+        <p>In NEoWave, an <strong>Invalidation Level</strong> is the price that if crossed, completely disproves your wave count. You MUST define it before trading. Example from the Bitcoin chart: <strong>$66,800 = Bearish Below</strong></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 1: IMPULSE ======================== -->
+<div class="tab-pane" id="tab-1">
+  <div class="pane-header">
+    <div class="concept-tag tag-basic">Building Block</div>
+    <h2 class="pane-title">Impulse Wave — The Power Move</h2>
+    <p class="pane-sub">The core directional pattern. 5 waves in the trend direction, alternating with 3-wave corrections. The engine of all major bull and bear markets.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Staircase with Resting Spots</h3>
+    <p>Imagine climbing a tall building using stairs. You walk up 3 flights (Wave 1 📈), rest briefly going down 1 flight (Wave 2 📉), run up 5 flights — the longest sprint! (Wave 3 📈), rest again going down 1 flight (Wave 4 📉), then finish climbing 2 more flights (Wave 5 📈). The market does exactly this — it <strong>cannot skip steps</strong> and has <strong>firm rules</strong> for each stair.</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Bullish Impulse Wave — 5 Sub-waves with NEoWave Rules</div>
+    <svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grid -->
+      <line x1="20" y1="230" x2="880" y2="230" stroke="#1e3050" stroke-width="0.5"/>
+      <line x1="20" y1="20" x2="20" y2="230" stroke="#1e3050" stroke-width="0.5"/>
+      <!-- Price zero line -->
+      <line x1="20" y1="230" x2="880" y2="230" stroke="#3a4f6e" stroke-width="0.5" stroke-dasharray="4 4"/>
+      <!-- Horizontal reference lines -->
+      <line x1="20" y1="160" x2="880" y2="160" stroke="#1e3050" stroke-width="0.5" stroke-dasharray="3 6"/>
+      <line x1="20" y1="90" x2="880" y2="90" stroke="#1e3050" stroke-width="0.5" stroke-dasharray="3 6"/>
+
+      <!-- WAVE 1 (green, rises) -->
+      <polyline points="40,220 65,195 58,205 82,175 74,185 100,155 92,165 118,132 110,142 138,108 130,118 158,88 148,98 175,70 165,80 195,52" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- Wave 1 label -->
+      <circle cx="195" cy="52" r="5" fill="#00e096"/>
+      <rect x="195" y="28" width="30" height="20" rx="4" fill="rgba(0,224,150,0.15)" stroke="rgba(0,224,150,0.4)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="210" y="42" text-anchor="middle">①</text>
+
+      <!-- WAVE 2 (red, retraces ~61.8%) -->
+      <polyline points="195,52 210,70 204,60 228,90 220,78 248,112 240,100 268,128" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="268" cy="128" r="5" fill="#ff4d6a"/>
+      <rect x="268" y="132" width="30" height="20" rx="4" fill="rgba(255,77,106,0.15)" stroke="rgba(255,77,106,0.4)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="283" y="147" text-anchor="middle">②</text>
+
+      <!-- WAVE 3 (green, LONGEST - thick) -->
+      <polyline points="268,128 288,105 280,116 308,83 298,94 330,60 320,70 355,40 345,50 380,22 370,33 410,8" fill="none" stroke="#00e096" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="410" cy="8" r="6" fill="#00e096"/>
+      <rect x="392" y="8" width="36" height="22" rx="4" fill="rgba(0,224,150,0.2)" stroke="rgba(0,224,150,0.5)" stroke-width="0.8"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#00e096" x="410" y="23" text-anchor="middle">③</text>
+      <!-- "LONGEST" label -->
+      <rect x="305" y="26" width="60" height="16" rx="3" fill="rgba(0,224,150,0.1)" stroke="rgba(0,224,150,0.2)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="8" fill="#00e096" x="335" y="37" text-anchor="middle" letter-spacing="1">LONGEST</text>
+
+      <!-- WAVE 4 (red, smaller than wave 2) -->
+      <polyline points="410,8 428,28 420,16 448,52 438,40 465,70 455,58 490,82" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="490" cy="82" r="5" fill="#ff4d6a"/>
+      <rect x="490" y="86" width="30" height="20" rx="4" fill="rgba(255,77,106,0.15)" stroke="rgba(255,77,106,0.4)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="505" y="101" text-anchor="middle">④</text>
+      <!-- No overlap rule -->
+      <line x1="490" y1="52" x2="490" y2="82" stroke="rgba(255,77,106,0.3)" stroke-width="1" stroke-dasharray="3 3"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="475" y="46">Wave 1</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="475" y="55">top ↓</text>
+
+      <!-- WAVE 5 (green) -->
+      <polyline points="490,82 510,62 502,72 530,44 521,54 552,28 542,38 572,15 562,22 600,5" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="600" cy="5" r="5" fill="#00e096"/>
+      <rect x="600" y="5" width="30" height="20" rx="4" fill="rgba(0,224,150,0.15)" stroke="rgba(0,224,150,0.4)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="615" y="19" text-anchor="middle">⑤</text>
+
+      <!-- Channel lines -->
+      <line x1="40" y1="220" x2="490" y2="82" stroke="#00d4aa" stroke-width="0.8" stroke-dasharray="6 4" opacity="0.4"/>
+      <line x1="195" y1="52" x2="600" y2="5" stroke="#00d4aa" stroke-width="0.8" stroke-dasharray="6 4" opacity="0.4"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="820" y="30" opacity="0.6">Upper channel</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="820" y="75" opacity="0.6">Lower channel</text>
+
+      <!-- NEoWave rules annotations -->
+      <!-- Wave 3 can't be shortest -->
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="650" y="45">NEoWave Rules:</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00e096" x="650" y="60">✓ Wave 3 ≠ shortest</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00e096" x="650" y="74">✓ Wave 4 ≠ overlap W1</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00e096" x="650" y="88">✓ Wave 2 ≤ 100% of W1</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00e096" x="650" y="102">✓ Alternation: W2 ≠ W4</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="650" y="118">✗ If any fails → NOT impulse</text>
+    </svg>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Up wave (impulsive)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Down wave (corrective)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--teal);opacity:0.5"></div>Wave channel</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="pro-box">
+        <h3>NEoWave Impulse Rules (ALL must be true)</h3>
+        <ul>
+          <li>Wave 2 must retrace <strong>at least 1% of Wave 1</strong> but NEVER 100% or more</li>
+          <li>Wave 3 must be <strong>the longest OR one of the two longest</strong> waves. It can never be the shortest of waves 1, 3, and 5</li>
+          <li>Wave 4 must NOT overlap Wave 1's price territory (crucial NEoWave rule)</li>
+          <li><strong>Alternation rule:</strong> Wave 2 and Wave 4 must look different (one sharp, one flat/complex)</li>
+          <li>The 5 waves must fit <strong>within a channel</strong> formed by connecting Wave 2 and 4 lows</li>
+          <li>Sub-wave structure: Waves 1, 3, 5 are 5-wave impulses; Waves 2, 4 are 3-wave corrections</li>
+        </ul>
+      </div>
+    </div>
+    <div class="three-col" style="grid-template-columns:1fr 1fr;margin:0">
+      <div class="card stat"><div class="stat-num">5</div><div class="stat-label">Total waves</div></div>
+      <div class="card stat"><div class="stat-num">3</div><div class="stat-label">Up waves (1,3,5)</div></div>
+      <div class="card stat"><div class="stat-num" style="color:var(--red)">2</div><div class="stat-label">Down waves (2,4)</div></div>
+      <div class="card stat"><div class="stat-num" style="color:var(--amber)">③</div><div class="stat-label">Always longest</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 2: ZIGZAG ======================== -->
+<div class="tab-pane" id="tab-2">
+  <div class="pane-header">
+    <div class="concept-tag tag-core">Correction</div>
+    <h2 class="pane-title">Zigzag — The Sharp Correction (5-3-5)</h2>
+    <p class="pane-sub">The most common corrective pattern. A sharp, deep retracement that looks like a lightning bolt. Structure: A(5 waves) – B(3 waves) – C(5 waves)</p>
+  </div>
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Bouncing Ball Falling Down Stairs</h3>
+    <p>You throw a ball down a staircase. It falls fast (Wave A 📉), bounces back up a little (Wave B 📈), then falls even further (Wave C 📉). The bounce-back in the middle is NEVER very big — always less than 61.8% of the first fall. This makes a sharp, pointed zig-zag shape — like a lightning bolt on the chart! Zigzags are the market's <strong>quick, violent correction moves</strong>.</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Zigzag Correction — a(5) · b(3) · c(5) — Sharp, Deep Retracement</div>
+    <svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grid -->
+      <line x1="20" y1="20" x2="20" y2="240" stroke="#1e3050" stroke-width="0.5"/>
+      <line x1="20" y1="240" x2="880" y2="240" stroke="#1e3050" stroke-width="0.5"/>
+      <!-- Starting peak (previous uptrend) -->
+      <polyline points="30,30 50,40 40,35 60,50" fill="none" stroke="#3a4f6e" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text font-family="Sora,sans-serif" font-size="10" fill="#6b7fa0" x="30" y="22">Previous peak</text>
+
+      <!-- WAVE A down (5-wave impulse DOWN) -->
+      <polyline points="60,50 82,78 74,64 100,102 90,88 118,130 108,116 138,158 126,144 160,190" fill="none" stroke="#ff4d6a" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="60" cy="50" r="5" fill="#ff4d6a"/>
+      <circle cx="160" cy="190" r="5" fill="#ff4d6a"/>
+      <!-- A label -->
+      <rect x="26" y="108" width="28" height="18" rx="3" fill="rgba(255,77,106,0.15)" stroke="rgba(255,77,106,0.3)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="40" y="121" text-anchor="middle">a:5</text>
+      <text font-family="Sora,sans-serif" font-size="8" fill="#6b7fa0" x="40" y="135" text-anchor="middle">5 sub-waves</text>
+
+      <!-- WAVE B up (3-wave correction, max 61.8% retrace) -->
+      <polyline points="160,190 180,168 172,178 200,152 190,162 218,140 208,148 245,130" fill="none" stroke="#00e096" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="245" cy="130" r="5" fill="#00e096"/>
+      <!-- B label -->
+      <rect x="218" y="108" width="28" height="18" rx="3" fill="rgba(0,224,150,0.15)" stroke="rgba(0,224,150,0.3)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="232" y="121" text-anchor="middle">b:3</text>
+      <!-- Retrace indicator -->
+      <line x1="250" y1="50" x2="250" y2="190" stroke="#6b7fa0" stroke-width="0.5" stroke-dasharray="3 4"/>
+      <line x1="250" y1="50" x2="270" y2="50" stroke="#6b7fa0" stroke-width="0.5"/>
+      <line x1="250" y1="190" x2="270" y2="190" stroke="#6b7fa0" stroke-width="0.5"/>
+      <line x1="250" y1="130" x2="270" y2="130" stroke="#f0a500" stroke-width="0.8"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="274" y="133">B = 50% retrace max</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="274" y="60">A start</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="274" y="193">A end</text>
+
+      <!-- WAVE C down (5-wave impulse, extends below A) -->
+      <polyline points="245,130 268,158 260,144 288,188 278,174 310,215 298,202 330,235 320,222 360,250" fill="none" stroke="#ff4d6a" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="360" cy="250" r="5" fill="#ff4d6a"/>
+      <!-- C label -->
+      <rect x="296" y="130" width="28" height="18" rx="3" fill="rgba(255,77,106,0.15)" stroke="rgba(255,77,106,0.3)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="310" y="143" text-anchor="middle">c:5</text>
+
+      <!-- C extends below A arrow -->
+      <line x1="360" y1="190" x2="360" y2="252" stroke="rgba(0,212,170,0.4)" stroke-width="1" stroke-dasharray="3 3"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="365" y="220">C extends</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="365" y="230">below A</text>
+
+      <!-- C=A fibonacci marker -->
+      <text font-family="Space Mono,monospace" font-size="9" fill="#9d7fff" x="425" y="110">Fibonacci Targets:</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="425" y="124">C = 61.8% of A (common)</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="425" y="137">C = 100% of A (standard)</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="425" y="150">C = 161.8% of A (extended)</text>
+
+      <!-- Pattern shape indicator -->
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="425" y="180">B retraces 38.2%-61.8% of A</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="425" y="194">Sharp, V-shaped pattern</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="425" y="212">C always extends beyond A's end</text>
+    </svg>
+  </div>
+  <div class="two-col">
+    <div class="pro-box">
+      <h3>Zigzag Rules (NEoWave Strict)</h3>
+      <ul>
+        <li>Wave A must be <strong>5 sub-waves</strong> (impulse structure)</li>
+        <li>Wave B retraces <strong>38.2% to 61.8%</strong> of Wave A — never more than 61.8%</li>
+        <li>Wave C must be <strong>5 sub-waves</strong> (impulse) — always extends beyond A's end</li>
+        <li>The entire pattern should be <strong>steep and sharp</strong> — like a lightning bolt</li>
+        <li>Time: Wave B is typically <strong>shorter in duration</strong> than Wave A</li>
+        <li>If B retraces more than 61.8% → it's a FLAT, not a Zigzag</li>
+      </ul>
+    </div>
+    <div class="kid-box" style="margin:0">
+      <h3>🔑 How to Spot a Zigzag</h3>
+      <p>Look for a sharp move down (or up), a small bounce, then another sharp move in the original direction. The whole thing should look like a steep "Z" or "N" shape. If the middle bounce is tiny (less than 61.8%), it's very likely a Zigzag.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 3: FLAT ======================== -->
+<div class="tab-pane" id="tab-3">
+  <div class="pane-header">
+    <div class="concept-tag tag-key">⭐ KEY PATTERN — As Seen in Bitcoin Chart</div>
+    <h2 class="pane-title">Flat Correction — Sideways Battle (3-3-5)</h2>
+    <p class="pane-sub">The exact pattern Trading Heights is using on Bitcoin right now. A sideways correction where B-wave retraces almost all of A, followed by a powerful C-wave impulse. Structure: a(3) – b(3) – c(5)</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Tug-of-War That Bulls Win</h3>
+    <p>Imagine two teams pulling a rope. Bulls pull it up (Wave a 📈), Bears pull it almost all the way back (Wave b 📉 — almost undoing the bulls' work), then Bulls EXPLODE forward with a huge 5-wave charge (Wave c 📈📈📈📈📈). The key difference from a Zigzag: the middle pullback (B-wave) is MUCH BIGGER — almost going all the way back to the start. But then C launches powerfully beyond A's top!</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">FLAT CORRECTION — Exact Bitcoin Pattern (a:3 · b:3 · c:5) — BULLISH</div>
+    <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grid -->
+      <line x1="30" y1="250" x2="870" y2="250" stroke="#1e3050" stroke-width="0.5"/>
+      <!-- Price level labels -->
+      <text font-family="Space Mono,monospace" font-size="9" fill="#3a4f6e" x="24" y="50" text-anchor="end">HIGH</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#3a4f6e" x="24" y="130" text-anchor="end">MID</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#3a4f6e" x="24" y="210" text-anchor="end">LOW</text>
+      <line x1="28" y1="50" x2="870" y2="50" stroke="#1e3050" stroke-width="0.5" stroke-dasharray="4 6"/>
+      <line x1="28" y1="130" x2="870" y2="130" stroke="#1e3050" stroke-width="0.5" stroke-dasharray="4 6"/>
+      <line x1="28" y1="210" x2="870" y2="210" stroke="#1e3050" stroke-width="0.5" stroke-dasharray="4 6"/>
+
+      <!-- PRE-PATTERN uptrend -->
+      <polyline points="30,240 55,215 45,225 72,195" fill="none" stroke="#3a4f6e" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#3a4f6e" x="45" y="258">prior impulse</text>
+
+      <!-- WAVE a:3 UP (bullish, 3-wave, goes from ~210 to 55) -->
+      <!-- sub-a up: 72,195 → 110,140 -->
+      <polyline points="72,195 88,173 80,183 100,155 92,165 115,138" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- sub-b down: 115,138 → 135,160 -->
+      <polyline points="115,138 125,150 120,143 138,162" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <!-- sub-c up: 138,162 → 188,58 -->
+      <polyline points="138,162 155,138 147,150 172,110 162,122 192,78 182,90 210,55" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="72" cy="195" r="5" fill="#00e096"/>
+      <circle cx="210" cy="55" r="6" fill="#00e096"/>
+      <!-- a:3 label -->
+      <rect x="120" y="32" width="36" height="20" rx="4" fill="rgba(0,224,150,0.15)" stroke="rgba(0,224,150,0.4)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="138" y="46" text-anchor="middle">a:3</text>
+      <line x1="138" y1="52" x2="200" y2="58" stroke="rgba(0,224,150,0.3)" stroke-width="0.5"/>
+
+      <!-- FLAT BOX (dashed) marking the flat correction area -->
+      <rect x="68" y="48" width="380" height="150" rx="6" fill="none" stroke="#f0a500" stroke-width="1" stroke-dasharray="8 4" opacity="0.4"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#f0a500" x="258" y="40" text-anchor="middle" letter-spacing="1" opacity="0.7">F L A T   C O R R E C T I O N</text>
+
+      <!-- WAVE b:3 DOWN (corrective, 3-wave, retraces ~100% of a) -->
+      <!-- sub-a down: 210,55 → 265,148 -->
+      <polyline points="210,55 228,82 220,68 248,110 238,96 268,148" fill="none" stroke="#ff4d6a" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- sub-b up: 265,148 → 290,120 -->
+      <polyline points="268,148 278,132 272,140 294,118" fill="none" stroke="#00e096" stroke-width="2" stroke-linecap="round"/>
+      <!-- sub-c down: 290,120 → 360,198 -->
+      <polyline points="294,118 310,142 302,130 325,165 315,153 345,188 338,175 368,202" fill="none" stroke="#ff4d6a" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="368" cy="202" r="6" fill="#ff4d6a"/>
+      <!-- b:3 label -->
+      <rect x="280" y="212" width="36" height="20" rx="4" fill="rgba(255,77,106,0.15)" stroke="rgba(255,77,106,0.4)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="298" y="226" text-anchor="middle">b:3</text>
+
+      <!-- b retraces ~100% annotation -->
+      <line x1="410" y1="55" x2="410" y2="202" stroke="rgba(240,165,0,0.5)" stroke-width="1"/>
+      <line x1="405" y1="55" x2="415" y2="55" stroke="rgba(240,165,0,0.5)" stroke-width="1"/>
+      <line x1="405" y1="202" x2="415" y2="202" stroke="rgba(240,165,0,0.5)" stroke-width="1"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="418" y="128">~100% retrace</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="418" y="138">(61.8–138.2%)</text>
+
+      <!-- WAVE c:5 UP (IMPULSE, extends beyond a's top → toward 160k) -->
+      <!-- sub-1 up -->
+      <polyline points="368,202 388,178 380,190 408,155 398,167 428,135" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round"/>
+      <!-- sub-2 down -->
+      <polyline points="428,135 442,152 435,142 458,165" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <!-- sub-3 up (longest) -->
+      <polyline points="458,165 475,138 467,152 498,105 488,118 518,72 508,85 542,48 532,60 565,28" fill="none" stroke="#00d4aa" stroke-width="3.5" stroke-linecap="round"/>
+      <!-- sub-4 down -->
+      <polyline points="565,28 578,45 571,36 595,60" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <!-- sub-5 up -->
+      <polyline points="595,60 610,42 603,51 630,22 620,32 655,8" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="655" cy="8" r="7" fill="#00d4aa"/>
+      <!-- c:5 label -->
+      <rect x="700" y="5" width="36" height="20" rx="4" fill="rgba(0,212,170,0.2)" stroke="rgba(0,212,170,0.5)" stroke-width="0.8"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00d4aa" x="718" y="19" text-anchor="middle">c:5</text>
+
+      <!-- Sub-wave labels for c:5 -->
+      <text font-family="Space Mono,monospace" font-size="9" fill="#00d4aa" x="435" y="128">1:3</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#ff4d6a" x="462" y="176">2:3</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#00d4aa" x="520" y="60">3:3</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#ff4d6a" x="580" y="72">4:3</text>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#00d4aa" x="612" y="42">5:3</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="500" y="185">c:5 extends BEYOND a's top</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="500" y="197">= confirms Flat pattern</text>
+
+      <!-- $66,800 invalidation level -->
+      <line x1="28" y1="210" x2="870" y2="210" stroke="#ff4d6a" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.6"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#ff4d6a" x="740" y="205">$66,800 — BEARISH BELOW</text>
+    </svg>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Bullish waves (a, c:5 sub-waves)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Bearish waves (b, counter-trend)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--amber);opacity:0.6"></div>Flat correction zone</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red);opacity:0.5;border-top:2px dashed var(--red)"></div>Invalidation level</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="pro-box">
+        <h3>Flat Correction Rules (NEoWave)</h3>
+        <ul>
+          <li>Wave A is a <strong>3-wave structure</strong> (not 5-wave — that would be a Zigzag)</li>
+          <li>Wave B retraces <strong>61.8% to 138.2%</strong> of Wave A. This wide range is the key differentiator</li>
+          <li>Wave C is a <strong>5-wave impulse</strong> that extends beyond A's end</li>
+          <li><strong>Regular Flat:</strong> B ends near A's start; C ends near A's end</li>
+          <li><strong>Expanded Flat:</strong> B exceeds A's start; C extends well beyond A's end</li>
+          <li><strong>Running Flat:</strong> B far exceeds A's start; C barely retraces (bullish signal)</li>
+          <li>In Bitcoin chart: This is a <strong>bullish Expanded Flat</strong> → c:5 targeting ~$160k</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="three-col" style="grid-template-columns:1fr 1fr 1fr;margin:0 0 16px">
+        <div class="card stat"><div class="stat-num">3</div><div class="stat-label">A wave sub-waves</div></div>
+        <div class="card stat"><div class="stat-num">3</div><div class="stat-label">B wave sub-waves</div></div>
+        <div class="card stat"><div class="stat-num" style="color:var(--amber)">5</div><div class="stat-label">C wave sub-waves</div></div>
+      </div>
+      <div class="inval-box">
+        <h3>⚠️ Bitcoin Chart Invalidation</h3>
+        <p>If price closes BELOW <strong>$66,800</strong>, the bullish Flat count is invalidated. This would suggest the b:3 wave went too low, and a bearish count takes over. Always place stops below this level when trading the c:5 wave up.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+  <h3 style="font-size:16px;margin-bottom:16px;color:var(--text-muted)">Three Types of Flat Corrections</h3>
+  <div class="three-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--teal)">Regular Flat</div>
+      <p style="font-size:12px;line-height:1.6;color:var(--text-muted)">B retraces ~100% of A. C ends at roughly A's end. Market moves sideways overall. Most common in consolidating markets.</p>
+    </div>
+    <div class="card" style="border-color:var(--amber)">
+      <div class="card-title" style="color:var(--amber)">Expanded Flat ⭐ Bitcoin</div>
+      <p style="font-size:12px;line-height:1.6;color:var(--text-muted)">B exceeds A's starting point. C extends well beyond A's end. VERY common in crypto bull markets. Bitcoin is in this pattern NOW.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--purple)">Running Flat</div>
+      <p style="font-size:12px;line-height:1.6;color:var(--text-muted)">B far exceeds A. C barely retraces at all. Extremely bullish signal — the correction barely makes a dent. Very strong underlying trend.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 4: DIAMETRIC ======================== -->
+<div class="tab-pane" id="tab-4">
+  <div class="pane-header">
+    <div class="concept-tag tag-key">⭐ NEoWave Exclusive Pattern</div>
+    <h2 class="pane-title">Diametric Formation — The 7-Wave Diamond</h2>
+    <p class="pane-sub">Completely unique to NEoWave. Not found in classical Elliott Wave at all. A 7-segment pattern (a-b-c-d-e-f-g) where alternating waves grow or shrink in a diamond shape. This is what preceded Bitcoin's current pattern.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Heartbeat Monitor Getting Louder, Then Quieter</h3>
+    <p>You know how a heartbeat (ECG) looks on a hospital monitor? It goes beep… BEEP… BEEP… beep… beep (getting bigger then smaller). A Diametric is exactly like that — 7 waves that either get BIGGER each time (Expanding Diametric) or get SMALLER each time (Contracting Diametric). The pattern has <strong>7 named waves: a, b, c, d, e, f, g</strong> — like the musical notes! It can only happen as a corrective pattern inside a larger trend.</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Expanding Diametric — a·b·c·d·e·f·g — Each wave larger than the previous (same direction)</div>
+    <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grid -->
+      <line x1="30" y1="240" x2="870" y2="240" stroke="#1e3050" stroke-width="0.5"/>
+      <line x1="30" y1="20" x2="30" y2="240" stroke="#1e3050" stroke-width="0.5"/>
+      <!-- center axis -->
+      <line x1="30" y1="130" x2="870" y2="130" stroke="#1e3050" stroke-width="0.5" stroke-dasharray="6 6"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#3a4f6e" x="26" y="133" text-anchor="end">Center</text>
+
+      <!-- WAVE a (small up, ~40px) -->
+      <polyline points="50,140 65,122 58,131 80,112 72,120 100,102" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="50" cy="140" r="4" fill="#6b7fa0"/>
+      <circle cx="100" cy="102" r="5" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#00e096" x="100" y="92" text-anchor="middle">a</text>
+
+      <!-- WAVE b (medium down, ~55px) -->
+      <polyline points="100,102 115,122 108,110 132,148 122,135 150,168 140,155 168,178" fill="none" stroke="#ff4d6a" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="168" cy="178" r="5" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#ff4d6a" x="168" y="192" text-anchor="middle">b</text>
+
+      <!-- WAVE c (larger up, ~90px) -->
+      <polyline points="168,178 188,148 178,162 210,115 198,130 232,80 220,96 256,55 244,68 280,38" fill="none" stroke="#00e096" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="280" cy="38" r="6" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#00e096" x="280" y="28" text-anchor="middle">c</text>
+
+      <!-- WAVE d (larger down, ~120px) -->
+      <polyline points="280,38 298,68 289,52 318,102 306,86 338,138 325,122 358,172 345,158 378,198 365,185 398,218" fill="none" stroke="#ff4d6a" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="398" cy="218" r="6" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#ff4d6a" x="398" y="232" text-anchor="middle">d</text>
+
+      <!-- WAVE e (even larger up, ~145px) -->
+      <polyline points="398,218 418,188 408,202 442,152 430,168 465,112 452,128 490,72 478,88 512,38 500,52 535,18" fill="none" stroke="#00e096" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="535" cy="18" r="7" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#00e096" x="535" y="10" text-anchor="middle">e</text>
+
+      <!-- WAVE f (larger down, ~165px) -->
+      <polyline points="535,18 555,48 545,32 578,85 565,68 602,128 588,110 625,168 610,150 648,205 635,190 668,228 655,215 688,248" fill="none" stroke="#ff4d6a" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="688" cy="248" r="7" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="12" fill="#ff4d6a" x="700" y="252" text-anchor="middle">f</text>
+
+      <!-- WAVE g (largest up, ~190px) -->
+      <polyline points="688,248 708,218 698,232 730,178 720,198 752,132 740,152 772,88 760,108 792,48 780,68 812,18 800,32 838,5" fill="none" stroke="#00e096" stroke-width="4.5" stroke-linecap="round"/>
+      <circle cx="838" cy="5" r="8" fill="#00d4aa"/>
+      <text font-family="Space Mono,monospace" font-size="13" fill="#00d4aa" x="840" y="22" text-anchor="middle">g</text>
+
+      <!-- Expanding diamond outline (upper) -->
+      <polyline points="50,140 100,102 280,38 535,18 838,5" fill="none" stroke="rgba(240,165,0,0.25)" stroke-width="1" stroke-dasharray="6 4"/>
+      <!-- Expanding diamond outline (lower) -->
+      <polyline points="50,140 168,178 398,218 688,248" fill="none" stroke="rgba(240,165,0,0.25)" stroke-width="1" stroke-dasharray="6 4"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="445" y="260" text-anchor="middle" opacity="0.6">← Each swing is LARGER than the previous same-direction swing →</text>
+    </svg>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Up waves (a, c, e, g) — each larger</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Down waves (b, d, f) — each larger</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--amber);opacity:0.4"></div>Expanding channel boundaries</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="pro-box">
+        <h3>Diametric Rules (NEoWave)</h3>
+        <ul>
+          <li>Exactly <strong>7 segments</strong> labeled a through g. Not 5, not 9 — exactly 7.</li>
+          <li><strong>Expanding:</strong> Each odd wave (a, c, e, g) is LARGER than the previous odd wave. Each even wave (b, d, f) is also progressively larger.</li>
+          <li><strong>Contracting:</strong> Each odd wave is SMALLER than the previous. Pattern converges to a point.</li>
+          <li>Even waves must be smaller than the adjacent odd waves (b &lt; a, d &lt; c, f &lt; e)</li>
+          <li>Pattern typically appears in <strong>complex corrections</strong> or as part of X-wave structures</li>
+          <li>After completion, a powerful impulse wave in the direction of the prior trend typically follows</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="three-col" style="grid-template-columns:1fr 1fr;margin:0 0 16px">
+        <div class="card stat"><div class="stat-num">7</div><div class="stat-label">Total segments</div></div>
+        <div class="card stat"><div class="stat-num">4</div><div class="stat-label">Odd waves (a,c,e,g)</div></div>
+        <div class="card stat"><div class="stat-num">3</div><div class="stat-label">Even waves (b,d,f)</div></div>
+        <div class="card stat"><div class="stat-num" style="color:var(--amber)">0</div><div class="stat-label">In classical Elliott!</div></div>
+      </div>
+      <div class="kid-box" style="margin:0;padding:14px">
+        <h3>🔑 Key Insight</h3>
+        <p style="font-size:13px">The Diametric is Glenn Neely's biggest discovery. It explains price action that completely stumped classical Elliott analysts. When you see 7 waves with growing or shrinking swings, you've found a Diametric.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 5: EXPANDING TRIANGLE ======================== -->
+<div class="tab-pane" id="tab-5">
+  <div class="pane-header">
+    <div class="concept-tag tag-key">⭐ As Seen in Bitcoin Chart</div>
+    <h2 class="pane-title">Expanding Triangle — The Opening Fan</h2>
+    <p class="pane-sub">A 5-wave corrective pattern where each successive swing is LARGER than the previous. The channel lines diverge outward like an opening fan or megaphone shape. Labeled: i · a · b · c · d · e</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Megaphone or Opening Fan</h3>
+    <p>Have you ever seen someone use a megaphone? The shape starts narrow and gets wider. An Expanding Triangle is exactly that shape on a chart — each wave swing gets BIGGER and BIGGER. The two lines you draw through the highs and lows are moving APART (diverging) unlike a regular triangle where they converge. After this pattern completes, the market usually makes a VERY big move in the direction of the prior trend!</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Expanding Triangle — i·a·b·c·d·e — Diverging channel (Megaphone shape)</div>
+    <svg viewBox="0 0 900 270" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grid -->
+      <line x1="30" y1="250" x2="870" y2="250" stroke="#1e3050" stroke-width="0.5"/>
+
+      <!-- Wave i (initial, small up) -->
+      <polyline points="60,180 78,162 70,170 92,148 84,155 108,135" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="60" cy="180" r="5" fill="#6b7fa0"/>
+      <circle cx="108" cy="135" r="5" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="108" y="126" text-anchor="middle">i</text>
+
+      <!-- Wave a (larger down) -->
+      <polyline points="108,135 125,158 117,146 148,185 138,172 168,205 158,192 192,220" fill="none" stroke="#ff4d6a" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="192" cy="220" r="6" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="192" y="234" text-anchor="middle">a</text>
+
+      <!-- Wave b (larger up, exceeds i's top) -->
+      <polyline points="192,220 212,192 202,206 238,160 226,174 262,125 250,138 288,98 276,110 315,72 302,85 338,48" fill="none" stroke="#00e096" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="338" cy="48" r="6" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="338" y="38" text-anchor="middle">b</text>
+
+      <!-- Wave c (larger down, goes below a's end) -->
+      <polyline points="338,48 358,80 348,62 382,118 370,100 408,155 395,138 432,192 418,175 458,225 444,210 488,248" fill="none" stroke="#ff4d6a" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="488" cy="248" r="7" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="488" y="263" text-anchor="middle">c</text>
+
+      <!-- Wave d (larger up, exceeds b's top) -->
+      <polyline points="488,248 510,215 498,230 538,172 522,190 565,128 548,148 592,85 575,105 620,45 602,65 645,18" fill="none" stroke="#00e096" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="645" cy="18" r="7" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#00e096" x="645" y="10" text-anchor="middle">d</text>
+
+      <!-- Wave e (largest down) -->
+      <polyline points="645,18 668,55 655,35 695,100 680,78 720,150 705,128 745,200 728,178 768,240 752,218 800,268" fill="none" stroke="#ff4d6a" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="800" cy="268" r="8" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="815" y="270" text-anchor="middle">e</text>
+
+      <!-- UPPER diverging channel line -->
+      <line x1="108" y1="135" x2="645" y2="18" stroke="#f0a500" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.6"/>
+      <line x1="645" y1="18" x2="820" y2="-8" stroke="#f0a500" stroke-width="1" stroke-dasharray="6 4" opacity="0.35"/>
+      <!-- LOWER diverging channel line -->
+      <line x1="192" y1="220" x2="488" y2="248" stroke="#f0a500" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.6"/>
+      <line x1="488" y1="248" x2="820" y2="280" stroke="#f0a500" stroke-width="1" stroke-dasharray="6 4" opacity="0.35"/>
+
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="460" y="18" text-anchor="middle" opacity="0.7">← DIVERGING CHANNEL (Megaphone shape) →</text>
+
+      <!-- Arrow: after e, big move up -->
+      <line x1="810" y1="240" x2="855" y2="170" stroke="#00d4aa" stroke-width="2" stroke-dasharray="5 3"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="858" y="165">Next: Big</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="858" y="176">impulse!</text>
+    </svg>
+  </div>
+
+  <div class="two-col">
+    <div class="pro-box">
+      <h3>Expanding Triangle Rules (NEoWave)</h3>
+      <ul>
+        <li>Each wave in the <strong>same direction</strong> must be LARGER than the previous (c &gt; a, e &gt; c)</li>
+        <li>Each wave in the <strong>opposite direction</strong> must also grow (d &gt; b, which must be &gt; i)</li>
+        <li>The two trendlines connecting the highs and lows must <strong>diverge</strong> — never parallel</li>
+        <li>Typically contains <strong>5 sub-waves</strong> (i or a through e)</li>
+        <li>After completion → expect a <strong>large, violent move</strong> in the direction of the prior trend</li>
+        <li>This is what Bitcoin's structure before the Diametric was: an <strong>Expanding Triangle</strong> labeled i, a, b, c, d, e</li>
+      </ul>
+    </div>
+    <div>
+      <div class="inval-box">
+        <h3>📍 In the Bitcoin Chart</h3>
+        <p>The first section of the Bitcoin chart (left side) shows: an <strong>Expanding Triangle</strong> labeled <strong>i, a, b, c, d, e</strong> (with red trendlines diverging). This was followed by an X-wave connector (g·x) which then launched the Flat correction currently in progress.</p>
+      </div>
+      <div class="kid-box" style="margin:12px 0 0;padding:14px">
+        <h3>⚡ Trading Tip</h3>
+        <p style="font-size:13px">When you see an Expanding Triangle complete its e-wave, get ready for a major trend move. The longer and more expansive the triangle, the more powerful the breakout that follows.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 6: TERMINAL ======================== -->
+<div class="tab-pane" id="tab-6">
+  <div class="pane-header">
+    <div class="concept-tag tag-key">⭐ REVERSAL SIGNAL — KEY Pattern</div>
+    <h2 class="pane-title">Terminal Impulse — The Exhaustion Wedge</h2>
+    <p class="pane-sub">The most powerful reversal signal in NEoWave. A 5-wave impulse where ALL sub-waves are 3-wave structures (1:3, 2:3, 3:3, 4:3, 5:3) fitting inside a converging wedge. When complete: SHARP REVERSAL follows. This is "TERMINAL?" on the Bitcoin chart.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Tired Runner About to Collapse</h3>
+    <p>Imagine a runner in a race who's nearly out of energy. Their steps get shorter and shorter (each wave gets smaller), they're barely moving forward anymore, but they're still going. That's a Terminal Impulse — the market is making one last push, but you can see it's running out of steam. Each sub-wave is a <strong>3-wave corrective move</strong> (not a proper impulse), which means the trend is <strong>very weak</strong>. When the 5th tiny wave completes — the runner falls! A BIG REVERSAL is coming. This is why Trading Heights put "TERMINAL?" on the Bitcoin chart at the top!</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Terminal Impulse — All 5 sub-waves are 3-wave structures · Converging wedge · REVERSAL signal</div>
+    <svg viewBox="0 0 900 270" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grid -->
+      <line x1="30" y1="250" x2="870" y2="250" stroke="#1e3050" stroke-width="0.5"/>
+
+      <!-- Start -->
+      <circle cx="60" cy="210" r="5" fill="#6b7fa0"/>
+
+      <!-- Wave 1:3 (3-wave up, smaller than would be in a real impulse) -->
+      <!-- sub-a up: 60,210 → 90,178 -->
+      <polyline points="60,210 72,195 66,202 85,180 78,188 98,168" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- sub-b down: 98,168 → 112,182 -->
+      <polyline points="98,168 106,176 102,172 115,185" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <!-- sub-c up: 112,182 → 140,152 -->
+      <polyline points="115,185 125,172 120,178 138,158 132,164 155,145" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="155" cy="145" r="5" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="155" y="135" text-anchor="middle">1:3</text>
+
+      <!-- Wave 2:3 (3-wave down, retraces INTO wave 1) -->
+      <polyline points="155,145 166,160 160,152 180,175 174,167 194,190 188,182 210,200" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="210" cy="200" r="5" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#ff4d6a" x="210" y="213" text-anchor="middle">2:3</text>
+      <!-- KEY: Wave 4 overlaps Wave 1 — mark this! -->
+      <line x1="155" y1="145" x2="155" y2="210" stroke="rgba(255,77,106,0.25)" stroke-width="1" stroke-dasharray="3 3"/>
+
+      <!-- Wave 3:3 (3-wave up, but SMALLER than wave 1:3) -->
+      <polyline points="210,200 222,185 216,192 236,170 230,178 248,158 242,165 262,142 256,150 278,128" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="278" cy="128" r="5" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="278" y="118" text-anchor="middle">3:3</text>
+      <!-- 3<1 annotation -->
+      <text font-family="Sora,sans-serif" font-size="8" fill="#ff4d6a" x="220" y="128">③ &lt; ①</text>
+
+      <!-- Wave 4:3 (3-wave down, overlaps Wave 1's territory) -->
+      <polyline points="278,128 290,142 284,135 305,158 298,150 320,172 314,164 340,185" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="340" cy="185" r="5" fill="#ff4d6a"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#ff4d6a" x="340" y="198" text-anchor="middle">4:3</text>
+
+      <!-- Wave 5:3 (3-wave up, SMALLEST) -->
+      <polyline points="340,185 352,172 346,178 364,158 358,165 378,145 372,152 392,135 386,140 408,122" fill="none" stroke="#00e096" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="408" cy="122" r="5" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="408" y="112" text-anchor="middle">5:3</text>
+      <!-- 5<3 annotation -->
+      <text font-family="Sora,sans-serif" font-size="8" fill="#ff4d6a" x="360" y="108">⑤ &lt; ③ &lt; ①</text>
+
+      <!-- CONVERGING WEDGE CHANNEL -->
+      <line x1="60" y1="210" x2="340" y2="185" stroke="#f0a500" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.7"/>
+      <line x1="155" y1="145" x2="408" y2="122" stroke="#f0a500" stroke-width="1.5" stroke-dasharray="8 4" opacity="0.7"/>
+      <line x1="340" y1="185" x2="480" y2="175" stroke="#f0a500" stroke-width="1" stroke-dasharray="5 4" opacity="0.4"/>
+      <line x1="408" y1="122" x2="480" y2="120" stroke="#f0a500" stroke-width="1" stroke-dasharray="5 4" opacity="0.4"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="230" y="220" text-anchor="middle" opacity="0.7">Converging wedge channel</text>
+
+      <!-- REVERSAL Arrow (dramatic) -->
+      <line x1="430" y1="118" x2="480" y2="118" stroke="#ff4d6a" stroke-width="1.5" stroke-dasharray="5 3"/>
+      <polyline points="480,115 560,165 620,210 700,240" fill="none" stroke="#ff4d6a" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="480" cy="118" r="6" fill="#ff4d6a"/>
+      <!-- Terminal label box -->
+      <rect x="460" y="60" width="120" height="38" rx="6" fill="rgba(255,77,106,0.12)" stroke="rgba(255,77,106,0.5)" stroke-width="1"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#ff4d6a" x="520" y="77" text-anchor="middle">TERMINAL?</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="520" y="90" text-anchor="middle">Expect Reversal</text>
+      <line x1="520" y1="98" x2="490" y2="116" stroke="rgba(255,77,106,0.5)" stroke-width="1"/>
+
+      <!-- Reversal label -->
+      <text font-family="Space Mono,monospace" font-size="11" fill="#ff4d6a" x="650" y="238" text-anchor="middle">SHARP REVERSAL</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="650" y="252" text-anchor="middle">After Terminal completes → big counter-trend move</text>
+
+      <!-- Rules sidebar -->
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="760" y="45">Key Rules:</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="760" y="60">③ must be &lt; ①</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="760" y="74">⑤ must be &lt; ③</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="760" y="88">④ overlaps ① zone</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#ff4d6a" x="760" y="102">All sub-waves = 3</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="760" y="116">Wedge channel</text>
+    </svg>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Up waves (each smaller: 1:3 > 3:3 > 5:3)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Down waves (corrective, 2:3, 4:3)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--amber);opacity:0.6"></div>Converging wedge channel</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Sharp reversal after completion</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="pro-box">
+        <h3>Terminal Impulse Rules (NEoWave) — Most Strict</h3>
+        <ul>
+          <li>ALL 5 sub-waves must be <strong>3-wave structures</strong> (corrective, not impulse). Hence labeled 1:3, 2:3, 3:3, 4:3, 5:3</li>
+          <li>Wave 3 must be <strong>shorter</strong> than Wave 1 (opposite of normal impulse!)</li>
+          <li>Wave 5 must be <strong>shorter</strong> than Wave 3</li>
+          <li>Wave 4 MUST <strong>overlap</strong> Wave 1's price territory (again, opposite of normal!)</li>
+          <li>All 5 waves must fit inside a <strong>converging channel / wedge</strong></li>
+          <li>Wave 4 is typically larger in time/price than Wave 2</li>
+          <li>Upon completion → expect the <strong>sharpest and fastest counter-trend move</strong> of any pattern</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="inval-box">
+        <h3>⚡ Bitcoin "TERMINAL?" Label</h3>
+        <p>The "TERMINAL?" label on the Trading Heights Bitcoin chart means: the c:5 wave (the final 5-wave impulse up) <strong>may itself be a Terminal Impulse</strong> — with sub-waves labeled 1:3, 2:3, 3:3, 4:3, 5:3. If confirmed, this means Bitcoin's rally would be OVER at that point and a sharp correction follows.</p>
+      </div>
+      <div class="three-col" style="grid-template-columns:1fr 1fr;margin:12px 0 0">
+        <div class="card stat"><div class="stat-num" style="color:var(--red)">3</div><div class="stat-label">Sub-waves per wave</div></div>
+        <div class="card stat"><div class="stat-num" style="color:var(--red)">↓</div><div class="stat-label">Each wave shrinks</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 7: X-WAVE ======================== -->
+<div class="tab-pane" id="tab-7">
+  <div class="pane-header">
+    <div class="concept-tag tag-core">Complex Correction Connector</div>
+    <h2 class="pane-title">X-Wave — The Pattern Connector</h2>
+    <p class="pane-sub">X-waves connect two separate corrective patterns in a "complex correction." They're the glue between patterns and tell you that what you're seeing is more complex than a simple correction. Identified by their shallow, 50–79% retracement.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of a Rest Stop Between Two Journeys</h3>
+    <p>Imagine you're driving a long road trip. Between two cities you have a rest stop where you just stretch your legs a bit — you don't go very far off the highway. An X-wave is exactly that rest stop in the market. The price makes a small, shallow move (only 50-79% back) BETWEEN two corrective patterns. On the Bitcoin chart, after the Expanding Triangle/Diametric pattern, there's a small "g·x" connector before the Flat correction begins. That "x" is the X-wave!</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">X-Wave — Connecting two corrective patterns — Shallow retracement (50-79% of prior wave)</div>
+    <svg viewBox="0 0 900 240" xmlns="http://www.w3.org/2000/svg">
+      <!-- Pattern 1 (W or flat shape going down) -->
+      <text font-family="Sora,sans-serif" font-size="10" fill="#6b7fa0" x="130" y="20" text-anchor="middle">Corrective Pattern 1 (e.g. Flat)</text>
+      <polyline points="30,80 65,140 50,110 90,160 75,140 120,100 105,120 155,70 140,85 180,60" fill="none" stroke="#f0a500" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="30" cy="80" r="4" fill="#6b7fa0"/>
+      <circle cx="180" cy="60" r="5" fill="#f0a500"/>
+      <rect x="10" y="18" width="240" height="150" rx="8" fill="none" stroke="#f0a500" stroke-width="1" stroke-dasharray="6 4" opacity="0.3"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#f0a500" x="36" y="175" opacity="0.6">W-pattern</text>
+
+      <!-- X-WAVE (shallow retrace, 50-79%) -->
+      <polyline points="180,60 205,80 196,70 225,100 215,88 248,118" fill="none" stroke="#9d7fff" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="248" cy="118" r="7" fill="#9d7fff"/>
+      <text font-family="Space Mono,monospace" font-size="14" fill="#9d7fff" x="255" y="112">x</text>
+      <!-- Retrace depth indicator -->
+      <line x1="280" y1="60" x2="280" y2="118" stroke="rgba(157,127,255,0.5)" stroke-width="1"/>
+      <line x1="275" y1="60" x2="285" y2="60" stroke="rgba(157,127,255,0.5)" stroke-width="1"/>
+      <line x1="275" y1="118" x2="285" y2="118" stroke="rgba(157,127,255,0.5)" stroke-width="1"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="290" y="92">50-79%</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="290" y="104">retrace</text>
+
+      <!-- Pattern 2 (zigzag going down) -->
+      <text font-family="Sora,sans-serif" font-size="10" fill="#6b7fa0" x="580" y="20" text-anchor="middle">Corrective Pattern 2 (e.g. Zigzag)</text>
+      <polyline points="260,118 310,170 285,148 350,210 330,192 400,155 380,170 450,120 430,135 510,80" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="510" cy="80" r="5" fill="#00d4aa"/>
+      <rect x="255" y="20" width="270" height="170" rx="8" fill="none" stroke="#00d4aa" stroke-width="1" stroke-dasharray="6 4" opacity="0.3"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#00d4aa" x="260" y="200" opacity="0.6">Zigzag</text>
+
+      <!-- Complex Correction label above -->
+      <rect x="18" y="0" width="525" height="20" rx="4" fill="rgba(240,165,0,0.06)" stroke="rgba(240,165,0,0.2)" stroke-width="0.5"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#f0a500" x="265" y="13" text-anchor="middle" letter-spacing="1">COMPLEX CORRECTION = Pattern 1 + X-Wave + Pattern 2</text>
+
+      <!-- Arrow indicating what comes next -->
+      <polyline points="510,80 560,60 620,40 700,30 790,22" fill="none" stroke="#00e096" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="8 4"/>
+      <text font-family="Sora,sans-serif" font-size="10" fill="#00e096" x="810" y="20">Impulse wave</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="810" y="33">resumes trend</text>
+
+      <!-- X-wave properties -->
+      <text font-family="Sora,sans-serif" font-size="9" fill="#6b7fa0" x="600" y="100">X-Wave Properties:</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="600" y="115">• Retraces 50-79% of prior pattern</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="600" y="128">• Always a 3-wave structure</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="600" y="141">• Small, subtle, easy to miss</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="600" y="154">• Never retrace more than 100%</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="600" y="172">On Bitcoin chart: "g x" marker</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="600" y="184">is the X-wave connector</text>
+    </svg>
+  </div>
+
+  <div class="two-col">
+    <div class="pro-box">
+      <h3>X-Wave Rules (NEoWave)</h3>
+      <ul>
+        <li>Always a <strong>3-wave corrective structure</strong> (never 5-wave)</li>
+        <li>Retraces <strong>50% to 79%</strong> of the prior corrective pattern's size</li>
+        <li>Cannot retrace more than 100% of the prior pattern</li>
+        <li>Typically much <strong>shorter in time</strong> than the patterns it connects</li>
+        <li>When you see an X-wave, expect <strong>another corrective pattern</strong> to follow (same length or larger)</li>
+        <li>Complex corrections: Double-three (W-X-Y), Triple-three (W-X-Y-X-Z)</li>
+      </ul>
+    </div>
+    <div class="kid-box" style="margin:0">
+      <h3>🔑 How to Find X-Waves</h3>
+      <p>After a complex-looking corrective pattern, if price retraces only 50-79% and then continues in the original direction, label that shallow move as "x". It's the market catching its breath between two larger corrective phases. On Bitcoin's chart, the "g·x" label on the arrow marks exactly this connector.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 8: FIBONACCI ======================== -->
+<div class="tab-pane" id="tab-8">
+  <div class="pane-header">
+    <div class="concept-tag tag-core">Mathematics of Waves</div>
+    <h2 class="pane-title">NEoWave Fibonacci Ratios — The Market's DNA</h2>
+    <p class="pane-sub">Glenn Neely discovered that markets use specific Fibonacci relationships more than others. These ratios appear consistently across all timeframes and all markets. Knowing them gives you exact price targets.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of Nature's Secret Code</h3>
+    <p>Have you ever seen a sunflower? Its seeds spiral in the golden ratio — a special number (1.618...) that appears everywhere in nature: seashells, galaxies, even the human face! Markets also seem to follow this same hidden code. Wave corrections and extensions almost always end at <strong>specific ratio levels</strong> — like 38.2%, 61.8%, or 161.8% of the previous wave. NEoWave uses these ratios to predict EXACTLY where price will stop or target next. It's like the market has a hidden ruler!</p>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">NEoWave Fibonacci Levels — Retracements and Extensions on a Real Wave</div>
+    <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg">
+      <!-- Base wave (up) -->
+      <polyline points="50,240 100,210 90,220 130,182 118,194 168,148 155,162 205,115 190,128 245,82 230,96 285,50" fill="none" stroke="#00e096" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="50" cy="240" r="5" fill="#6b7fa0"/>
+      <circle cx="285" cy="50" r="7" fill="#00e096"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00e096" x="296" y="44">Top (100%)</text>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#6b7fa0" x="36" y="253">Base (0%)</text>
+
+      <!-- Fibonacci retrace levels -->
+      <line x1="285" y1="50" x2="750" y2="50" stroke="#6b7fa0" stroke-width="0.5" stroke-dasharray="3 5" opacity="0.5"/>
+      <line x1="50" y1="240" x2="750" y2="240" stroke="#6b7fa0" stroke-width="0.5" stroke-dasharray="3 5" opacity="0.5"/>
+
+      <!-- 23.6% retrace -->
+      <line x1="50" y1="192" x2="750" y2="192" stroke="#3a4f6e" stroke-width="1" stroke-dasharray="4 6"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#3a4f6e" x="755" y="195">23.6%</text>
+
+      <!-- 38.2% retrace (important) -->
+      <line x1="50" y1="164" x2="750" y2="164" stroke="#9d7fff" stroke-width="1.2" stroke-dasharray="6 4"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#9d7fff" x="755" y="168">38.2% ★</text>
+
+      <!-- 50% retrace -->
+      <line x1="50" y1="145" x2="750" y2="145" stroke="#6b7fa0" stroke-width="1" stroke-dasharray="4 6"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#6b7fa0" x="755" y="148">50.0%</text>
+
+      <!-- 61.8% retrace (GOLDEN RATIO — MOST IMPORTANT) -->
+      <line x1="50" y1="126" x2="750" y2="126" stroke="#f0a500" stroke-width="2" />
+      <text font-family="Space Mono,monospace" font-size="10" fill="#f0a500" x="755" y="130">61.8% ⭐</text>
+      <rect x="700" y="118" width="8" height="16" rx="2" fill="rgba(240,165,0,0.3)"/>
+
+      <!-- 78.6% retrace -->
+      <line x1="50" y1="102" x2="750" y2="102" stroke="#3a4f6e" stroke-width="1" stroke-dasharray="4 6"/>
+      <text font-family="Space Mono,monospace" font-size="9" fill="#3a4f6e" x="755" y="105">78.6%</text>
+
+      <!-- Extension levels (below the wave top) -->
+      <!-- 127.2% extension -->
+      <line x1="285" y1="25" x2="750" y2="25" stroke="#00d4aa" stroke-width="1.2" stroke-dasharray="6 4"/>
+      <text font-family="Space Mono,monospace" font-size="10" fill="#00d4aa" x="755" y="28">127.2%</text>
+
+      <!-- Typical retrace arrows showing where waves end -->
+      <!-- Wave 2 usually ends at 61.8% -->
+      <polyline points="285,50 340,95 310,72 380,110 355,94 420,126" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round" stroke-dasharray="5 3"/>
+      <circle cx="420" cy="126" r="5" fill="#f0a500"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="390" y="142">Wave 2 ends</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#f0a500" x="390" y="153">at 61.8%</text>
+
+      <!-- Wave 4 usually ends at 38.2% -->
+      <circle cx="480" cy="164" r="5" fill="#9d7fff"/>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="488" y="158">Wave 4 at</text>
+      <text font-family="Sora,sans-serif" font-size="9" fill="#9d7fff" x="488" y="170">38.2%</text>
+
+      <!-- Extension wave 3 = 1.618 x wave 1 -->
+      <text font-family="Sora,sans-serif" font-size="9" fill="#00d4aa" x="50" y="22">Wave 3 = 161.8% of Wave 1 (most common extension)</text>
+    </svg>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <table class="fib-table">
+        <thead><tr><th>Ratio</th><th>Type</th><th>NEoWave Use</th><th>Importance</th></tr></thead>
+        <tbody>
+          <tr><td class="key-ratio">23.6%</td><td>Retrace</td><td class="use">Very shallow corrections, strong trends</td><td>Low</td></tr>
+          <tr><td class="key-ratio">38.2%</td><td>Retrace</td><td class="use">Wave 4 of impulse, shallow B-waves</td><td>Medium</td></tr>
+          <tr><td class="key-ratio">50.0%</td><td>Retrace</td><td class="use">Moderate corrections</td><td>Medium</td></tr>
+          <tr><td class="key-ratio" style="color:var(--amber)">61.8% ⭐</td><td>Retrace</td><td class="use">Wave 2 of impulse, X-wave max, B-wave</td><td style="color:var(--amber)">★ Very High</td></tr>
+          <tr><td class="key-ratio">78.6%</td><td>Retrace</td><td class="use">Deep corrections</td><td>Medium</td></tr>
+          <tr><td class="key-ratio">100%</td><td>Retrace</td><td class="use">Flat B-wave maximum</td><td>High</td></tr>
+          <tr><td class="key-ratio">127.2%</td><td>Extension</td><td class="use">C-wave of flat minimum target</td><td>High</td></tr>
+          <tr><td class="key-ratio" style="color:var(--teal)">161.8% ⭐</td><td>Extension</td><td class="use">Wave 3 target, C-wave extension</td><td style="color:var(--teal)">★ Very High</td></tr>
+          <tr><td class="key-ratio">261.8%</td><td>Extension</td><td class="use">Extended Wave 3, strong impulse target</td><td>High</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div class="pro-box">
+        <h3>NEoWave Fibonacci Rules</h3>
+        <ul>
+          <li><strong>Wave 2</strong> retraces 38.2% to 61.8% of Wave 1 in most cases</li>
+          <li><strong>Wave 3</strong> is typically 161.8% of Wave 1, or 61.8% of Waves 1+2 combined</li>
+          <li><strong>Wave 4</strong> retraces 38.2% of Wave 3 (most common)</li>
+          <li><strong>Wave 5</strong> often equals Wave 1, or 61.8% of Waves 1-3</li>
+          <li><strong>B-wave of flat</strong> = 61.8% to 138.2% of Wave A</li>
+          <li><strong>C-wave of flat</strong> = 127.2% or 161.8% beyond A's end</li>
+          <li>If a wave misses ALL Fibonacci levels → question your wave count!</li>
+        </ul>
+      </div>
+      <div class="kid-box" style="margin:12px 0 0;padding:14px">
+        <h3>🌻 Golden Ratio = 1.618</h3>
+        <p style="font-size:13px">The Golden Ratio (φ = 1.618...) is the most important number in NEoWave. It appears as 61.8% retracements and 161.8% extensions. When a wave hits exactly 61.8%, prepare for a reversal. When it extends to 161.8%, that's your Wave 3 target.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TAB 9: RULES ======================== -->
+<div class="tab-pane" id="tab-9">
+  <div class="pane-header">
+    <div class="concept-tag tag-basic">Master Reference</div>
+    <h2 class="pane-title">NEoWave Core Rules — The Complete Cheat Sheet</h2>
+    <p class="pane-sub">These are the fundamental laws that Glenn Neely discovered. Every NEoWave analysis must follow ALL applicable rules. If even one rule is violated, it's a different pattern. Zero exceptions.</p>
+  </div>
+
+  <div class="kid-box simple-only">
+    <h3>🧒 Think of Traffic Laws</h3>
+    <p>Just like traffic laws — you can't run a red light "just a little bit" — NEoWave rules are absolute. If Wave 3 is shorter than Wave 1 AND Wave 5, it's NOT an impulse. It's like saying "I barely ran the red light" — it's still a violation! These rules remove all the guesswork from wave counting. When all rules are satisfied → high confidence trade!</p>
+  </div>
+
+  <h3 style="font-size:15px;color:var(--text-muted);margin:20px 0 12px">The 5 Laws of NEoWave Pattern Formation</h3>
+  <div class="rules-grid">
+    <div class="rule-item">
+      <div class="rule-num">01</div>
+      <div class="rule-text"><strong>Law of Pattern Integrity</strong>Every wave must meet ALL structure requirements. A pattern with one violated rule is INVALID — not "mostly valid."</div>
+    </div>
+    <div class="rule-item">
+      <div class="rule-num">02</div>
+      <div class="rule-text"><strong>Law of Wave Alternation</strong>In any 5-wave pattern, Wave 2 and Wave 4 must alternate in form — one is simple (zigzag), the other is complex (flat/triangle).</div>
+    </div>
+    <div class="rule-item">
+      <div class="rule-num">03</div>
+      <div class="rule-text"><strong>Law of Wave Proportion</strong>Wave 3 can NEVER be the shortest of waves 1, 3, and 5 in an impulse. Wave 3 is usually the longest.</div>
+    </div>
+    <div class="rule-item">
+      <div class="rule-num">04</div>
+      <div class="rule-text"><strong>Law of Channel Containment</strong>Each wave pattern must fit within a parallel or converging price channel. If it breaks the channel, question the count.</div>
+    </div>
+    <div class="rule-item">
+      <div class="rule-num">05</div>
+      <div class="rule-text"><strong>Law of Fibonacci Confluence</strong>True wave endpoints must align with Fibonacci ratios of the prior wave. If NO Fibonacci level is hit, the wave count is suspect.</div>
+    </div>
+    <div class="rule-item">
+      <div class="rule-num">06</div>
+      <div class="rule-text"><strong>Law of Position Logic</strong>Which patterns are allowed depends on WHERE in the larger structure you are. A terminal can only occur as the last wave of a pattern.</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3 style="font-size:15px;color:var(--text-muted);margin:0 0 12px">NEoWave Pattern Quick Reference</h3>
+  <div class="three-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--green)">Impulse (5-3-5-3-5)</div>
+      <div class="wave-steps" style="gap:6px">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>W2 retraces W1</span><span style="color:var(--teal)">38.2–61.8%</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>W3 length</span><span style="color:var(--teal)">161.8% of W1</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>W4 overlap W1?</span><span style="color:var(--red)">NEVER</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>W3 shortest?</span><span style="color:var(--red)">NEVER</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--amber)">Flat (3-3-5)</div>
+      <div class="wave-steps" style="gap:6px">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>A structure</span><span style="color:var(--teal)">3 waves</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>B retraces A</span><span style="color:var(--teal)">61.8–138.2%</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>C structure</span><span style="color:var(--teal)">5 waves</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>C extends beyond A?</span><span style="color:var(--amber)">YES</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--red)">Terminal (3-3-3-3-3)</div>
+      <div class="wave-steps" style="gap:6px">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>All sub-waves</span><span style="color:var(--red)">3-wave each</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>W3 vs W1</span><span style="color:var(--red)">Shorter!</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>W4 overlap W1?</span><span style="color:var(--red)">YES (must)</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>After completion</span><span style="color:var(--red)">Sharp reversal</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--purple)">Zigzag (5-3-5)</div>
+      <div class="wave-steps" style="gap:6px">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>A structure</span><span style="color:var(--teal)">5 waves</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>B retraces A</span><span style="color:var(--teal)">38.2–61.8%</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>C structure</span><span style="color:var(--teal)">5 waves</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>C vs A end</span><span style="color:var(--purple)">Always beyond</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--amber)">Diametric (7 waves)</div>
+      <div class="wave-steps" style="gap:6px">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>Segments</span><span style="color:var(--teal)">a-b-c-d-e-f-g</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>Expanding</span><span style="color:var(--teal)">c&gt;a, e&gt;c, g&gt;e</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>Contracting</span><span style="color:var(--teal)">c&lt;a, e&lt;c, g&lt;e</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>In Elliott?</span><span style="color:var(--red)">NOT FOUND</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--teal)">X-Wave (connector)</div>
+      <div class="wave-steps" style="gap:6px">
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>Structure</span><span style="color:var(--teal)">3 waves</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>Retrace prior</span><span style="color:var(--teal)">50–79%</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>Purpose</span><span style="color:var(--teal)">Connector</span></div>
+        <div style="font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between"><span>After X-wave</span><span style="color:var(--amber)">Another correction</span></div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3 style="font-size:15px;color:var(--text-muted);margin:0 0 12px">Reading the Bitcoin Chart — Step by Step</h3>
+  <div class="wave-steps">
+    <div class="wave-step"><div class="wave-badge wb-amber">1</div><div class="ws-text"><strong>Expanding Triangle (i · a · b · c · d · e)</strong><span>The initial structure on the left of the chart. Red trendlines diverge. Wave i is small, each subsequent wave is larger. This was the first complex correction.</span></div></div>
+    <div class="wave-step"><div class="wave-badge wb-purple">2</div><div class="ws-text"><strong>NEoWave Diametric (a · b · c · d · e · f · g)</strong><span>After the triangle, a full 7-wave Diametric pattern forms. The pink channel lines show it. Labeled with purple text in the "Predicted" chart.</span></div></div>
+    <div class="wave-step"><div class="wave-badge wb-amber">3</div><div class="ws-text"><strong>X-Wave Connector (g · x marker)</strong><span>After the Diametric's g-wave, a small shallow retracement labeled "x" — this is the X-wave connecting the Diametric to the Flat correction.</span></div></div>
+    <div class="wave-step"><div class="wave-badge wb-green">4</div><div class="ws-text"><strong>Flat Correction Begins (a:3 · b:3)</strong><span>The large green dashed box marks the Flat. Wave a:3 goes up, Wave b:3 pulls back to the $66,800 area (support = invalidation level).</span></div></div>
+    <div class="wave-step"><div class="wave-badge wb-green">5</div><div class="ws-text"><strong>c:5 Wave Launches (1:3 · 2:3 · 3:3 · 4:3 · 5:3)</strong><span>The powerful c:5 wave begins from b:3's low. Sub-waves labeled 1:3 through 5:3. If it's a Terminal, all sub-waves are 3s — possible reversal at "TERMINAL?" label near $160k area.</span></div></div>
+  </div>
+</div>
+
+</div><!-- end .content -->
+
+<script>
+let currentMode = 'simple';
+let currentTab = 0;
+
+function showTab(n) {
+  document.querySelectorAll('.tab-pane').forEach(function(p,i){p.classList.toggle('active', i===n)});
+  document.querySelectorAll('.nav-btn').forEach(function(b,i){b.classList.toggle('active', i===n)});
+  currentTab = n;
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-simple').classList.toggle('active', mode==='simple');
+  document.getElementById('btn-pro').classList.toggle('active', mode==='pro');
+  document.querySelectorAll('.simple-only').forEach(function(el){
+    el.style.display = mode==='simple' ? 'block' : 'none';
+  });
+  document.querySelectorAll('.kid-box').forEach(function(el){
+    el.style.display = mode==='simple' ? 'block' : 'none';
+  });
+}
+
+// Initialize
+setMode('simple');
+</script>
+</body>
+</html>

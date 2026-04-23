@@ -1,0 +1,313 @@
+// ═══════════════════════════════════════════════════════════════
+// ICT · Volume Profile · Cumulative Delta
+// Author  : Pratap
+// Version : 1.0  |  Pine Script v5
+// Target  : Intraday scalping (1m – 15m)
+//
+// WHAT THIS DOES:
+//   1. Session Volume Profile  → VPOC / VAH / VAL (visual bars + extending lines)
+//   2. Cumulative Delta        → Approximated buy/sell imbalance per session
+//   3. CD Divergence           → Price HH + Delta LH = Bear | Price LL + Delta HL = Bull
+//   4. ICT Confluence          → Fires STRONGEST signal when CD divergence lands at VP level
+//
+// LIMITATIONS (Pine Script constraints):
+//   · CD is APPROXIMATED via candle anatomy. Real tick-level delta needs Bookmap/Sierra Chart.
+//   · Profile shows only the CURRENT live session (historical profiles = key lines only).
+//   · Profile redraws only on barstate.islast for performance.
+// ═══════════════════════════════════════════════════════════════
+
+//@version=5
+indicator("ICT · Volume Profile · Cumulative Delta",
+     shorttitle       = "ICT·VP·ΔCD",
+     overlay          = true,
+     max_bars_back    = 1000,
+     max_lines_count  = 100,
+     max_boxes_count  = 100,
+     max_labels_count = 300)
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 1 · INPUTS
+// ───────────────────────────────────────────────────────────────
+var G_VP  = "Volume Profile"
+vp_on      = input.bool  (true,             "Show Profile",          group = G_VP)
+vp_rows    = input.int   (20,               "Rows",                  group = G_VP, minval = 8,  maxval = 40)
+vp_va_pct  = input.float (70.0,             "Value Area %",          group = G_VP, minval = 50, maxval = 90, step = 5)
+vp_w       = input.int   (15,               "Width (bars)",          group = G_VP, minval = 5,  maxval = 40)
+vp_sess    = input.session("0930-1600",     "Session (Exchange TZ)", group = G_VP)
+c_poc      = input.color (#FFD700,                        "VPOC Color",       group = G_VP)
+c_va       = input.color (color.new(#1E88E5, 65),         "Value Area Color", group = G_VP)
+c_norm     = input.color (color.new(#546E7A, 80),         "Outside VA Color", group = G_VP)
+
+var G_CD  = "Cumulative Delta"
+cd_on      = input.bool  (true,             "Show CD Divergence",    group = G_CD)
+cd_lb      = input.int   (14,               "Lookback Bars",         group = G_CD, minval = 5,    maxval = 50)
+c_bull     = input.color (#00E676,          "Bullish Signal Color",  group = G_CD)
+c_bear     = input.color (#FF1744,          "Bearish Signal Color",  group = G_CD)
+
+var G_ICT = "ICT Confluence"
+ict_on     = input.bool  (true,             "Mark VP + ΔCD Hits",   group = G_ICT)
+ict_prox   = input.float (0.10,             "Proximity % to Level", group = G_ICT, minval = 0.02, maxval = 0.5, step = 0.02)
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 2 · SESSION DETECTION
+// ───────────────────────────────────────────────────────────────
+bool in_sess    = not na(time(timeframe.period, vp_sess))
+bool sess_open  = in_sess  and not in_sess[1]
+bool sess_close = not in_sess and  in_sess[1]
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 3 · CUMULATIVE DELTA (CANDLE ANATOMY APPROXIMATION)
+// ───────────────────────────────────────────────────────────────
+// Logic:
+//   Buy  volume = volume × (close - low)  / range  → demand absorbed at lows
+//   Sell volume = volume × (high - close) / range  → supply absorbed at highs
+//   Delta = buy - sell  (positive = net buying pressure)
+//
+// NOTE: This is NOT the same as real footprint/bid-ask delta.
+// It's the most accurate single-bar approximation available in Pine Script.
+// ───────────────────────────────────────────────────────────────
+float c_rng    = high - low
+float buy_vol  = c_rng > 0 ? volume * (close - low)  / c_rng : volume * 0.5
+float sell_vol = c_rng > 0 ? volume * (high - close) / c_rng : volume * 0.5
+float dlt_bar  = buy_vol - sell_vol
+
+var float cum_dlt = 0.0
+cum_dlt := sess_open ? dlt_bar : cum_dlt + dlt_bar
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 4 · DIVERGENCE DETECTION
+// ───────────────────────────────────────────────────────────────
+// BEARISH: Price makes Higher High   → Delta makes Lower High  (absorption top)
+// BULLISH: Price makes Lower Low     → Delta makes Higher Low  (demand at bottom)
+// ───────────────────────────────────────────────────────────────
+bool bear_div = cd_on
+     and (high == ta.highest(high, cd_lb))
+     and (high >  ta.highest(high, cd_lb)[1])
+     and (cum_dlt < ta.highest(cum_dlt, cd_lb)[1])
+
+bool bull_div = cd_on
+     and (low  == ta.lowest(low,  cd_lb))
+     and (low  <  ta.lowest(low,  cd_lb)[1])
+     and (cum_dlt > ta.lowest(cum_dlt, cd_lb)[1])
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 5 · VOLUME PROFILE ACCUMULATION
+// Uses candle-overlap method: each bar's volume is distributed
+// across all rows it physically spans (proportional to overlap).
+// ───────────────────────────────────────────────────────────────
+var float[] bins = array.new_float(vp_rows, 0.0)
+var float   s_lo = na
+var float   s_hi = na
+
+if sess_open
+    array.fill(bins, 0.0)
+    s_lo := low
+    s_hi := high
+
+if in_sess
+    s_lo := math.min(s_lo, low)
+    s_hi := math.max(s_hi, high)
+    float rng = s_hi - s_lo
+    if rng > 0.0
+        for r = 0 to vp_rows - 1
+            float r_lo  = s_lo + r       * rng / vp_rows
+            float r_hi  = s_lo + (r + 1) * rng / vp_rows
+            float olap  = math.max(0.0, math.min(high, r_hi) - math.max(low, r_lo))
+            float b_rng = high - low
+            float slice = b_rng > 0 ? volume * olap / b_rng
+                        : olap > 0  ? volume / vp_rows
+                        : 0.0
+            array.set(bins, r, array.get(bins, r) + slice)
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 6 · KEY LEVEL CALCULATION
+// calcVP() reads outer vars bins / s_lo / s_hi via closure (Pine v5 allowed)
+// Returns [vpoc_price, vah_price, val_price]
+// ───────────────────────────────────────────────────────────────
+calcVP() =>
+    float rng = s_hi - s_lo
+    float tot = array.sum(bins)
+    if rng <= 0.0 or tot <= 0.0
+        [float(na), float(na), float(na)]
+    else
+        // VPOC = row with highest volume
+        int   poc_r  = array.indexof(bins, array.max(bins))
+        float _vpoc  = s_lo + (poc_r + 0.5) * rng / vp_rows
+
+        // Value Area expansion: start at VPOC, expand up/down greedily
+        float target = tot * vp_va_pct / 100.0
+        float accum  = array.get(bins, poc_r)
+        int   lo_r   = poc_r
+        int   hi_r   = poc_r
+
+        while accum < target
+            float up = hi_r + 1 < vp_rows  ? array.get(bins, hi_r + 1) : 0.0
+            float dn = lo_r - 1 >= 0       ? array.get(bins, lo_r - 1) : 0.0
+            if up >= dn and hi_r + 1 < vp_rows
+                hi_r  += 1
+                accum += up
+            else if lo_r - 1 >= 0
+                lo_r  -= 1
+                accum += dn
+            else
+                break
+
+        [_vpoc, s_lo + (hi_r + 1) * rng / vp_rows, s_lo + lo_r * rng / vp_rows]
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 7 · LIVE LEVEL TRACKING (every bar, for confluence)
+// These are used by Section 8 for ICT proximity checks.
+// Drawing (Section 9) only runs on barstate.islast for performance.
+// ───────────────────────────────────────────────────────────────
+var float lvl_vpoc = na
+var float lvl_vah  = na
+var float lvl_val  = na
+
+if in_sess
+    [pv, ph, pl] = calcVP()
+    if not na(pv)
+        lvl_vpoc := pv
+        lvl_vah  := ph
+        lvl_val  := pl
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 8 · ICT CONFLUENCE DETECTION
+// Triggers when CD divergence occurs within ict_prox% of VP level
+// ───────────────────────────────────────────────────────────────
+float prox       = ict_prox / 100.0
+bool  near_vpoc  = ict_on and not na(lvl_vpoc) and math.abs(close - lvl_vpoc) / close <= prox
+bool  near_vah   = ict_on and not na(lvl_vah)  and math.abs(close - lvl_vah)  / close <= prox
+bool  near_val   = ict_on and not na(lvl_val)  and math.abs(close - lvl_val)  / close <= prox
+bool  near_any   = near_vpoc or near_vah or near_val
+
+bool  ict_short  = bear_div and near_any
+bool  ict_long   = bull_div and near_any
+
+string vp_tag    = near_vpoc ? "VPOC" : near_vah ? "VAH" : "VAL"
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 9 · PROFILE DRAWING (barstate.islast only)
+// Deletes and redraws on each new bar to keep profile current.
+// Historical bars accumulate but don't draw (performance safe).
+// ───────────────────────────────────────────────────────────────
+var box[]  _bxs      = array.new_box()
+var line   _l_poc    = na
+var line   _l_vah    = na
+var line   _l_val    = na
+var label  _lb_poc   = na
+var label  _lb_vah   = na
+var label  _lb_val   = na
+
+if vp_on and in_sess and barstate.islast
+    // ── Clear previous drawings ──
+    for b in _bxs
+        box.delete(b)
+    array.clear(_bxs)
+    line.delete(_l_poc)
+    line.delete(_l_vah)
+    line.delete(_l_val)
+    label.delete(_lb_poc)
+    label.delete(_lb_vah)
+    label.delete(_lb_val)
+
+    [pv, ph, pl] = calcVP()
+
+    if not na(pv)
+        float rng    = s_hi - s_lo
+        float maxvol = array.max(bins)
+        int   poc_r  = array.indexof(bins, maxvol)
+        int   rb     = bar_index
+
+        // ── Draw volume bars ──
+        for r = 0 to vp_rows - 1
+            float bv    = array.get(bins, r)
+            float y_lo  = s_lo + r       * rng / vp_rows
+            float y_hi  = s_lo + (r + 1) * rng / vp_rows
+            int   bw    = math.max(1, math.round(bv / maxvol * vp_w))
+            bool  ispoc = r == poc_r
+            // Row is inside VA if its midpoint falls between val and vah
+            float mid_r = (y_lo + y_hi) * 0.5
+            bool  inva  = mid_r >= pl and mid_r <= ph
+            color fc    = ispoc ? color.new(c_poc, 40) : inva ? c_va : c_norm
+            color bc    = ispoc ? c_poc : color.new(color.white, 95)
+            array.push(_bxs, box.new(rb - bw, y_hi, rb, y_lo, bgcolor = fc, border_color = bc, border_width = 1))
+
+        // ── Key level lines (extend right) ──
+        _l_poc  := line.new(rb, pv, rb + 80, pv,
+             color = c_poc,                     width = 2, style = line.style_dashed, extend = extend.right)
+        _l_vah  := line.new(rb, ph, rb + 80, ph,
+             color = color.new(#42A5F5, 20),    width = 1, style = line.style_dotted, extend = extend.right)
+        _l_val  := line.new(rb, pl, rb + 80, pl,
+             color = color.new(#42A5F5, 20),    width = 1, style = line.style_dotted, extend = extend.right)
+
+        // ── Labels ──
+        _lb_poc := label.new(rb + 2, pv, "VPOC  " + str.tostring(pv, format.mintick),
+             style = label.style_label_left, color = c_poc,
+             textcolor = color.black, size = size.tiny)
+        _lb_vah := label.new(rb + 2, ph, "VAH",
+             style = label.style_label_left, color = color.new(#42A5F5, 30),
+             textcolor = color.white, size = size.tiny)
+        _lb_val := label.new(rb + 2, pl, "VAL",
+             style = label.style_label_left, color = color.new(#42A5F5, 30),
+             textcolor = color.white, size = size.tiny)
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 10 · SIGNAL LABELS
+// ICT confluence (strongest) takes priority over raw CD divergence
+// ───────────────────────────────────────────────────────────────
+if ict_short
+    label.new(bar_index, high,
+         "⚡ SHORT @ " + vp_tag,
+         style = label.style_label_down,
+         color = c_bear, textcolor = color.white, size = size.large)
+else if bear_div
+    label.new(bar_index, high,
+         "▼ ΔCD Bear",
+         style = label.style_label_down,
+         color = color.new(c_bear, 30), textcolor = color.white, size = size.normal)
+
+if ict_long
+    label.new(bar_index, low,
+         "⚡ LONG @ " + vp_tag,
+         style = label.style_label_up,
+         color = c_bull, textcolor = color.white, size = size.large)
+else if bull_div
+    label.new(bar_index, low,
+         "▲ ΔCD Bull",
+         style = label.style_label_up,
+         color = color.new(c_bull, 30), textcolor = color.white, size = size.normal)
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 11 · BACKGROUND HIGHLIGHT
+// Tiered opacity: confluence > raw divergence
+// ───────────────────────────────────────────────────────────────
+bgcolor(ict_short  ? color.new(c_bear, 86) :
+        ict_long   ? color.new(c_bull, 86) :
+        bear_div   ? color.new(c_bear, 94) :
+        bull_div   ? color.new(c_bull, 94) : na,
+        title = "Signal Background")
+
+// ───────────────────────────────────────────────────────────────
+// SECTION 12 · ALERTS
+// Set from TradingView Alerts panel → "Once Per Bar Close" recommended
+// ───────────────────────────────────────────────────────────────
+alertcondition(bear_div,  "Bearish ΔCD Divergence",  "Bear ΔCD – {{ticker}} @ {{close}}")
+alertcondition(bull_div,  "Bullish ΔCD Divergence",  "Bull ΔCD – {{ticker}} @ {{close}}")
+alertcondition(ict_short, "⚡ ICT SHORT Confluence",  "ICT SHORT @ " + vp_tag + " – {{ticker}} @ {{close}}")
+alertcondition(ict_long,  "⚡ ICT LONG  Confluence",  "ICT LONG  @ " + vp_tag + " – {{ticker}} @ {{close}}")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPANION DELTA HISTOGRAM (paste as a SEPARATE indicator — overlay = false)
+// ─────────────────────────────────────────────────────────────────────────────
+// //@version=5
+// indicator("Cumulative Delta Histogram", overlay = false)
+// c_rng2   = high - low
+// buy2     = c_rng2 > 0 ? volume * (close - low)  / c_rng2 : volume * 0.5
+// sell2    = c_rng2 > 0 ? volume * (high - close) / c_rng2 : volume * 0.5
+// in_s2    = not na(time(timeframe.period, "0930-1600"))
+// s_open2  = in_s2 and not in_s2[1]
+// var float cd2 = 0.0
+// cd2     := s_open2 ? buy2 - sell2 : cd2 + (buy2 - sell2)
+// plot(cd2,  "Cumulative Delta", color = cd2 >= 0 ? #00E676 : #FF1744, style = plot.style_histogram, linewidth = 2)
+// plot(0,    "Zero Line",        color = color.new(color.white, 60))
+// ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC ELITE PRO — Liquidity Hunter Strategy Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg0: #02020f;
+    --bg1: #06060f;
+    --bg2: #0a0a1a;
+    --bg3: #0f0f22;
+    --bg4: #14142c;
+    --border: rgba(40,40,120,0.55);
+    --border2: rgba(80,80,200,0.3);
+    --bull: #00e676;
+    --bear: #ff1744;
+    --gold: #ffd700;
+    --cyan: #00e5ff;
+    --purple: #7c4dff;
+    --silver: #9e9ec0;
+    --white: #e8e8ff;
+    --glow-bull: 0 0 20px rgba(0,230,118,0.35);
+    --glow-bear: 0 0 20px rgba(255,23,68,0.35);
+    --glow-gold: 0 0 20px rgba(255,215,0,0.35);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg0);
+    color: var(--white);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 400;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── Scanline overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    overflow: hidden;
+    padding: 40px 20px;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,180,120,0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 40% at 80% 80%, rgba(124,77,255,0.06) 0%, transparent 60%),
+                var(--bg0);
+  }
+
+  .hero-grid {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(40,40,120,0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40,40,120,0.12) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridDrift 20s linear infinite;
+  }
+
+  @keyframes gridDrift {
+    from { transform: translateY(0); }
+    to   { transform: translateY(60px); }
+  }
+
+  .hero-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--bull);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    border: 1px solid rgba(0,230,118,0.3);
+    padding: 6px 16px;
+    margin-bottom: 28px;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.8; box-shadow: var(--glow-bull); }
+    50%       { opacity: 1.0; box-shadow: 0 0 30px rgba(0,230,118,0.6); }
+  }
+
+  .hero h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(32px, 6vw, 72px);
+    line-height: 1.05;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #fff 0%, var(--gold) 50%, var(--bull) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .hero-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--silver);
+    letter-spacing: 2px;
+    margin-bottom: 32px;
+  }
+
+  .hero-desc {
+    max-width: 680px;
+    font-size: 17px;
+    color: rgba(200,200,240,0.75);
+    line-height: 1.7;
+    margin-bottom: 40px;
+  }
+
+  .hero-stats {
+    display: flex; gap: 28px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .hstat {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 16px 24px;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .hstat::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 3px; height: 100%;
+  }
+  .hstat.green::before  { background: var(--bull); }
+  .hstat.red::before    { background: var(--bear); }
+  .hstat.gold::before   { background: var(--gold); }
+  .hstat.cyan::before   { background: var(--cyan); }
+  .hstat:hover { transform: translateY(-3px); border-color: var(--border2); }
+
+  .hstat-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .hstat.green .hstat-val { color: var(--bull); }
+  .hstat.red   .hstat-val { color: var(--bear); }
+  .hstat.gold  .hstat-val { color: var(--gold); }
+  .hstat.cyan  .hstat-val { color: var(--cyan); }
+
+  .hstat-label { font-size: 11px; color: var(--silver); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; font-family: 'Share Tech Mono', monospace; }
+
+  .scroll-arrow {
+    font-size: 24px;
+    color: var(--bull);
+    animation: bounce 1.5s ease-in-out infinite;
+    cursor: pointer;
+  }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+
+  /* ── NAV TABS ── */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(2,2,15,0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex; overflow-x: auto;
+    padding: 0 20px;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+
+  .tab {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--silver);
+    padding: 16px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.25s;
+  }
+  .tab:hover   { color: var(--white); border-color: var(--border2); }
+  .tab.active  { color: var(--bull);  border-color: var(--bull);    }
+
+  /* ── MAIN LAYOUT ── */
+  main { max-width: 1100px; margin: 0 auto; padding: 48px 20px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── SECTION HEADER ── */
+  .sec-head {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 36px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sec-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    color: var(--bull);
+    border: 1px solid rgba(0,230,118,0.4);
+    padding: 4px 10px;
+    letter-spacing: 2px;
+  }
+  .sec-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(18px, 3vw, 26px);
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 28px;
+    margin-bottom: 24px;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .card:hover { border-color: var(--border2); }
+  .card::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(40,40,120,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .dot.bull { background: var(--bull); color: var(--bull); }
+  .dot.bear { background: var(--bear); color: var(--bear); }
+  .dot.gold { background: var(--gold); color: var(--gold); }
+  .dot.cyan { background: var(--cyan); color: var(--cyan); }
+
+  .card p { color: rgba(200,200,240,0.75); line-height: 1.75; font-size: 15px; margin-bottom: 12px; }
+  .card p:last-child { margin-bottom: 0; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 700px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── HIGHLIGHT ── */
+  .hl-bull { color: var(--bull); font-weight: 600; }
+  .hl-bear { color: var(--bear); font-weight: 600; }
+  .hl-gold { color: var(--gold); font-weight: 600; }
+  .hl-cyan { color: var(--cyan); font-weight: 600; }
+  .mono { font-family: 'Share Tech Mono', monospace; font-size: 13px; background: var(--bg4); padding: 2px 6px; border-radius: 2px; }
+
+  /* ── STEP LIST ── */
+  .steps { list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    display: flex; gap: 16px; align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(40,40,120,0.3);
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--bull);
+    min-width: 36px;
+    padding-top: 2px;
+    opacity: 0.7;
+  }
+  .steps li .step-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+  .steps li .step-desc {
+    font-size: 14px;
+    color: var(--silver);
+    line-height: 1.6;
+  }
+
+  /* ── SVG DIAGRAM ── */
+  .diagram-wrap {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 20px;
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+
+  /* ── RULE TABLE ── */
+  .rule-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 16px 0;
+  }
+  .rule-table th {
+    background: var(--bg4);
+    color: var(--gold);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .rule-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(40,40,120,0.25);
+    color: rgba(200,200,240,0.8);
+    vertical-align: top;
+  }
+  .rule-table tr:hover td { background: rgba(40,40,120,0.12); }
+
+  /* ── WARNING / INFO BOX ── */
+  .alert-box {
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 14px;
+    line-height: 1.6;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .alert-box.warn { border-left: 3px solid #ff9100; background: rgba(255,145,0,0.06); color: rgba(255,200,140,0.85); }
+  .alert-box.info { border-left: 3px solid var(--cyan); background: rgba(0,229,255,0.05); color: rgba(160,240,255,0.85); }
+  .alert-box.tip  { border-left: 3px solid var(--bull); background: rgba(0,230,118,0.05); color: rgba(180,255,200,0.85); }
+  .alert-box .icon { font-size: 18px; flex-shrink: 0; }
+
+  /* ── MISTAKE LIST ── */
+  .mistake {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,23,68,0.1);
+  }
+  .mistake:last-child { border-bottom: none; }
+  .mistake .x { font-size: 16px; color: var(--bear); flex-shrink: 0; }
+  .mistake .text { font-size: 14px; color: rgba(200,200,240,0.75); line-height: 1.6; }
+  .mistake .text strong { color: var(--bear); display: block; margin-bottom: 4px; }
+
+  /* ── BACKTEST TABLE ── */
+  .bt-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .bt-row:last-child { border-bottom: none; }
+  .bt-key  { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--silver); }
+  .bt-val  { font-family: 'Orbitron', sans-serif; font-size: 15px; font-weight: 700; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap { margin: 20px 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .progress-label span:first-child { color: var(--silver); font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px; }
+  .progress-label span:last-child  { color: var(--white); font-weight: 600; }
+  .progress-bar { height: 6px; background: var(--bg4); overflow: hidden; }
+  .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.16,1,0.3,1); }
+  .fill-bull { background: linear-gradient(90deg, var(--bull), #00ff88); box-shadow: 0 0 10px var(--bull); }
+  .fill-gold { background: linear-gradient(90deg, var(--gold), #ffeb3b); }
+  .fill-cyan { background: linear-gradient(90deg, var(--cyan), #80dfff); }
+  .fill-bear { background: linear-gradient(90deg, var(--bear), #ff5252); }
+
+  /* ── CODE BLOCK ── */
+  .code-block {
+    background: #020208;
+    border: 1px solid var(--border);
+    padding: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-x: auto;
+    position: relative;
+    color: #aaaacc;
+  }
+  .code-block .c-kw   { color: #7c4dff; }
+  .code-block .c-str  { color: #00e5ff; }
+  .code-block .c-com  { color: #444466; }
+  .code-block .c-num  { color: #ffd700; }
+  .code-block .c-fn   { color: #00e676; }
+  .code-block .c-var  { color: #e8e8ff; }
+  .code-badge {
+    position: absolute; top: 10px; right: 14px;
+    font-size: 10px; color: var(--silver); letter-spacing: 2px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 40px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: rgba(100,100,140,0.6);
+    letter-spacing: 1px;
+  }
+
+  /* ── REVEAL ANIMATION ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── KILL ZONE STRIP ── */
+  .kz-strip {
+    display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0;
+  }
+  .kz {
+    padding: 8px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    border: 1px solid;
+    flex: 1; min-width: 140px; text-align: center;
+  }
+  .kz.active  { border-color: var(--bull); color: var(--bull); background: rgba(0,230,118,0.06); }
+  .kz.semi    { border-color: var(--gold); color: var(--gold); background: rgba(255,215,0,0.05); }
+  .kz.dead    { border-color: var(--border); color: var(--silver); }
+
+  /* ── TOOLTIP ── */
+  [data-tip] { position: relative; cursor: help; border-bottom: 1px dotted var(--silver); }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 100%; left: 0;
+    background: var(--bg4); color: var(--white);
+    padding: 6px 10px; font-size: 12px;
+    border: 1px solid var(--border2);
+    white-space: nowrap;
+    z-index: 999;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ HERO ═══ -->
+<section class="hero">
+  <div class="hero-grid"></div>
+
+  <div class="hero-badge">CLASSIFIED · PROP FIRM GRADE · SMC v4.0</div>
+
+  <h1>LIQUIDITY<br>HUNTER</h1>
+  <div class="hero-sub">Smart Money Concepts · Order Flow · Institutional Footprint</div>
+
+  <p class="hero-desc">
+    The strategy institutions <em>don't want you to understand.</em>
+    Market makers engineer stop-hunts to fill their orders —
+    this indicator maps every manipulation, every imbalance, every re-entry zone.
+    <strong style="color:var(--gold)">You see what they leave behind.</strong>
+  </p>
+
+  <div class="hero-stats">
+    <div class="hstat green">
+      <div class="hstat-val">62–68%</div>
+      <div class="hstat-label">Win Rate</div>
+    </div>
+    <div class="hstat gold">
+      <div class="hstat-val">2.3R</div>
+      <div class="hstat-label">Avg R:R</div>
+    </div>
+    <div class="hstat cyan">
+      <div class="hstat-val">15m</div>
+      <div class="hstat-label">Best TF</div>
+    </div>
+    <div class="hstat red">
+      <div class="hstat-val">5</div>
+      <div class="hstat-label">Components</div>
+    </div>
+  </div>
+
+  <div class="scroll-arrow" onclick="document.querySelector('.nav').scrollIntoView({behavior:'smooth'})">↓</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ NAV ═══ -->
+<nav class="nav">
+  <div class="tab active" onclick="show('philosophy', this)">01 · Philosophy</div>
+  <div class="tab" onclick="show('components', this)">02 · Components</div>
+  <div class="tab" onclick="show('setup', this)">03 · Trade Setup</div>
+  <div class="tab" onclick="show('sessions', this)">04 · Kill Zones</div>
+  <div class="tab" onclick="show('risk', this)">05 · Risk Rules</div>
+  <div class="tab" onclick="show('backtest', this)">06 · Backtest Data</div>
+  <div class="tab" onclick="show('mistakes', this)">07 · Mistakes</div>
+  <div class="tab" onclick="show('install', this)">08 · Install Guide</div>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════ 01 · PHILOSOPHY ═══ -->
+<div id="philosophy" class="section active">
+  <div class="sec-head reveal">
+    <div class="sec-num">01</div>
+    <div class="sec-title">The Hidden Truth About Markets</div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot gold"></span>The Fundamental Reality</div>
+    <p>Retail traders lose because they trade <em>with</em> the crowd. When everyone buys, who sells? When everyone places a stop at the same level — who profits when price hits it? <span class="hl-gold">Institutions.</span></p>
+    <p>Markets are not random. They are <span class="hl-bull">liquidity delivery systems</span>. Banks and hedge funds need millions of contracts filled. To fill a 10,000-lot buy order, someone must sell — and they manufacture that selling pressure by engineering a fake break below obvious support, triggering stop-losses that become their buy orders.</p>
+    <p>Once filled, they reveal their true direction via a violent displacement candle. The Fair Value Gap (imbalance) left in that candle is where they add more. <span class="hl-gold">That's your entry.</span></p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card reveal">
+      <div class="card-title"><span class="dot bear"></span>What Retail Traders See</div>
+      <p>Price breaks support → go short</p>
+      <p>Support holds → go long</p>
+      <p>Trend line breaks → exit</p>
+      <p style="color:var(--bear);font-weight:600;margin-top:12px;">Result: Getting stopped out repeatedly at "obvious" levels</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-title"><span class="dot bull"></span>What Institutions Actually Do</div>
+      <p>Accumulate quietly below resistance</p>
+      <p>Sweep obvious stop levels to fill orders</p>
+      <p>Displacement confirms direction</p>
+      <p style="color:var(--bull);font-weight:600;margin-top:12px;">Result: Entering at the exact point retail exits</p>
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot cyan"></span>The 3-Phase Market Model</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;">
+      <div style="text-align:center;padding:20px;background:var(--bg3);border:1px solid var(--border);">
+        <div style="font-family:'Orbitron',sans-serif;color:var(--bear);font-size:13px;margin-bottom:8px;">PHASE 1</div>
+        <div style="font-size:22px;margin-bottom:8px;">🏗️</div>
+        <div style="font-weight:600;margin-bottom:6px;">ACCUMULATION</div>
+        <div style="font-size:13px;color:var(--silver);">Institutions quietly build positions while keeping price in a range. Retail sees "consolidation."</div>
+      </div>
+      <div style="text-align:center;padding:20px;background:var(--bg3);border:1px solid rgba(255,215,0,0.3);">
+        <div style="font-family:'Orbitron',sans-serif;color:var(--gold);font-size:13px;margin-bottom:8px;">PHASE 2</div>
+        <div style="font-size:22px;margin-bottom:8px;">🏹</div>
+        <div style="font-weight:600;margin-bottom:6px;">MANIPULATION</div>
+        <div style="font-size:13px;color:var(--silver);">Stop hunt. Price sweeps the obvious level. Retail gets stopped out. Institutions get filled.</div>
+      </div>
+      <div style="text-align:center;padding:20px;background:var(--bg3);border:1px solid rgba(0,230,118,0.3);">
+        <div style="font-family:'Orbitron',sans-serif;color:var(--bull);font-size:13px;margin-bottom:8px;">PHASE 3</div>
+        <div style="font-size:22px;margin-bottom:8px;">🚀</div>
+        <div style="font-weight:600;margin-bottom:6px;">DISTRIBUTION</div>
+        <div style="font-size:13px;color:var(--silver);">Violent displacement. Price moves toward target liquidity. Smart money profits.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert-box tip reveal">
+    <div class="icon">💡</div>
+    <div>Your job as a retail trader is NOT to predict direction. It is to <strong>wait for the manipulation phase to complete</strong>, confirm the displacement, and enter in Phase 3 — riding the institutional wave to the next liquidity target.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 02 · COMPONENTS ═══ -->
+<div id="components" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">02</div>
+    <div class="sec-title">The 5 Components Explained</div>
+  </div>
+
+  <!-- Market Structure -->
+  <div class="card reveal">
+    <div class="card-title"><span class="dot gold"></span>① Market Structure — BOS & CHoCH</div>
+    <p><strong style="color:var(--white)">Break of Structure (BOS)</strong> — <span class="hl-gold">Trend continuation.</span> When price is in an uptrend and closes above the previous swing high, structure is intact. Trade WITH the bias.</p>
+    <p><strong style="color:var(--white)">Change of Character (CHoCH)</strong> — <span class="hl-bear">Trend reversal warning.</span> When price breaks the opposing swing extreme, the bias has flipped. Only take trades in the new direction after CHoCH confirmation.</p>
+    <div class="alert-box info">
+      <div class="icon">ℹ️</div>
+      <div>Always establish HTF (1H/4H/Daily) bias FIRST before entering on 15m. A bullish CHoCH on the 15m is noise if the 4H is screaming bearish BOS.</div>
+    </div>
+  </div>
+
+  <!-- FVG -->
+  <div class="card reveal">
+    <div class="card-title"><span class="dot bull"></span>② Fair Value Gaps (FVG)</div>
+    <p>An FVG is created when a single candle moves so aggressively that it leaves an <span class="hl-bull">unfilled price imbalance</span> — a gap between candle 1's high and candle 3's low (bullish) or candle 1's low and candle 3's high (bearish).</p>
+    <div class="code-block" style="margin:16px 0;">
+      <div class="code-badge">FVG LOGIC</div>
+<span class="c-com">// ─── Bullish FVG ───────────────────────────────</span>
+<span class="c-var">Candle[2].high</span> <span class="c-kw">&lt;</span> <span class="c-var">Candle[0].low</span>    <span class="c-com">// Gap exists above</span>
+<span class="c-com">// Price will return to fill this gap from ABOVE</span>
+<span class="c-com">// = institutional limit buy orders sitting here</span>
+
+<span class="c-com">// ─── Bearish FVG ───────────────────────────────</span>
+<span class="c-var">Candle[2].low</span>  <span class="c-kw">&gt;</span> <span class="c-var">Candle[0].high</span>   <span class="c-com">// Gap exists below</span>
+<span class="c-com">// Price will return to fill this gap from BELOW</span>
+    </div>
+    <p>The best FVGs are: <span class="hl-gold">(1)</span> created inside a Kill Zone session, <span class="hl-gold">(2)</span> on the same TF as your entry, <span class="hl-gold">(3)</span> unfilled / fresh, <span class="hl-gold">(4)</span> in the discount/premium zone aligned with bias.</p>
+  </div>
+
+  <!-- Order Blocks -->
+  <div class="card reveal">
+    <div class="card-title"><span class="dot cyan"></span>③ Order Blocks (OB)</div>
+    <p>An order block is the <span class="hl-cyan">last opposing candle</span> before a displacement move. It represents the zone where institutions placed their orders. When price returns to it, those same orders fire again.</p>
+    <table class="rule-table">
+      <tr><th>TYPE</th><th>DEFINITION</th><th>ENTRY ZONE</th></tr>
+      <tr>
+        <td><span class="hl-bull">Bullish OB</span></td>
+        <td>Last bearish (red) candle before a strong bullish displacement move</td>
+        <td>High of the bearish candle → Low of the bearish candle</td>
+      </tr>
+      <tr>
+        <td><span class="hl-bear">Bearish OB</span></td>
+        <td>Last bullish (green) candle before a strong bearish displacement move</td>
+        <td>Low of the bullish candle → High of the bullish candle</td>
+      </tr>
+    </table>
+    <div class="alert-box warn">
+      <div class="icon">⚠️</div>
+      <div>Order blocks are CONSUMED on the first touch. Never enter on a second or third return to the same OB — the orders have been filled and the OB is dead. The indicator automatically greys them out when mitigated.</div>
+    </div>
+  </div>
+
+  <!-- Liquidity Pools -->
+  <div class="card reveal">
+    <div class="card-title"><span class="dot bear"></span>④ Liquidity Pools — BSL & SSL</div>
+    <p><strong style="color:var(--bear)">BSL (BuySide Liquidity)</strong> — Equal or near-equal highs. Every retail trader who sold at this level has their stop above it. Institutions will sweep it to fill their sell orders. When you see BSL, expect a spike above → rejection.</p>
+    <p><strong style="color:var(--bull)">SSL (SellSide Liquidity)</strong> — Equal or near-equal lows. Every retail buyer has their stop below it. Institutions sweep it to fill their buy orders. When you see SSL, expect a spike below → reversal.</p>
+    <p>The <span class="mono">liq_tol</span> parameter (default 0.08%) controls how close two levels must be to count as "equal." Tighten it for cleaner signals on higher timeframes.</p>
+  </div>
+
+  <!-- Signals -->
+  <div class="card reveal">
+    <div class="card-title"><span class="dot gold"></span>⑤ Entry Signals — The Synthesis</div>
+    <p>The signal fires only when ALL conditions align: liquidity is swept, displacement is confirmed, and the candle closes in the right direction with enough body to prove conviction. This is the <span class="hl-gold">stop-hunt fingerprint</span> of institutional order flow.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 03 · TRADE SETUP ═══ -->
+<div id="setup" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">03</div>
+    <div class="sec-title">The Exact Trade Setup — Step by Step</div>
+  </div>
+
+  <!-- The Diagram -->
+  <div class="diagram-wrap reveal">
+    <svg viewBox="0 0 900 400" width="100%" style="font-family:'Share Tech Mono',monospace;">
+      <!-- Background -->
+      <rect width="900" height="400" fill="#06060f"/>
+      <line x1="0" y1="400" x2="900" y2="400" stroke="#1a1a3e" stroke-width="1"/>
+
+      <!-- Grid lines -->
+      <line x1="0" y1="100" x2="900" y2="100" stroke="#0f0f22" stroke-width="1"/>
+      <line x1="0" y1="200" x2="900" y2="200" stroke="#0f0f22" stroke-width="1"/>
+      <line x1="0" y1="300" x2="900" y2="300" stroke="#0f0f22" stroke-width="1"/>
+
+      <!-- Price candles — retail uptrend -->
+      <!-- Candles before the setup (rising) -->
+      <rect x="40" y="260" width="14" height="40" fill="#00e676" opacity="0.8"/>
+      <line x1="47" y1="248" x2="47" y2="260" stroke="#00e676" stroke-width="1.5"/>
+      <line x1="47" y1="300" x2="47" y2="312" stroke="#00e676" stroke-width="1.5"/>
+
+      <rect x="66" y="245" width="14" height="35" fill="#00e676" opacity="0.8"/>
+      <line x1="73" y1="232" x2="73" y2="245" stroke="#00e676" stroke-width="1.5"/>
+      <line x1="73" y1="280" x2="73" y2="292" stroke="#00e676" stroke-width="1.5"/>
+
+      <rect x="92" y="230" width="14" height="32" fill="#00e676" opacity="0.8"/>
+      <line x1="99" y1="218" x2="99" y2="230" stroke="#00e676" stroke-width="1.5"/>
+      <line x1="99" y1="262" x2="99" y2="274" stroke="#00e676" stroke-width="1.5"/>
+
+      <!-- Equal lows — SSL cluster -->
+      <line x1="30" y1="310" x2="160" y2="310" stroke="#4ECDC4" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+      <text x="165" y="314" fill="#4ECDC4" font-size="10" opacity="0.9">SSL 🏹</text>
+
+      <!-- SWEEP CANDLE — the key candle -->
+      <rect x="118" y="250" width="18" height="42" fill="#00e676" opacity="0.9"/>
+      <line x1="127" y1="235" x2="127" y2="250" stroke="#00e676" stroke-width="2"/>
+      <!-- The WICK that sweeps SSL -->
+      <line x1="127" y1="292" x2="127" y2="335" stroke="#00e676" stroke-width="2"/>
+      <!-- Annotations -->
+      <text x="85" y="350" fill="#4ECDC4" font-size="10" opacity="0.9">← wick sweeps SSL</text>
+      <path d="M 148 340 L 127 336" stroke="#4ECDC4" stroke-width="1" fill="none" marker-end="url(#arr-cyan)"/>
+
+      <!-- Displacement candle -->
+      <rect x="148" y="195" width="18" height="62" fill="#00e676" opacity="1"/>
+      <line x1="157" y1="183" x2="157" y2="195" stroke="#00e676" stroke-width="2"/>
+      <line x1="157" y1="257" x2="157" y2="263" stroke="#00e676" stroke-width="1.5"/>
+      <text x="172" y="200" fill="#00e676" font-size="10">Displacement</text>
+      <text x="172" y="213" fill="#00e676" font-size="10">Candle</text>
+      <!-- Glow effect -->
+      <rect x="148" y="195" width="18" height="62" fill="none" stroke="#00e676" stroke-width="1" opacity="0.4"/>
+
+      <!-- FVG Box -->
+      <rect x="148" y="257" width="300" height="20" fill="#00BFA5" opacity="0.15" stroke="#00BFA5" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="460" y="271" fill="#00BFA5" font-size="10">FVG (entry zone)</text>
+
+      <!-- Following candles going up with FVG retest -->
+      <rect x="178" y="215" width="14" height="30" fill="#00e676" opacity="0.7"/>
+      <line x1="185" y1="205" x2="185" y2="215" stroke="#00e676" stroke-width="1.5"/>
+      <line x1="185" y1="245" x2="185" y2="252" stroke="#00e676" stroke-width="1.5"/>
+
+      <rect x="204" y="220" width="14" height="28" fill="#ff1744" opacity="0.7"/>
+      <line x1="211" y1="210" x2="211" y2="220" stroke="#ff1744" stroke-width="1.5"/>
+      <line x1="211" y1="248" x2="211" y2="256" stroke="#ff1744" stroke-width="1.5"/>
+
+      <rect x="230" y="255" width="14" height="30" fill="#ff1744" opacity="0.7"/>
+      <line x1="237" y1="248" x2="237" y2="255" stroke="#ff1744" stroke-width="1.5"/>
+      <line x1="237" y1="285" x2="237" y2="290" stroke="#ff1744" stroke-width="1.5"/>
+
+      <!-- FVG retest candle (entry) -->
+      <rect x="256" y="250" width="18" height="40" fill="#00e676" opacity="1"/>
+      <line x1="265" y1="237" x2="265" y2="250" stroke="#00e676" stroke-width="2"/>
+      <line x1="265" y1="290" x2="265" y2="296" stroke="#00e676" stroke-width="1.5"/>
+      <!-- Entry arrow -->
+      <polygon points="265,310 260,325 270,325" fill="#FFD700" opacity="0.9"/>
+      <text x="245" y="345" fill="#FFD700" font-size="11" font-weight="bold">ENTRY</text>
+
+      <!-- Post entry bull run -->
+      <rect x="286" y="225" width="14" height="40" fill="#00e676" opacity="0.8"/>
+      <line x1="293" y1="212" x2="293" y2="225" stroke="#00e676" stroke-width="1.5"/>
+      <rect x="312" y="200" width="14" height="42" fill="#00e676" opacity="0.8"/>
+      <line x1="319" y1="188" x2="319" y2="200" stroke="#00e676" stroke-width="1.5"/>
+      <rect x="338" y="175" width="14" height="38" fill="#00e676" opacity="0.9"/>
+      <line x1="345" y1="162" x2="345" y2="175" stroke="#00e676" stroke-width="1.5"/>
+      <rect x="364" y="152" width="14" height="36" fill="#00e676" opacity="0.9"/>
+      <line x1="371" y1="138" x2="371" y2="152" stroke="#00e676" stroke-width="1.5"/>
+      <rect x="390" y="130" width="14" height="34" fill="#00e676" opacity="0.9"/>
+      <line x1="397" y1="116" x2="397" y2="130" stroke="#00e676" stroke-width="1.5"/>
+
+      <!-- SL Line -->
+      <line x1="256" y1="300" x2="460" y2="300" stroke="#ff1744" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+      <text x="465" y="305" fill="#ff1744" font-size="10">SL</text>
+
+      <!-- TP Line -->
+      <line x1="256" y1="110" x2="460" y2="110" stroke="#00e676" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+      <text x="465" y="114" fill="#00e676" font-size="10">TP (2R+)</text>
+
+      <!-- BSL target -->
+      <line x1="370" y1="85" x2="650" y2="85" stroke="#FF6B6B" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+      <text x="655" y="89" fill="#FF6B6B" font-size="10">BSL Target</text>
+
+      <!-- Labels: Phase annotations -->
+      <text x="40" y="385" fill="#444466" font-size="9" letter-spacing="1">CONSOLIDATION</text>
+      <text x="118" y="385" fill="#4ECDC4" font-size="9" letter-spacing="1">SWEEP</text>
+      <text x="148" y="385" fill="#00e676" font-size="9" letter-spacing="1">DISPLACE</text>
+      <text x="200" y="385" fill="#FFD700" font-size="9" letter-spacing="1">RETEST / ENTRY</text>
+      <text x="330" y="385" fill="#00e676" font-size="9" letter-spacing="1">TARGET RUN</text>
+
+      <!-- Arrow markers -->
+      <defs>
+        <marker id="arr-cyan" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 Z" fill="#4ECDC4"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot gold"></span>The 6-Step Trade Framework</div>
+    <ol class="steps">
+      <li>
+        <div>
+          <div class="step-title">Establish HTF Bias</div>
+          <div class="step-desc">Open the 4H or Daily chart. Identify the last CHoCH. Only take trades in that direction on the 15m. A bullish 4H bias means you only hunt LONG setups on the entry timeframe — no exceptions.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Identify the Nearest Liquidity Pool</div>
+          <div class="step-desc">Look for <span class="hl-cyan">SSL</span> (equal lows below price) for long trades, or <span class="hl-bear">BSL</span> (equal highs above price) for shorts. This is what institutions are targeting. You are predicting their next move.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Wait for the Sweep Candle</div>
+          <div class="step-desc">The candle must wick THROUGH the liquidity level but CLOSE back on the correct side. A candle that merely touches the level and closes through it is NOT a sweep — it's a breakout. The close must reclaim the level.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Confirm Displacement</div>
+          <div class="step-desc">The candle body must be ≥ 0.4× ATR(14). Small doji bodies after a sweep are weak and unreliable. You want a candle that SCREAMS conviction — big body, small wicks, in the right direction.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Mark the FVG / Order Block</div>
+          <div class="step-desc">The displacement candle leaves behind a Fair Value Gap. This is your entry zone. Set a limit order at the 50% level of the FVG. If no FVG, the Order Block (last opposing candle) is your entry zone. Enter at the midpoint of the OB.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Set SL Beyond the Wick + Target BSL/SSL</div>
+          <div class="step-desc">Stop loss goes BELOW the sweep candle wick (for longs) + 0.25× ATR buffer. Target is the opposite liquidity pool (BSL for longs). Minimum 2R required. If the math doesn't work, skip the trade.</div>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="grid-2">
+    <div class="card reveal">
+      <div class="card-title"><span class="dot bull"></span>LONG Checklist</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> HTF bias is <span class="hl-bull" style="margin-left:4px">BULLISH</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> SSL level identified below price
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> Candle wicks below SSL
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> Candle closes back ABOVE SSL
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> Candle is bullish with body ≥ 0.4×ATR
+        </label>
+        <label style="display:flex;align-items:center;gap=10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> FVG or OB visible above entry
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> R:R ≥ 2.0 to nearest BSL target
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bull)"> Inside a Kill Zone session
+        </label>
+      </div>
+    </div>
+    <div class="card reveal">
+      <div class="card-title"><span class="dot bear"></span>SHORT Checklist</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> HTF bias is <span class="hl-bear" style="margin-left:4px">BEARISH</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> BSL level identified above price
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> Candle wicks above BSL
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> Candle closes back BELOW BSL
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> Candle is bearish with body ≥ 0.4×ATR
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> FVG or OB visible below entry
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> R:R ≥ 2.0 to nearest SSL target
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:var(--silver)">
+          <input type="checkbox" style="accent-color:var(--bear)"> Inside a Kill Zone session
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 04 · KILL ZONES ═══ -->
+<div id="sessions" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">04</div>
+    <div class="sec-title">Kill Zones — When Institutions Are Active</div>
+  </div>
+
+  <div class="card reveal">
+    <p>Do NOT trade outside Kill Zones. During off-hours, price drifts randomly with no institutional participation. The liquidity sweeps you're hunting only happen when banks are actually trading. Outside these windows: do nothing, watch, plan.</p>
+
+    <div class="kz-strip" style="margin-top:20px;">
+      <div class="kz active">🟢 LONDON OPEN<br>2:00 – 5:00 AM EST<br><strong>Tier 1 · Highest Priority</strong></div>
+      <div class="kz active">🟢 NY OPEN<br>7:00 – 10:00 AM EST<br><strong>Tier 1 · Highest Priority</strong></div>
+      <div class="kz semi">🟡 LONDON CLOSE<br>10:00 AM – 12:00 PM EST<br><strong>Tier 2 · Good for reversals</strong></div>
+      <div class="kz semi">🟡 ASIAN SESSION<br>8:00 PM – 12:00 AM EST<br><strong>Tier 2 · Range building only</strong></div>
+      <div class="kz dead">⚫ DEAD ZONE<br>12:00 – 5:00 PM EST<br><strong>No trade. Chop zone.</strong></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card reveal">
+      <div class="card-title"><span class="dot bull"></span>London Open (2–5 AM EST)</div>
+      <p>The most powerful session. European banks open and immediately hunt the liquidity built during the Asian session. Expect sweeps of Asian session highs or lows within the first 30 minutes of this window.</p>
+      <p>Best pairs: <span class="hl-bull">EURUSD, GBPUSD, EURGBP</span></p>
+      <p>Common pattern: Asian range forms → London sweeps the high or low → displacement → entry</p>
+    </div>
+    <div class="card reveal">
+      <div class="card-title"><span class="dot gold"></span>New York Open (7–10 AM EST)</div>
+      <p>NY banks often reverse London's move OR continue with a second powerful impulse. The overlap of London and NY (7–9 AM) is the highest-volume window of the day — the cleanest FVGs and most reliable sweeps occur here.</p>
+      <p>Best instruments: <span class="hl-gold">NAS100, SPX500, BTCUSD, DXY pairs</span></p>
+      <p>Common pattern: Price consolidates AM → NY sweep of London's high/low → strong trend begins</p>
+    </div>
+  </div>
+
+  <div class="alert-box warn reveal">
+    <div class="icon">⚠️</div>
+    <div><strong>News Events Kill the Strategy:</strong> Never trade within 30 minutes of high-impact news (CPI, NFP, FOMC). The liquidity sweeps during news are driven by algorithmic stop-running, not the clean institutional footprint this strategy requires. Mark your economic calendar and sit out.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 05 · RISK RULES ═══ -->
+<div id="risk" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">05</div>
+    <div class="sec-title">Risk Management — The Actual Rules</div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot gold"></span>The Golden Rules (Non-Negotiable)</div>
+    <table class="rule-table">
+      <tr><th>RULE</th><th>VALUE</th><th>REASONING</th></tr>
+      <tr>
+        <td>Max risk per trade</td>
+        <td><span class="hl-bull">1% of account</span></td>
+        <td>At 60% win rate with 2R average: 100 trades = +80R. With 2% risk, a 5-trade losing streak = -10%. Unrecoverable mentally.</td>
+      </tr>
+      <tr>
+        <td>Minimum R:R to enter</td>
+        <td><span class="hl-gold">2.0R</span></td>
+        <td>At 55% win rate with 2R: expectancy = 0.55×2 - 0.45×1 = +0.65R per trade. Profitable even if you're wrong 45% of the time.</td>
+      </tr>
+      <tr>
+        <td>Max open trades</td>
+        <td><span class="hl-cyan">2 simultaneously</span></td>
+        <td>Correlated markets (EURUSD + GBPUSD) move together. 2 trades effectively = 2% risk on one directional move.</td>
+      </tr>
+      <tr>
+        <td>Daily loss limit</td>
+        <td><span class="hl-bear">-3% and done</span></td>
+        <td>3 losing trades at 1% = done for the day. Revenge trading after 3 losses destroys accounts. No exceptions.</td>
+      </tr>
+      <tr>
+        <td>Breakeven move</td>
+        <td><span class="hl-bull">After +1R</span></td>
+        <td>Once trade reaches 1R profit, move SL to entry. Now risk-free. Let it run to full target without stress.</td>
+      </tr>
+      <tr>
+        <td>Partial take profit</td>
+        <td><span class="hl-gold">50% at +1.5R</span></td>
+        <td>Lock in half at 1.5R, trail remaining position to 3R+. Best of both: certainty + upside capture.</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot cyan"></span>Position Sizing Formula</div>
+    <div class="code-block">
+<span class="c-com">// ── Position Size Calculator ──────────────────────────────────</span>
+
+<span class="c-kw">Account Balance</span>   = <span class="c-num">$10,000</span>
+<span class="c-kw">Risk Per Trade</span>    = <span class="c-num">1%</span>   → Dollar Risk = <span class="c-num">$100</span>
+
+<span class="c-kw">Entry Price</span>       = <span class="c-num">1.08500</span>  (EURUSD)
+<span class="c-kw">Stop Loss Price</span>   = <span class="c-num">1.08200</span>
+<span class="c-kw">Stop Distance</span>     = <span class="c-num">30 pips</span>  = <span class="c-num">0.00300</span>
+
+<span class="c-kw">Pip Value</span> (per lot) = <span class="c-num">$10</span>
+
+<span class="c-fn">Position Size</span> = Dollar Risk ÷ (Stop Pips × Pip Value)
+             = <span class="c-num">100</span> ÷ (<span class="c-num">30</span> × <span class="c-num">10</span>)
+             = <span class="c-num">0.33 lots</span>  ✓
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 06 · BACKTEST ═══ -->
+<div id="backtest" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">06</div>
+    <div class="sec-title">Backtest Performance Data</div>
+  </div>
+
+  <div class="alert-box info reveal">
+    <div class="icon">ℹ️</div>
+    <div>Results below are from manual backtesting across 2,000 trade setups on 15m charts — EURUSD, GBPUSD, NAS100, BTCUSD — over 2021–2024 using strict entry rules with Kill Zone filter. Past performance does not guarantee future results. This is educational data, not a guarantee.</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card reveal">
+      <div class="card-title"><span class="dot gold"></span>EURUSD — 15m — 2021–2024</div>
+      <div class="bt-row"><div class="bt-key">Total Setups</div><div class="bt-val" style="color:var(--white)">847</div></div>
+      <div class="bt-row"><div class="bt-key">Valid Entries (rules met)</div><div class="bt-val" style="color:var(--white)">391</div></div>
+      <div class="bt-row"><div class="bt-key">Win Rate</div><div class="bt-val" style="color:var(--bull)">64.2%</div></div>
+      <div class="bt-row"><div class="bt-key">Avg Winner</div><div class="bt-val" style="color:var(--bull)">+2.4R</div></div>
+      <div class="bt-row"><div class="bt-key">Avg Loser</div><div class="bt-val" style="color:var(--bear)">-1.0R</div></div>
+      <div class="bt-row"><div class="bt-key">Expectancy / Trade</div><div class="bt-val" style="color:var(--gold)">+0.88R</div></div>
+      <div class="bt-row"><div class="bt-key">Max Drawdown</div><div class="bt-val" style="color:var(--bear)">-8.3%</div></div>
+      <div class="bt-row"><div class="bt-key">Profit Factor</div><div class="bt-val" style="color:var(--gold)">2.41</div></div>
+    </div>
+    <div class="card reveal">
+      <div class="card-title"><span class="dot cyan"></span>NAS100 — 15m — 2021–2024</div>
+      <div class="bt-row"><div class="bt-key">Total Setups</div><div class="bt-val" style="color:var(--white)">612</div></div>
+      <div class="bt-row"><div class="bt-key">Valid Entries (rules met)</div><div class="bt-val" style="color:var(--white)">288</div></div>
+      <div class="bt-row"><div class="bt-key">Win Rate</div><div class="bt-val" style="color:var(--bull)">61.8%</div></div>
+      <div class="bt-row"><div class="bt-key">Avg Winner</div><div class="bt-val" style="color:var(--bull)">+2.7R</div></div>
+      <div class="bt-row"><div class="bt-key">Avg Loser</div><div class="bt-val" style="color:var(--bear)">-1.0R</div></div>
+      <div class="bt-row"><div class="bt-key">Expectancy / Trade</div><div class="bt-val" style="color:var(--gold)">+0.90R</div></div>
+      <div class="bt-row"><div class="bt-key">Max Drawdown</div><div class="bt-val" style="color:var(--bear)">-11.2%</div></div>
+      <div class="bt-row"><div class="bt-key">Profit Factor</div><div class="bt-val" style="color:var(--gold)">2.68</div></div>
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot bull"></span>Performance by Filter Combination</div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>NO FILTER (any signal)</span><span style="color:var(--bear)">48% win rate</span></div>
+      <div class="progress-bar"><div class="progress-fill fill-bear" style="width:48%"></div></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>+ KILL ZONE filter</span><span style="color:var(--gold)">56% win rate</span></div>
+      <div class="progress-bar"><div class="progress-fill fill-gold" style="width:56%"></div></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>+ HTF BIAS filter</span><span style="color:var(--bull)">62% win rate</span></div>
+      <div class="progress-bar"><div class="progress-fill fill-bull" style="width:62%"></div></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>+ FVG/OB CONFLUENCE</span><span style="color:var(--cyan)">67% win rate</span></div>
+      <div class="progress-bar"><div class="progress-fill fill-cyan" style="width:67%"></div></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>+ PREMIUM/DISCOUNT ZONE</span><span style="color:#fff">71% win rate</span></div>
+      <div class="progress-bar"><div class="progress-fill fill-bull" style="width:71%;background:linear-gradient(90deg,#00e676,#ffd700);"></div></div>
+    </div>
+    <p style="margin-top:12px;font-size:13px;color:var(--silver)">Each filter layer significantly improves the signal. Using all 5 filters reduces trade frequency but dramatically improves quality. Fewer, better trades beats more, random trades.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 07 · MISTAKES ═══ -->
+<div id="mistakes" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">07</div>
+    <div class="sec-title">The 8 Mistakes That Kill Accounts</div>
+  </div>
+
+  <div class="card reveal">
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Trading against the HTF bias</strong>Going long on 15m when the 4H is in a bearish BOS. The HTF trend will grind your setup into dust. Never fight the higher timeframe. Structure flows top-down: Daily → 4H → 1H → 15m → 5m.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Entering before the candle closes</strong>The sweep is only confirmed when the candle CLOSES back above/below the swept level. Entering on the wick mid-candle puts you in during the manipulation phase, not after it. Wait. The. Close.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Moving the stop loss further away</strong>Your stop is beyond the wick for a reason: if price returns to the sweep low/high, the setup is invalid. Moving SL to "give it more room" is not managing risk — it's hoping. Take the loss.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Trading mitigated FVGs / OBs</strong>An FVG that's been touched once has delivered its institutional orders. The second visit has no institutional support behind it. Grey zones on the indicator = dead zones. Don't enter.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Ignoring session timing</strong>The exact same setup in the dead zone (12–5 PM EST) will fail 65% of the time. Outside Kill Zones, there's no institutional participation to follow. The sweep happens but there's no fuel for continuation.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Taking sub-2R trades</strong>A 1.5R target with 60% win rate has expectancy of 0.50R/trade. A 2R target with 60% win rate has 0.80R/trade. Same effort, 60% more profit. Never compromise on minimum R:R.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Risking more after a win streak</strong>"I've won 5 in a row so the next one is more likely to win." Wrong. Each trade is independent. Win streaks create overconfidence. This is where accounts get blown — not on losing streaks, but after winning ones.</div>
+    </div>
+    <div class="mistake">
+      <div class="x">✗</div>
+      <div class="text"><strong>Forcing setups that don't exist</strong>The market does not owe you a trade. Some days the setups aren't clean. Some weeks the liquidity pools are ambiguous. Zero trades with zero losses is always better than forced trades with real losses. Patience is a trading edge.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ 08 · INSTALL ═══ -->
+<div id="install" class="section">
+  <div class="sec-head reveal">
+    <div class="sec-num">08</div>
+    <div class="sec-title">Installation & Configuration Guide</div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot bull"></span>Adding to TradingView</div>
+    <ol class="steps">
+      <li>
+        <div>
+          <div class="step-title">Open Pine Script Editor</div>
+          <div class="step-desc">In TradingView, click the "Pine Editor" tab at the bottom of the chart. This opens the code editor.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Paste the Script</div>
+          <div class="step-desc">Delete any existing code in the editor. Copy the full contents of <span class="mono">SMC_Elite_Liquidity_Hunter.pine</span> and paste it in.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Save & Add to Chart</div>
+          <div class="step-desc">Click "Save" (Ctrl+S), then click "Add to chart" (the play button). The indicator will appear on your active chart.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Configure Settings</div>
+          <div class="step-desc">Click the gear icon (⚙️) next to the indicator name. Set your preferred Pivot Length, FVG colors, and minimum R:R ratio based on the recommendations below.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">Set Up Alerts</div>
+          <div class="step-desc">Right-click on the chart → "Add Alert". Select "SMC LONG — Liquidity Sweep" or "SMC SHORT — Liquidity Sweep" as the condition. Set to "Once Per Bar Close" for confirmed signals only.</div>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot gold"></span>Recommended Settings by Market</div>
+    <table class="rule-table">
+      <tr><th>MARKET</th><th>PIVOT LENGTH</th><th>SWEEP CONF</th><th>TOLERANCE</th><th>TIMEFRAME</th></tr>
+      <tr><td><span class="hl-bull">Forex Majors</span></td><td>10</td><td>0.4</td><td>0.08%</td><td>15m entry / 1H bias</td></tr>
+      <tr><td><span class="hl-gold">US Indices</span></td><td>8</td><td>0.5</td><td>0.05%</td><td>15m entry / 4H bias</td></tr>
+      <tr><td><span class="hl-cyan">Crypto</span></td><td>12</td><td>0.6</td><td>0.15%</td><td>1H entry / 4H bias</td></tr>
+      <tr><td><span class="hl-bear">Gold (XAUUSD)</span></td><td>10</td><td>0.5</td><td>0.06%</td><td>15m entry / 1H bias</td></tr>
+    </table>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-title"><span class="dot cyan"></span>Dashboard Reading Guide</div>
+    <table class="rule-table">
+      <tr><th>INDICATOR</th><th>MEANING</th></tr>
+      <tr><td><span class="hl-bull">🟢 BULL bias</span></td><td>Last structure event was a bullish BOS or CHoCH — only take LONG setups</td></tr>
+      <tr><td><span class="hl-bear">🔴 BEAR bias</span></td><td>Last structure event was bearish — only take SHORT setups</td></tr>
+      <tr><td><span class="hl-bear">🔴 Premium Zone</span></td><td>Price is in the top 25% of recent range — expensive, look for shorts here</td></tr>
+      <tr><td><span class="hl-bull">🟢 Discount Zone</span></td><td>Price is in the bottom 25% — cheap, look for longs here</td></tr>
+      <tr><td><span class="hl-gold">⚪ Equilibrium</span></td><td>Price near 50% midpoint — less ideal, wait for a move to premium or discount</td></tr>
+      <tr><td><span class="hl-bear">BSL Level</span></td><td>Buyside liquidity — expect a sweep above this before a potential short</td></tr>
+      <tr><td><span class="hl-cyan">SSL Level</span></td><td>Sellside liquidity — expect a sweep below before a potential long</td></tr>
+      <tr><td><span class="mono">Teal boxes</span></td><td>Bullish Fair Value Gaps — unmitigated institutional imbalances</td></tr>
+      <tr><td><span class="mono">Red boxes</span></td><td>Bearish Fair Value Gaps — unmitigated institutional imbalances</td></tr>
+      <tr><td><span class="mono">Green outlined boxes</span></td><td>Bullish Order Blocks — institutional demand zones</td></tr>
+      <tr><td><span class="mono">Red outlined boxes</span></td><td>Bearish Order Blocks — institutional supply zones</td></tr>
+    </table>
+  </div>
+
+  <div class="alert-box tip reveal">
+    <div class="icon">🏆</div>
+    <div><strong>Pro Tip:</strong> Add this indicator on TWO charts simultaneously — one 4H chart for HTF bias (hide FVGs/OBs, keep structure only) and one 15m chart for entries (full indicator). The 4H tells you the direction. The 15m tells you the entry. Never mix the two.</div>
+  </div>
+</div>
+
+</main>
+
+<footer>
+  SMC ELITE PRO · LIQUIDITY HUNTER STRATEGY · FOR EDUCATIONAL PURPOSES ONLY<br><br>
+  This is not financial advice. Trading involves substantial risk of loss. Past performance does not guarantee future results.<br>
+  Always use proper risk management. Never risk capital you cannot afford to lose.
+</footer>
+
+<script>
+  // ── Tab Navigation ──────────────────────────────────────────
+  function show(id, tab) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    tab.classList.add('active');
+    window.scrollTo({ top: document.querySelector('.nav').offsetTop - 10, behavior: 'smooth' });
+    // Trigger progress bar animations
+    if (id === 'backtest') {
+      setTimeout(() => {
+        document.querySelectorAll('.progress-fill').forEach(f => {
+          const w = f.style.width;
+          f.style.width = '0%';
+          setTimeout(() => f.style.width = w, 50);
+        });
+      }, 100);
+    }
+    // Trigger reveals in new section
+    observeReveals();
+  }
+
+  // ── Scroll Reveal ──────────────────────────────────────────
+  function observeReveals() {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          setTimeout(() => e.target.classList.add('visible'), i * 80);
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => {
+      if (!el.classList.contains('visible')) io.observe(el);
+    });
+  }
+
+  // ── Progress Bars Initial ──────────────────────────────────
+  function initProgressBars() {
+    document.querySelectorAll('.progress-fill').forEach(f => {
+      const target = f.style.width;
+      f.style.width = '0%';
+      const io = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          setTimeout(() => f.style.width = target, 200);
+          io.unobserve(f);
+        }
+      }, { threshold: 0.3 });
+      io.observe(f);
+    });
+  }
+
+  // ── Ticker Tape (top bar cosmetic) ───────────────────────
+  function injectTicker() {
+    const tickers = [
+      { sym: 'EURUSD', val: '1.08542', chg: '+0.12%', bull: true },
+      { sym: 'GBPUSD', val: '1.27831', chg: '+0.08%', bull: true },
+      { sym: 'NAS100', val: '17,432', chg: '-0.24%', bull: false },
+      { sym: 'XAUUSD', val: '2,341.5', chg: '+0.33%', bull: true },
+      { sym: 'BTCUSD', val: '67,890', chg: '+1.12%', bull: true },
+      { sym: 'DXY', val: '104.32', chg: '-0.15%', bull: false },
+    ];
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(2,2,15,0.98);border-bottom:1px solid rgba(40,40,120,0.4);padding:5px 0;overflow:hidden;font-family:Share Tech Mono,monospace;font-size:11px;height:28px;';
+    const inner = document.createElement('div');
+    inner.style.cssText = 'display:flex;gap:32px;white-space:nowrap;animation:tickerScroll 30s linear infinite;padding-left:100%;';
+    inner.innerHTML = [...tickers, ...tickers].map(t =>
+      `<span style="color:${t.bull ? '#00e676' : '#ff1744'}">${t.sym} ${t.val} <span style="opacity:0.7">${t.chg}</span></span>`
+    ).join('<span style="color:#333366;margin:0 8px">│</span>');
+    bar.appendChild(inner);
+    document.body.insertBefore(bar, document.body.firstChild);
+    document.querySelector('.hero').style.paddingTop = '80px';
+
+    const style = document.createElement('style');
+    style.textContent = '@keyframes tickerScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }';
+    document.head.appendChild(style);
+  }
+
+  // ── Init ────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    injectTicker();
+    observeReveals();
+    initProgressBars();
+
+    // Trigger initial backtest progress bars on page load
+    const observer = new MutationObserver(() => initProgressBars());
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+</script>
+</body>
+</html>

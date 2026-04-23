@@ -1,0 +1,102 @@
+# Stealth Liquidity Cascade Engine [SLCE] — Walkthrough
+
+## The Hidden Concept: The Liquidity Cascade Score
+
+> [!IMPORTANT]
+> What top 1% prop firms use is **NOT a single indicator** — it's a **multi-dimensional event-chain scoring system** that quantifies the quality of institutional liquidity operations in real-time.
+
+### Why This Works
+
+Retail traders see individual events (a wick, a gap, a breakout). Institutions operate in a **repeating 5-stage sequence** that leaves forensic footprints:
+
+```
+① MAP   → Identify resting liquidity pools (equal highs/lows, stop clusters)
+② RAID  → Sweep the pool — the "liquidity grab" / stop hunt
+③ SHIFT → Market structure changes direction
+④ VOID  → Fair Value Gaps form during aggressive displacement
+⑤ ENTRY → Price retests the void = optimal institutional entry point
+```
+
+**The secret edge is the CASCADE SCORE** — a proprietary multi-factor score (0-100) that rates the ENTIRE chain, not just any one event:
+
+| Factor | What It Measures | Perfect Score Benchmark |
+|--------|-----------------|----------------------|
+| **Grab Intensity** | Wick depth / candle range | 75% wick ratio = 100 |
+| **Displacement** | Distance from grab level / ATR | 3× ATR move = 100 |
+| **Volume Anomaly** | Volume at grab / avg volume | 3× average volume = 100 |
+| **FVG Quality** | FVG size / ATR | 1× ATR gap = 100 |
+
+### Score Interpretation
+
+| Score Range | Label | Meaning |
+|-------------|-------|---------|
+| **≥ 80** | 🟢 PERFECT STORM | Highest probability — all factors aligned |
+| **60-80** | 🟡 STRONG CASCADE | Above-average institutional setup |
+| **< 60** | ⚫ FILTERED | Noise — not enough institutional evidence |
+
+---
+
+## What The Indicator Shows On Chart
+
+### Visual Elements
+
+1. **Liquidity Pool Lines** — Dotted horizontal lines at swing highs (orange) and lows (blue)
+2. **Equal Level Markers** — `EQH ◆` / `EQL ◆` in gold for premium liquidity targets
+3. **Grab Markers** — ✕ marks with wick % when institutional sweeps occur
+4. **FVG Boxes** — Semi-transparent zones showing institutional voids
+5. **Cascade FVGs** — Thicker bordered, brighter boxes with ⚡score labels
+6. **Entry Diamonds** — Diamond shapes with "PERFECT STORM" or "STRONG CASCADE" labels
+7. **Real-time Dashboard** — Cascade state, grab quality, volume, active voids, signal counts
+
+### Signal Logic
+
+- **LONG Signal**: Price retests a bullish CASCADE FVG (formed after sellside grab with score ≥ 60)
+- **SHORT Signal**: Price retests a bearish CASCADE FVG (formed after buyside grab with score ≥ 60)
+
+> [!TIP]
+> The entry occurs at the **FVG retest** — NOT at the grab itself. This is the "optimal trade entry" concept from market microstructure theory.
+
+---
+
+## How To Use
+
+### Installation
+1. Open TradingView → Pine Script Editor
+2. Paste the contents of [stealth_liquidity_cascade.pine](file:///c:/TT%20Office/personal%20data/TradingVIew%20Crack/chartcraft-pro/stealth_liquidity_cascade.pine)
+3. Click "Add to Chart"
+
+### Recommended Settings By Timeframe
+
+| Timeframe | Pivot Lookback | Min Wick | Cascade Window | Min Score |
+|-----------|---------------|----------|---------------|-----------|
+| 1m-5m | 3 | 0.25 | 3 | 55 |
+| 15m-1H | 5 | 0.30 | 5 | 60 |
+| 4H-Daily | 7 | 0.35 | 5 | 65 |
+| Weekly+ | 10 | 0.40 | 7 | 70 |
+
+### Trading Rules
+1. Wait for a **Liquidity Grab** (✕ marker) — DON'T enter here
+2. Wait for **Cascade FVG** to form (⚡ scored box)
+3. Enter when price **retests** the cascade FVG (💎 diamond signal)
+4. Stop loss: Beyond the grab wick
+5. Take profit: Next liquidity pool on the opposite side
+
+---
+
+## Theoretical Foundation
+
+| Concept | Source | Application |
+|---------|--------|-------------|
+| Kyle's Lambda | Academic (1985) | Price impact modeling — grabs reveal institutional size |
+| VPIN | Easley et al. (2011) | Volume-clock toxicity — volume anomaly scoring |
+| Fractal Market | Peters (1994) | Markets are self-similar liquidity machines |
+| ICT SMC | Inner Circle Trader | Liquidity sweep → displacement → FVG framework |
+
+> [!CAUTION]
+> This indicator is for **educational purposes only**. No indicator guarantees profits. Always use proper risk management (0.5-1% per trade max). Backtest extensively on demo before live trading.
+
+---
+
+## File Created
+
+- [stealth_liquidity_cascade.pine](file:///c:/TT%20Office/personal%20data/TradingVIew%20Crack/chartcraft-pro/stealth_liquidity_cascade.pine) — 637 lines, Pine Script v5, overlay indicator

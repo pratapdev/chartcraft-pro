@@ -1,0 +1,272 @@
+// ============================================================
+// VWAP MEAN REVERSION SCALPING INDICATOR
+// Based on institutional prop desk methodology
+// Timeframe : 1-minute (PRIMARY) | Use 5-min for context
+// Markets   : Stocks, ES/NQ Futures, ETFs (liquid only)
+// Version   : Pine Script v5
+// ============================================================
+// HOW TO USE
+// 1. Add to TradingView on 1-MINUTE chart ONLY
+// 2. Blue line = VWAP (center of gravity)
+// 3. Gold bands = ±1.5% deviation zones (overextension)
+// 4. Orange line = 9 EMA (first profit target)
+// 5. Red downward triangle = short scalp entry signal
+// 6. Green upward triangle = long scalp entry signal
+// 7. Entry: only take signals INSIDE the gold overextension zones
+// 8. T1 = 9 EMA | T2 = VWAP | Stop = above/below the spike high/low
+// 9. Do NOT trade 12:00–13:30 EST (lunch chop — no edge)
+// 10. Stop after 3 consecutive losses for the day
+// ============================================================
+
+//@version=5
+indicator("VWAP Mean Reversion Scalp [Prop Desk]", shorttitle="VWAP·REV", overlay=true, max_bars_back=500)
+
+// ── INPUTS ────────────────────────────────────────────────────
+grp1 = "VWAP Settings"
+dev1_pct = input.float(1.5, "Extension Zone % (overextension trigger)", group=grp1, step=0.1, minval=0.5, maxval=5.0)
+dev2_pct = input.float(2.5, "Extreme Zone % (high-prob fade)",          group=grp1, step=0.1, minval=1.0, maxval=8.0)
+
+grp2 = "EMA"
+ema_len = input.int(9, "EMA Length (trail / T1)", group=grp2, minval=3, maxval=21)
+
+grp3 = "Exhaustion Filter"
+exhaust_vol_mult = input.float(2.0, "Exhaustion Volume Multiplier (×avg)", group=grp3, step=0.1)
+vol_avg_len      = input.int(20,   "Volume Average Lookback",              group=grp3)
+require_reversal = input.bool(true, "Require Reversal Candle (body closes opposite direction)", group=grp3)
+
+grp4 = "Session"
+avoid_lunch  = input.bool(true,  "Avoid 12:00–13:30 EST (lunch chop)", group=grp4)
+trade_sess   = input.session("0930-1130", "Primary Trading Session (EST)", group=grp4)
+
+grp5 = "Risk"
+stop_buffer_ticks = input.float(0.10, "Stop Buffer above/below spike (price units)", group=grp5, step=0.01)
+max_losses_day    = input.int(3,      "Max Consecutive Losses — then stop",           group=grp5, minval=1, maxval=10)
+
+grp6 = "Display"
+show_dev_bands = input.bool(true, "Show Deviation Bands",     group=grp6)
+show_ema       = input.bool(true, "Show 9 EMA",               group=grp6)
+show_signals   = input.bool(true, "Show Entry/Exit Signals",  group=grp6)
+show_levels    = input.bool(true, "Show Stop/Target Lines",   group=grp6)
+show_table     = input.bool(true, "Show Stats Table",         group=grp6)
+
+// ── SESSION CHECK ─────────────────────────────────────────────
+is_new_day   = ta.change(time("D")) != 0
+in_prime     = not na(time(timeframe.period, trade_sess))
+h = hour(time("60"), "America/New_York")
+m = minute(time("60"), "America/New_York")
+is_lunch = avoid_lunch ? (h == 12 or (h == 13 and m < 30)) : false
+trade_ok = in_prime and not is_lunch
+
+// ── VWAP (session reset) ──────────────────────────────────────
+var float vw_sum = 0.0
+var float vw_vol = 0.0
+if is_new_day
+    vw_sum := 0.0
+    vw_vol := 0.0
+
+vw_sum  += (high + low + close) / 3.0 * volume
+vw_vol  += volume
+vwap     = vw_sum / vw_vol
+
+// Deviation bands
+dev1_up  = vwap * (1 + dev1_pct / 100)
+dev1_dn  = vwap * (1 - dev1_pct / 100)
+dev2_up  = vwap * (1 + dev2_pct / 100)
+dev2_dn  = vwap * (1 - dev2_pct / 100)
+
+// ── EMA ───────────────────────────────────────────────────────
+ema9 = ta.ema(close, ema_len)
+
+// ── PLOTS ─────────────────────────────────────────────────────
+plot(vwap, "VWAP", color=#4fc3f7, linewidth=2)
+plot(show_ema ? ema9 : na, "9 EMA", color=#ff7043, linewidth=1)
+
+// Deviation bands
+p_d1u = plot(show_dev_bands ? dev1_up : na, "+1.5% Zone", color=color.new(#f5a623, 60), linewidth=1, style=plot.style_linebr)
+p_d1d = plot(show_dev_bands ? dev1_dn : na, "−1.5% Zone", color=color.new(#f5a623, 60), linewidth=1, style=plot.style_linebr)
+p_d2u = plot(show_dev_bands ? dev2_up : na, "+2.5% Zone", color=color.new(#ff5252, 70), linewidth=1, style=plot.style_linebr)
+p_d2d = plot(show_dev_bands ? dev2_dn : na, "−2.5% Zone", color=color.new(#ff5252, 70), linewidth=1, style=plot.style_linebr)
+
+// Fill between VWAP and bands to show overextension zones
+fill(p_d1u, p_d2u, color=color.new(#f5a623, 92), title="Upper Extension Zone")
+fill(p_d1d, p_d2d, color=color.new(#f5a623, 92), title="Lower Extension Zone")
+
+// ── VOLUME & EXHAUSTION ───────────────────────────────────────
+vol_avg      = ta.sma(volume, vol_avg_len)
+is_spike_vol = volume >= vol_avg * exhaust_vol_mult
+
+// ── OVEREXTENSION DETECTION ───────────────────────────────────
+above_dev1 = high >= dev1_up     // price reached upper overextension
+below_dev1 = low  <= dev1_dn     // price reached lower overextension
+
+// Spike candle = hit dev zone on high volume
+spike_short = above_dev1 and is_spike_vol   // price spiked UP = fade short
+spike_long  = below_dev1 and is_spike_vol   // price spiked DOWN = fade long
+
+// ── REVERSAL CANDLE CONFIRMATION ─────────────────────────────
+// Short reversal: the candle AFTER a spike closes bearish (open > close) with body < prior candle
+bearish_reversal = close < open and (open - close) > (high - low) * 0.4  // bearish body ≥ 40% of range
+bullish_reversal = close > open and (close - open) > (high - low) * 0.4
+
+// Volume lower than prior spike (exhaustion confirmed)
+vol_lower_than_spike = volume < volume[1]
+
+// ── ENTRY SIGNALS ─────────────────────────────────────────────
+// SHORT: prior bar was spike, this bar is bearish reversal with lower volume
+short_signal = trade_ok and
+     spike_short[1] and
+     (require_reversal ? bearish_reversal : true) and
+     vol_lower_than_spike and
+     close < open[1]           // closing below spike bar open = confirmation
+
+// LONG: prior bar was spike down, this bar is bullish reversal with lower volume
+long_signal  = trade_ok and
+     spike_long[1] and
+     (require_reversal ? bullish_reversal : true) and
+     vol_lower_than_spike and
+     close > open[1]
+
+// ── TRADE STATE ───────────────────────────────────────────────
+var float entry_p   = na
+var float stop_p    = na
+var float t1_p      = na    // 9 EMA at entry (approximated as entry ± half move to EMA)
+var float t2_p      = na    // VWAP at entry
+var bool  in_long   = false
+var bool  in_short  = false
+var int   consec_losses = 0
+var bool  day_stopped   = false
+
+if is_new_day
+    consec_losses := 0
+    day_stopped   := false
+
+can_trade = not day_stopped and consec_losses < max_losses_day
+
+// Enter short
+if short_signal and not in_long and not in_short and can_trade
+    entry_p  := close
+    stop_p   := high[1] + stop_buffer_ticks   // above the spike high
+    t1_p     := ema9                           // 9 EMA = T1
+    t2_p     := vwap                           // VWAP = T2
+    in_short := true
+
+// Enter long
+if long_signal and not in_long and not in_short and can_trade
+    entry_p  := close
+    stop_p   := low[1] - stop_buffer_ticks    // below the spike low
+    t1_p     := ema9                           // 9 EMA = T1
+    t2_p     := vwap                           // VWAP = T2
+    in_long  := true
+
+// Track T1 dynamically (9 EMA moves)
+t1_live = in_long ? ema9 : in_short ? ema9 : na
+
+// Exit short
+var bool short_stopped = false
+var bool short_t1_hit  = false
+var bool short_t2_hit  = false
+if in_short
+    short_stopped := high >= stop_p
+    short_t1_hit  := low  <= t1_p
+    short_t2_hit  := low  <= t2_p
+    if short_stopped or short_t2_hit or not trade_ok
+        if short_stopped
+            consec_losses := consec_losses + 1
+            if consec_losses >= max_losses_day
+                day_stopped := true
+        else
+            consec_losses := 0
+        in_short := false
+        entry_p  := na
+        stop_p   := na
+        t1_p     := na
+        t2_p     := na
+
+// Exit long
+var bool long_stopped = false
+var bool long_t1_hit  = false
+var bool long_t2_hit  = false
+if in_long
+    long_stopped := low  <= stop_p
+    long_t1_hit  := high >= t1_p
+    long_t2_hit  := high >= t2_p
+    if long_stopped or long_t2_hit or not trade_ok
+        if long_stopped
+            consec_losses := consec_losses + 1
+            if consec_losses >= max_losses_day
+                day_stopped := true
+        else
+            consec_losses := 0
+        in_long  := false
+        entry_p  := na
+        stop_p   := na
+        t1_p     := na
+        t2_p     := na
+
+// ── PLOT LEVELS ───────────────────────────────────────────────
+plot(show_levels and (in_long or in_short) ? stop_p : na, "Stop",     color=color.new(#ff1744, 0), linewidth=1, style=plot.style_linebr)
+plot(show_levels and (in_long or in_short) ? t1_p   : na, "T1 (EMA)", color=color.new(#ff7043, 0), linewidth=1, style=plot.style_linebr)
+plot(show_levels and (in_long or in_short) ? t2_p   : na, "T2 (VWAP)",color=color.new(#4fc3f7, 0), linewidth=1, style=plot.style_linebr)
+
+// ── SIGNAL SHAPES ─────────────────────────────────────────────
+plotshape(show_signals and short_signal, title="Short Entry",
+     style=shape.triangledown, location=location.abovebar,
+     color=color.new(#ff5252, 0), size=size.normal, text="FADE\nSHORT")
+
+plotshape(show_signals and long_signal, title="Long Entry",
+     style=shape.triangleup, location=location.belowbar,
+     color=color.new(#00e676, 0), size=size.normal, text="FADE\nLONG")
+
+// T1 exit markers
+t1_exit = (in_long[1] and long_t1_hit) or (in_short[1] and short_t1_hit)
+plotshape(show_signals and t1_exit, title="T1 Exit (50%)",
+     style=shape.circle, location=location.abovebar,
+     color=color.new(#ff7043, 0), size=size.small, text="T1\n50%")
+
+// T2 exit markers
+t2_exit = (in_long[1] and long_t2_hit) or (in_short[1] and short_t2_hit)
+plotshape(show_signals and t2_exit, title="T2 Exit (50%)",
+     style=shape.circle, location=location.abovebar,
+     color=color.new(#4fc3f7, 0), size=size.small, text="T2\n50%")
+
+// Stop hit marker
+stop_exit = (in_long[1] and long_stopped) or (in_short[1] and short_stopped)
+plotshape(show_signals and stop_exit, title="Stop Hit",
+     style=shape.xcross, location=location.abovebar,
+     color=color.new(#ff1744, 0), size=size.small, text="STOP")
+
+// Day stopped warning
+bgcolor(day_stopped ? color.new(#ff1744, 96) : na, title="Trading Stopped for Day")
+
+// ── CURRENT DEVIATION LABEL ───────────────────────────────────
+vwap_dev_pct = (close - vwap) / vwap * 100
+
+// ── STATS TABLE ───────────────────────────────────────────────
+var table stats = table.new(position.bottom_right, 2, 7,
+     bgcolor=#0b0c16, border_color=#222338, border_width=1)
+
+if barstate.islast and show_table
+    dev_clr = math.abs(vwap_dev_pct) >= dev1_pct ? #f5a623 : #50527a
+    trade_clr = day_stopped ? #ff1744 : consec_losses >= 2 ? #f5a623 : #00e676
+    table.cell(stats, 0, 0, "VWAP SCALP",           text_color=#50527a, text_size=size.tiny, bgcolor=#0b0c16)
+    table.cell(stats, 1, 0, "VALUE",                 text_color=#50527a, text_size=size.tiny, bgcolor=#0b0c16)
+    table.cell(stats, 0, 1, "VWAP",                  text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 1, 1, str.tostring(vwap,"#.##"), text_color=#4fc3f7, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 0, 2, "Dev from VWAP",         text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 1, 2, str.tostring(vwap_dev_pct,"#.##") + "%", text_color=dev_clr, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 0, 3, "9 EMA",                 text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 1, 3, str.tostring(ema9,"#.##"), text_color=#ff7043, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 0, 4, "Vol vs Avg",             text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 1, 4, str.tostring(volume/vol_avg,"#.#") + "×", text_color=is_spike_vol ? #f5a623 : #50527a, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 0, 5, "Consec Losses",          text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 1, 5, str.tostring(consec_losses) + " / " + str.tostring(max_losses_day), text_color=trade_clr, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 0, 6, "Status",                 text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(stats, 1, 6, day_stopped ? "STOPPED" : is_lunch ? "LUNCH - SKIP" : trade_ok ? "ACTIVE" : "OFF-HOURS", text_color=trade_clr, text_size=size.tiny, bgcolor=#0e0f1d)
+
+// ── ALERTS ────────────────────────────────────────────────────
+alertcondition(short_signal,    "VWAP Fade Short",   "VWAP FADE SHORT: {{ticker}} overextended above +1.5% with exhaustion volume. Enter short. Stop above spike high.")
+alertcondition(long_signal,     "VWAP Fade Long",    "VWAP FADE LONG: {{ticker}} overextended below -1.5% with exhaustion volume. Enter long. Stop below spike low.")
+alertcondition(t1_exit,         "Scalp T1 Hit",      "T1 HIT (9 EMA): Take 50% profit on {{ticker}}. Move stop to breakeven.")
+alertcondition(t2_exit,         "Scalp T2 Hit",      "T2 HIT (VWAP): Take remaining 50% profit on {{ticker}}. Trade complete.")
+alertcondition(stop_exit,       "Scalp Stop Hit",    "STOP HIT: {{ticker}} scalp stopped out. Check consecutive loss count.")
+alertcondition(day_stopped,     "Day Trading Halted","MAX LOSSES REACHED on {{ticker}} for today. Do not take any more trades.")

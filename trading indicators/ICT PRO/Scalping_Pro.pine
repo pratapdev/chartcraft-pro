@@ -1,0 +1,713 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  ⚡ SCALPING PRO — VWAP, ORDER FLOW & MARKET STRUCTURE
+//  Pine Script v5
+//  Setups: VWAP Bounce | Opening Range Breakout | VWAP Trend Scalp |
+//          PDH/PDL Fade | VWAP Value Area Scalp
+//  Features: VWAP + SD Bands • Opening Range • Previous Day H/L/C
+//             Volume Analysis • RSI Filter • Entry Signals
+//             SL/TP Lines • Full Info Panel with Instructions
+//  Best Markets : ES/NQ Futures, Forex Majors, SPY/QQQ
+//  Best TF      : 1m, 2m, 3m, 5m
+// ════════════════════════════════════════════════════════════════════════════
+//@version=5
+indicator("⚡ Scalping Pro — VWAP & Order Flow", shortTitle="Scalp Pro",
+    overlay=true, max_lines_count=500, max_labels_count=300, max_boxes_count=80)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SETUP SELECTION
+// ─────────────────────────────────────────────────────────────────────────────
+i_setup = input.string(
+    defval  = "VWAP Bounce",
+    title   = "⚡ SELECT SCALPING SETUP",
+    options = ["VWAP Bounce",
+               "Opening Range Breakout (ORB)",
+               "VWAP Trend Scalp",
+               "PDH / PDL Fade",
+               "VWAP Value Area Scalp"],
+    tooltip = "Each model has distinct entry rules. Panel shows live instructions. Use 1m–5m charts only.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — VWAP
+// ─────────────────────────────────────────────────────────────────────────────
+G1 = "📊 VWAP & Standard Deviation Bands"
+i_showVWAP = input.bool(true,  "Show VWAP",              group=G1)
+i_showSD1  = input.bool(true,  "Show ±1 SD Band",        group=G1)
+i_showSD2  = input.bool(true,  "Show ±2 SD Band",        group=G1)
+i_showSD3  = input.bool(false, "Show ±3 SD Band",        group=G1)
+c_vwap     = input.color(color.new(#ffffff, 0),  "VWAP Line Color",  group=G1)
+c_sd1      = input.color(color.new(#42a5f5, 50), "±1 SD Color",      group=G1)
+c_sd2      = input.color(color.new(#66bb6a, 40), "±2 SD Color",      group=G1)
+c_sd3      = input.color(color.new(#ef5350, 30), "±3 SD Color",      group=G1)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — OPENING RANGE
+// ─────────────────────────────────────────────────────────────────────────────
+G2 = "📐 Opening Range (RTH — US Markets)"
+i_showOR = input.bool(true, "Show Opening Range Box + Lines", group=G2)
+i_orMins = input.int(30,    "OR Duration (minutes)",          group=G2,
+    minval=5, maxval=60,
+    tooltip="Standard = 30 min (9:30–10:00 AM ET). Futures traders use 15m or 60m variants.")
+c_orH    = input.color(color.new(#00e5ff, 15), "OR High Color", group=G2)
+c_orL    = input.color(color.new(#ff6e40, 15), "OR Low Color",  group=G2)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — PREVIOUS DAY LEVELS
+// ─────────────────────────────────────────────────────────────────────────────
+G3 = "📅 Previous Day Levels"
+i_showPD = input.bool(true, "Show PDH / PDL / PDC", group=G3,
+    tooltip="PDH and PDL are key liquidity levels. Price often rejects or breaks through these at session open.")
+c_pdh    = input.color(color.new(#ef9a9a, 0), "PDH Color", group=G3)
+c_pdl    = input.color(color.new(#a5d6a7, 0), "PDL Color", group=G3)
+c_pdc    = input.color(color.new(#fff176, 0), "PDC Color", group=G3)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — VOLUME ANALYSIS
+// ─────────────────────────────────────────────────────────────────────────────
+G4 = "📊 Volume Analysis"
+i_showVol  = input.bool(true,  "Colour Bars by Relative Volume", group=G4)
+i_volMA    = input.int(20,     "Volume MA Length",               group=G4, minval=5, maxval=100)
+i_highVolX = input.float(1.5,  "High Volume Threshold (× MA)",   group=G4,
+    minval=1.1, maxval=5.0, step=0.1,
+    tooltip="Volume must exceed this multiple of MA to confirm entry. Keeps you out of fakeouts.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — RSI FILTER
+// ─────────────────────────────────────────────────────────────────────────────
+G5 = "📉 RSI Filter"
+i_useRSI = input.bool(true, "Enable RSI Filter",        group=G5,
+    tooltip="When enabled, long signals require RSI < OB level; short signals require RSI > OS level")
+i_rsiLen = input.int(14,    "RSI Length",               group=G5, minval=2, maxval=50)
+i_rsiOS  = input.int(40,    "Oversold Level (for longs)",  group=G5, minval=10, maxval=50)
+i_rsiOB  = input.int(60,    "Overbought Level (for shorts)", group=G5, minval=50, maxval=90)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — RISK MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+G6 = "🎯 Risk Management"
+i_risk     = input.float(0.5, "Risk % per Trade",     group=G6,
+    minval=0.1, maxval=2.0, step=0.1,
+    tooltip="0.5% is the professional standard. Never risk more than 1% on a scalp trade.")
+i_scalpRR  = input.float(2.0, "Target R:R",           group=G6,
+    minval=1.0, maxval=5.0, step=0.5,
+    tooltip="Scalping typically targets 1:2 to 1:3 R:R. More than 3 is rare on 1m-5m.")
+i_showRisk = input.bool(true,  "Show SL / TP Lines on Chart", group=G6)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — SESSIONS (for signal filtering)
+// ─────────────────────────────────────────────────────────────────────────────
+G7 = "🕐 Session Filter (UTC times)"
+i_filterSession = input.bool(true,  "Only Signal During Active Sessions", group=G7,
+    tooltip="Scalping during lunch / dead hours is the #1 mistake. This filter blocks signals outside high-vol windows.")
+i_showSess = input.bool(true, "Show Session Backgrounds", group=G7)
+c_sessPre  = input.color(color.new(#455a64, 90), "Pre-Market Colour",  group=G7)
+c_sessRTH  = input.color(color.new(#1b5e20, 92), "RTH Session Colour", group=G7)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — DISPLAY
+// ─────────────────────────────────────────────────────────────────────────────
+G8 = "🖥 Display"
+i_showPanel = input.bool(true, "Show Info Panel", group=G8)
+i_panelPos  = input.string("Top Right", "Panel Position",
+    options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=G8)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SESSION BACKGROUNDS
+//  Pre-Market  : 08:00–13:30 UTC  (4:00–9:30 AM ET)
+//  RTH Prime   : 13:30–16:00 UTC  (9:30 AM–12:00 PM ET)
+//  RTH PM      : 19:00–21:00 UTC  (3:00–5:00 PM ET)
+//  Avoid zone  : 16:00–19:00 UTC  (lunch / dead hours)
+// ─────────────────────────────────────────────────────────────────────────────
+inSess(s) => not na(time(timeframe.period, s, "UTC"))
+
+isPreMkt   = inSess("0800-1330")
+isRTH      = inSess("1330-1600")
+isRTH_PM   = inSess("1900-2100")
+isLunch    = inSess("1600-1900")
+isActiveSession = isRTH or isRTH_PM
+
+bgcolor(i_showSess and isPreMkt  ? c_sessPre : na, title="Pre-Market")
+bgcolor(i_showSess and isRTH     ? c_sessRTH : na, title="RTH Prime")
+bgcolor(i_showSess and isRTH_PM  ? c_sessRTH : na, title="RTH PM")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  VWAP CALCULATION  (anchored — resets every calendar day)
+//  Uses price² × volume method for accurate standard deviation bands
+// ─────────────────────────────────────────────────────────────────────────────
+isNewDay = timeframe.change("D")
+
+var float cumPV  = 0.0
+var float cumPV2 = 0.0
+var float cumVol = 0.0
+
+if isNewDay
+    cumPV  := 0.0
+    cumPV2 := 0.0
+    cumVol := 0.0
+
+cumPV  += hlc3 * volume
+cumPV2 += hlc3 * hlc3 * volume
+cumVol += volume
+
+vwap     = cumVol > 0 ? cumPV / cumVol : hlc3
+variance = cumVol > 0 ? math.max(cumPV2 / cumVol - vwap * vwap, 0.0) : 0.0
+vwapSD   = math.sqrt(variance)
+
+sd1u = vwap + 1.0 * vwapSD
+sd1d = vwap - 1.0 * vwapSD
+sd2u = vwap + 2.0 * vwapSD
+sd2d = vwap - 2.0 * vwapSD
+sd3u = vwap + 3.0 * vwapSD
+sd3d = vwap - 3.0 * vwapSD
+
+// ── Plots ────────────────────────────────────────────────────────────────────
+pVwap = plot(i_showVWAP ? vwap : na, "VWAP",  color=c_vwap,  linewidth=2)
+p1u   = plot(i_showSD1  ? sd1u : na, "+1 SD", color=c_sd1,   linewidth=1)
+p1d   = plot(i_showSD1  ? sd1d : na, "-1 SD", color=c_sd1,   linewidth=1)
+p2u   = plot(i_showSD2  ? sd2u : na, "+2 SD", color=c_sd2,   linewidth=1)
+p2d   = plot(i_showSD2  ? sd2d : na, "-2 SD", color=c_sd2,   linewidth=1)
+p3u   = plot(i_showSD3  ? sd3u : na, "+3 SD", color=c_sd3,   linewidth=1)
+p3d   = plot(i_showSD3  ? sd3d : na, "-3 SD", color=c_sd3,   linewidth=1)
+
+fill(p1u, p1d, color=color.new(#42a5f5, 96), title="±1 SD Fill")
+fill(p2u, p1u, color=color.new(#66bb6a, 97), title="+1↔+2 Fill")
+fill(p1d, p2d, color=color.new(#66bb6a, 97), title="-1↔-2 Fill")
+
+// VWAP label on right edge
+if barstate.islast and i_showVWAP
+    label.new(bar_index + 1, vwap,
+        "VWAP\n" + str.tostring(vwap, format.mintick),
+        color     = color.new(#ffffff, 15),
+        textcolor = color.black,
+        style     = label.style_label_left,
+        size      = size.tiny)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  OPENING RANGE (OR)
+//  RTH Start = 9:30 AM ET = 13:30 UTC
+//  OR closes after i_orMins minutes
+// ─────────────────────────────────────────────────────────────────────────────
+orStartSecs = 13 * 3600 + 30 * 60
+orEndSecs   = orStartSecs + i_orMins * 60
+barSecUTC   = int((time / 1000) % 86400)
+isOR        = barSecUTC >= orStartSecs and barSecUTC < orEndSecs
+
+var float orHigh     = na
+var float orLow      = na
+var bool  orDone     = false
+var box   orBox      = na
+var line  orHighLine = na
+var line  orLowLine  = na
+
+if isNewDay
+    orHigh     := na
+    orLow      := na
+    orDone     := false
+    if not na(orBox)
+        box.delete(orBox)
+    if not na(orHighLine)
+        line.delete(orHighLine)
+    if not na(orLowLine)
+        line.delete(orLowLine)
+
+if isOR
+    orHigh := na(orHigh) ? high : math.max(orHigh, high)
+    orLow  := na(orLow)  ? low  : math.min(orLow, low)
+
+// Draw once when OR just closed
+orJustClosed = not isOR and isOR[1] and not na(orHigh) and not orDone
+
+if orJustClosed
+    orDone := true
+    if i_showOR
+        orHighLine := line.new(bar_index, orHigh, bar_index + 350, orHigh,
+            color=c_orH, width=2, style=line.style_dashed)
+        orLowLine  := line.new(bar_index, orLow,  bar_index + 350, orLow,
+            color=c_orL, width=2, style=line.style_dashed)
+        orBox      := box.new(bar_index, orHigh, bar_index + 350, orLow,
+            border_color = color.new(#00e5ff, 55),
+            bgcolor      = color.new(#00e5ff, 95),
+            border_width = 1)
+        label.new(bar_index + 2, orHigh,
+            "OR High  " + str.tostring(orHigh, format.mintick),
+            color=c_orH, textcolor=color.black,
+            style=label.style_label_left, size=size.tiny,
+            tooltip="Opening Range High — breakout above = bullish signal")
+        label.new(bar_index + 2, orLow,
+            "OR Low  " + str.tostring(orLow, format.mintick),
+            color=c_orL, textcolor=color.black,
+            style=label.style_label_left, size=size.tiny,
+            tooltip="Opening Range Low — breakdown below = bearish signal")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PREVIOUS DAY LEVELS
+// ─────────────────────────────────────────────────────────────────────────────
+[pdh, pdl, pdc] = request.security(syminfo.tickerid, "D",
+    [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
+
+if i_showPD and isNewDay and not na(pdh)
+    line.new(bar_index, pdh, bar_index + 500, pdh,
+        color=c_pdh, width=1, style=line.style_dotted)
+    line.new(bar_index, pdl, bar_index + 500, pdl,
+        color=c_pdl, width=1, style=line.style_dotted)
+    line.new(bar_index, pdc, bar_index + 500, pdc,
+        color=c_pdc, width=1, style=line.style_dotted)
+    label.new(bar_index, pdh, "PDH",
+        color=c_pdh, textcolor=color.black,
+        style=label.style_label_right, size=size.tiny,
+        tooltip="Previous Day High — key resistance. Fade at open, or trade breakout with volume.")
+    label.new(bar_index, pdl, "PDL",
+        color=c_pdl, textcolor=color.black,
+        style=label.style_label_right, size=size.tiny,
+        tooltip="Previous Day Low — key support. Fade at open, or trade breakdown with volume.")
+    label.new(bar_index, pdc, "PDC",
+        color=c_pdc, textcolor=color.black,
+        style=label.style_label_right, size=size.tiny,
+        tooltip="Previous Day Close — major magnet / pivot. TP target for fade setups.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  VOLUME ANALYSIS
+// ─────────────────────────────────────────────────────────────────────────────
+volMA     = ta.sma(volume, i_volMA)
+relVol    = volume / math.max(volMA, 1)
+isHighVol = volume >= volMA * i_highVolX
+
+barcolor(i_showVol ?
+    (isHighVol    ? color.new(close >= open ? #00c853 : #d50000, 15) :
+     relVol > 1.0 ? color.new(close >= open ? #4caf50 : #ef5350, 50) :
+                    color.new(#546e7a, 65)) : na,
+    title="Volume Colour")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  RSI
+// ─────────────────────────────────────────────────────────────────────────────
+rsi14    = ta.rsi(close, i_rsiLen)
+rsiLong  = not i_useRSI or rsi14 < i_rsiOB    // RSI filter for longs (not overbought)
+rsiShort = not i_useRSI or rsi14 > i_rsiOS    // RSI filter for shorts (not oversold)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ATR
+// ─────────────────────────────────────────────────────────────────────────────
+atr14 = ta.atr(14)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PRICE POSITION RELATIVE TO VWAP
+// ─────────────────────────────────────────────────────────────────────────────
+aboveVWAP = close > vwap
+belowVWAP = close < vwap
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SESSION GATE — only signal during active, high-volume sessions
+// ─────────────────────────────────────────────────────────────────────────────
+sessionOK = not i_filterSession or isActiveSession
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CANDLE PATTERN HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+isBullCandle = close > open
+isBearCandle = close < open
+bodySize     = math.abs(close - open)
+upperWick    = high - math.max(close, open)
+lowerWick    = math.min(close, open) - low
+isHammer     = lowerWick > bodySize * 1.5 and upperWick < bodySize * 0.5
+isShootingStar = upperWick > bodySize * 1.5 and lowerWick < bodySize * 0.5
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SETUP SIGNAL LOGIC
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── SETUP 1 : VWAP BOUNCE ────────────────────────────────────────────────────
+// Mean reversion from ±2 SD back toward VWAP
+// Long  : price wicks to -2SD, closes back above it, RSI oversold, high vol
+// Short : price wicks to +2SD, closes back below it, RSI overbought, high vol
+vbLong  = low  <= sd2d * 1.001 and close > sd2d and
+          isBullCandle and isHighVol and
+          rsi14 < i_rsiOB and sessionOK
+
+vbShort = high >= sd2u * 0.999 and close < sd2u and
+          isBearCandle and isHighVol and
+          rsi14 > i_rsiOS and sessionOK
+
+// ── SETUP 2 : OPENING RANGE BREAKOUT (ORB) ───────────────────────────────────
+// Classic momentum play. Breakout above OR High or below OR Low with volume.
+// Best entry = RETEST of OR level after breakout (shown in instructions)
+orbLong  = orDone and not na(orHigh) and
+           close > orHigh and low   <= orHigh * 1.002 and
+           isBullCandle and isHighVol and sessionOK
+
+orbShort = orDone and not na(orLow) and
+           close < orLow  and high  >= orLow  * 0.998 and
+           isBearCandle and isHighVol and sessionOK
+
+// ── SETUP 3 : VWAP TREND SCALP ───────────────────────────────────────────────
+// Trade WITH the prevailing VWAP trend. Enter on pullback to ±1SD.
+// Long  : price above VWAP, pulls back to +1SD, bounces (trend continuation)
+// Short : price below VWAP, pulls back to -1SD, rejects (trend continuation)
+vtLong  = aboveVWAP and
+          low   <= sd1u * 1.001 and close > sd1u and
+          isBullCandle and rsi14 > 40 and rsi14 < 70 and sessionOK
+
+vtShort = belowVWAP and
+          high  >= sd1d * 0.999 and close < sd1d and
+          isBearCandle and rsi14 < 60 and rsi14 > 30 and sessionOK
+
+// ── SETUP 4 : PDH / PDL FADE ─────────────────────────────────────────────────
+// Previous day levels are major magnets. Fade rejection at PDH or PDL.
+// Long  : price wicks to PDL, forms bullish rejection, RSI not overbought
+// Short : price wicks to PDH, forms bearish rejection, RSI not oversold
+pdFadeLong  = not na(pdl) and
+              low  <= pdl * 1.001 and close > pdl and
+              (isBullCandle or isHammer) and rsiLong and sessionOK
+
+pdFadeShort = not na(pdh) and
+              high >= pdh * 0.999 and close < pdh and
+              (isBearCandle or isShootingStar) and rsiShort and sessionOK
+
+// ── SETUP 5 : VWAP VALUE AREA SCALP ──────────────────────────────────────────
+// Price is inside the value area (between ±1 SD). Fade the band extremes.
+// Long  : price touches -1SD from inside value area, closes back toward VWAP
+// Short : price touches +1SD from inside value area, closes back toward VWAP
+vaLong  = close > sd2d and
+          low   <= sd1d * 1.001 and close > sd1d and
+          isBullCandle and rsiLong and sessionOK
+
+vaShort = close < sd2u and
+          high  >= sd1u * 0.999 and close < sd1u and
+          isBearCandle and rsiShort and sessionOK
+
+// ── COMBINED SIGNALS ──────────────────────────────────────────────────────────
+bullSignal = switch i_setup
+    "VWAP Bounce"                 => vbLong
+    "Opening Range Breakout (ORB)"=> orbLong
+    "VWAP Trend Scalp"            => vtLong
+    "PDH / PDL Fade"              => pdFadeLong
+    "VWAP Value Area Scalp"       => vaLong
+    => false
+
+bearSignal = switch i_setup
+    "VWAP Bounce"                 => vbShort
+    "Opening Range Breakout (ORB)"=> orbShort
+    "VWAP Trend Scalp"            => vtShort
+    "PDH / PDL Fade"              => pdFadeShort
+    "VWAP Value Area Scalp"       => vaShort
+    => false
+
+// Trigger only on the FIRST bar of a new signal (no repeat labels)
+bullTrigger = bullSignal and not bullSignal[1]
+bearTrigger = bearSignal and not bearSignal[1]
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DYNAMIC TP LOGIC
+//  VWAP Bounce   → TP = VWAP (mean reversion target)
+//  ORB           → TP = OR height projected from breakout
+//  PDH/PDL Fade  → TP = PDC (previous day close — natural magnet)
+//  Others        → TP = ATR × R:R
+// ─────────────────────────────────────────────────────────────────────────────
+calcTP(ep, dir) =>
+    atrTP = atr14 * i_scalpRR
+    result = dir > 0 ? ep + atrTP : ep - atrTP   // default ATR-based
+    if i_setup == "VWAP Bounce"
+        result := vwap                            // target = VWAP
+    else if i_setup == "Opening Range Breakout (ORB)" and orDone and not na(orHigh)
+        orRange = orHigh - orLow
+        result  := dir > 0 ? orHigh + orRange : orLow - orRange
+    else if i_setup == "PDH / PDL Fade" and not na(pdc)
+        result  := pdc                            // target = PDC
+    result
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ENTRY LABELS + SL / TP LINES
+// ─────────────────────────────────────────────────────────────────────────────
+if bullTrigger
+    ep   = close
+    sl   = low - atr14 * 0.3
+    tp   = calcTP(ep, 1)
+    // Ensure TP is actually above entry
+    tp  := math.max(tp, ep + atr14 * 1.0)
+    rrActual = (tp - ep) / math.max(ep - sl, 0.000001)
+
+    label.new(bar_index, low - atr14 * 0.6,
+        text =
+            "⚡ SCALP LONG\n"                                              +
+            "━━━━━━━━━━━━━━━━━━━━━━\n"                                    +
+            "Entry  : " + str.tostring(ep,  format.mintick)  + "\n"       +
+            "SL     : " + str.tostring(sl,  format.mintick)  + "  ← stop\n" +
+            "TP     : " + str.tostring(tp,  format.mintick)  + "\n"       +
+            "R:R    : 1:" + str.tostring(rrActual, "#.##")   + "\n"       +
+            "Volume : " + str.tostring(relVol, "#.##") + "× avg\n"        +
+            "RSI    : " + str.tostring(rsi14,  "#.#"),
+        color     = color.new(#00c853, 5),
+        textcolor = color.white,
+        style     = label.style_label_up,
+        size      = size.normal)
+
+    if i_showRisk
+        line.new(bar_index, sl, bar_index + 40, sl,
+            color=color.red,   width=2, style=line.style_dashed)
+        line.new(bar_index, tp, bar_index + 40, tp,
+            color=color.green, width=2, style=line.style_dashed)
+        line.new(bar_index, ep, bar_index + 40, ep,
+            color=color.white, width=1, style=line.style_dotted)
+        label.new(bar_index + 40, sl, "SL",
+            color=color.red,    textcolor=color.white,
+            style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 40, tp, "TP",
+            color=color.green,  textcolor=color.black,
+            style=label.style_label_left, size=size.tiny)
+
+if bearTrigger
+    ep   = close
+    sl   = high + atr14 * 0.3
+    tp   = calcTP(ep, -1)
+    tp  := math.min(tp, ep - atr14 * 1.0)
+    rrActual = (ep - tp) / math.max(sl - ep, 0.000001)
+
+    label.new(bar_index, high + atr14 * 0.6,
+        text =
+            "⚡ SCALP SHORT\n"                                             +
+            "━━━━━━━━━━━━━━━━━━━━━━\n"                                    +
+            "Entry  : " + str.tostring(ep,  format.mintick)  + "\n"       +
+            "SL     : " + str.tostring(sl,  format.mintick)  + "  ← stop\n" +
+            "TP     : " + str.tostring(tp,  format.mintick)  + "\n"       +
+            "R:R    : 1:" + str.tostring(rrActual, "#.##")   + "\n"       +
+            "Volume : " + str.tostring(relVol, "#.##") + "× avg\n"        +
+            "RSI    : " + str.tostring(rsi14,  "#.#"),
+        color     = color.new(#d50000, 5),
+        textcolor = color.white,
+        style     = label.style_label_down,
+        size      = size.normal)
+
+    if i_showRisk
+        line.new(bar_index, sl, bar_index + 40, sl,
+            color=color.red,   width=2, style=line.style_dashed)
+        line.new(bar_index, tp, bar_index + 40, tp,
+            color=color.green, width=2, style=line.style_dashed)
+        line.new(bar_index, ep, bar_index + 40, ep,
+            color=color.white, width=1, style=line.style_dotted)
+        label.new(bar_index + 40, sl, "SL",
+            color=color.red,    textcolor=color.white,
+            style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 40, tp, "TP",
+            color=color.green,  textcolor=color.black,
+            style=label.style_label_left, size=size.tiny)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INFO PANEL — live market stats + step-by-step setup instructions
+// ─────────────────────────────────────────────────────────────────────────────
+if i_showPanel and barstate.islast
+    panPos = switch i_panelPos
+        "Top Right"    => position.top_right
+        "Top Left"     => position.top_left
+        "Bottom Right" => position.bottom_right
+        "Bottom Left"  => position.bottom_left
+        => position.top_right
+
+    // ── Live stats ──────────────────────────────────────────────────────
+    tfStatus = switch
+        timeframe.in_seconds() <= 60  => "✅ 1m  — Optimal"
+        timeframe.in_seconds() <= 120 => "✅ 2m  — Optimal"
+        timeframe.in_seconds() <= 180 => "✅ 3m  — Optimal"
+        timeframe.in_seconds() <= 300 => "✅ 5m  — Good"
+        timeframe.in_seconds() <= 900 => "⚠️ 15m — Too slow"
+        => "❌ Switch to 1m–5m"
+
+    sessStatus = isRTH     ? "🟢 RTH PRIME (Best)"  :
+                 isRTH_PM  ? "🟢 RTH CLOSE (Good)"  :
+                 isPreMkt  ? "🟡 Pre-Market"         :
+                 isLunch   ? "🔴 LUNCH — Avoid"      :
+                              "⚫ After Hours"
+
+    vwapZone = close > sd2u  ? "🔴 Above +2SD — Extended"  :
+               close > sd1u  ? "🟡 +1SD to +2SD"           :
+               close > vwap  ? "🟢 VWAP to +1SD"           :
+               close > sd1d  ? "🟢 -1SD to VWAP"           :
+               close > sd2d  ? "🟡 -2SD to -1SD"           :
+                                "🔴 Below -2SD — Extended"
+
+    rsiLabel = rsi14 > i_rsiOB ? "🔴 OB  " + str.tostring(rsi14, "#.#") :
+               rsi14 < i_rsiOS ? "🟢 OS  " + str.tostring(rsi14, "#.#") :
+                                   "⚪ Neutral " + str.tostring(rsi14, "#.#")
+
+    volLabel = isHighVol   ? "🔥 HIGH  " + str.tostring(relVol, "#.##") + "×" :
+               relVol > 1.0 ? "📊 Normal " + str.tostring(relVol, "#.##") + "×" :
+                               "💤 Low    " + str.tostring(relVol, "#.##") + "×"
+
+    orLabel  = isOR         ? "🟡 FORMING…"    :
+               orDone       ? "✅ SET  H:" + str.tostring(orHigh, format.mintick) +
+                               " / L:" + str.tostring(orLow, format.mintick) :
+                               "⚫ Not set yet"
+
+    // ── Instructions per setup ──────────────────────────────────────────
+    string si1 = ""
+    string si2 = ""
+    string si3 = ""
+    string si4 = ""
+    string si5 = ""
+    string siSL = ""
+    string siTP = ""
+    string siTF = ""
+    string siSess = ""
+
+    if i_setup == "VWAP Bounce"
+        si1   := "① Price must reach the ±2 SD band (extreme zone)"
+        si2   := "② RSI < 60 for longs  |  RSI > 40 for shorts"
+        si3   := "③ Wait for candle to CLOSE back inside ±2 SD"
+        si4   := "④ Volume must be HIGH (≥ 1.5× avg) on signal bar"
+        si5   := "⑤ Enter at close — SL below wick, TP = VWAP"
+        siSL  := "SL: 0.3 × ATR beyond the wick"
+        siTP  := "TP: VWAP (mean reversion target)"
+        siTF  := "1m or 2m entry  |  5m for VWAP context"
+        siSess:= "NY Open 9:30–11:30 AM ET  |  Avoid lunch"
+
+    else if i_setup == "Opening Range Breakout (ORB)"
+        si1   := "① Let OR form fully — do NOT trade inside it"
+        si2   := "② Wait for a full CLOSE above OR High or below OR Low"
+        si3   := "③ Volume must be HIGH on the breakout candle"
+        si4   := "④ Best entry = wait for RETEST of OR level after break"
+        si5   := "⑤ Enter at the retest, SL inside OR, TP = OR height"
+        siSL  := "SL: Back inside the Opening Range"
+        siTP  := "TP: OR height projected from breakout level"
+        siTF  := "5m to detect ORB  |  1m–2m for precise entry"
+        siSess:= "9:45–11:30 AM ET only — avoid afternoon ORBs"
+
+    else if i_setup == "VWAP Trend Scalp"
+        si1   := "① Confirm: price firmly above OR below VWAP"
+        si2   := "② Wait for pullback into the ±1 SD band"
+        si3   := "③ RSI between 40–70 (long) or 30–60 (short) — not extreme"
+        si4   := "④ Reversal candle at ±1SD confirms entry"
+        si5   := "⑤ Enter in DIRECTION of VWAP trend only"
+        siSL  := "SL: Beyond the ±1 SD band"
+        siTP  := "TP: ±2 SD or previous intraday swing high/low"
+        siTF  := "3m or 5m  |  best during trending post-news moves"
+        siSess:= "NY Open after a clear directional move. Avoid chop."
+
+    else if i_setup == "PDH / PDL Fade"
+        si1   := "① PDH and PDL auto-plotted at session open"
+        si2   := "② Price must WICK into PDH (short) or PDL (long)"
+        si3   := "③ Candle must CLOSE away from the level (rejection)"
+        si4   := "④ RSI must confirm: OB at PDH | OS at PDL"
+        si5   := "⑤ Enter after the rejection candle closes"
+        siSL  := "SL: 0.3–0.5 ATR beyond the PDH or PDL wick"
+        siTP  := "TP: PDC (previous day close) — 80%+ hit rate"
+        siTF  := "5m for level awareness  |  1m–3m for entry"
+        siSess:= "Pre-market & first 30 min of RTH — highest probability"
+
+    else // VWAP Value Area Scalp
+        si1   := "① Confirm market is in a RANGE (price inside ±1SD)"
+        si2   := "② Wait for price to TAG the ±1 SD band"
+        si3   := "③ Long at -1SD  |  Short at +1SD (fade the extreme)"
+        si4   := "④ Volume should be LOW / declining (rotation, not trend)"
+        si5   := "⑤ Enter on rejection candle, TP = VWAP or opposite band"
+        siSL  := "SL: Beyond ±1 SD band"
+        siTP  := "TP: VWAP midpoint or opposite ±1 SD"
+        siTF  := "1m or 2m  |  works only in range-bound conditions"
+        siSess:= "Avoid: trending sessions, news, first 15 min of RTH"
+
+    // ── Draw table ──────────────────────────────────────────────────────
+    var table t = table.new(panPos, 2, 22,
+        bgcolor      = color.new(#0d1117, 3),
+        border_color = color.new(#30363d, 0),
+        border_width = 1,
+        frame_color  = color.new(#00e5ff, 20),
+        frame_width  = 2)
+
+    H  = color.new(#161b22, 0)
+    R  = color.new(#0d1117, 0)
+    tc = color.white
+    sc = color.new(#8b949e, 0)
+    ts = size.tiny
+    ss = size.small
+
+    // Header
+    table.cell(t, 0, 0, "⚡  SCALPING PRO",
+        text_color=color.new(#00e5ff,  0), text_size=ss, bgcolor=H)
+    table.cell(t, 1, 0, "VWAP + ORDER FLOW",
+        text_color=color.new(#00e5ff, 30), text_size=ts, bgcolor=H)
+
+    // Live data rows
+    table.cell(t, 0, 1, "Setup",     text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 1, i_setup,     text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 2, "Timeframe", text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 2, tfStatus,    text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 3, "Session",   text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 3, sessStatus,  text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 4, "VWAP Zone", text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 4, vwapZone,    text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 5, "RSI",       text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 5, rsiLabel,    text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 6, "Volume",    text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 6, volLabel,    text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 7, "Opn Range", text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 7, orLabel,     text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 8, "Risk / RR", text_color=sc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 8, str.tostring(i_risk,"#.#") + "% risk  |  1:"
+                        + str.tostring(i_scalpRR,"#.#") + " R:R",
+        text_color=tc, text_size=ts, bgcolor=R)
+
+    // Divider
+    table.cell(t, 0, 9, "── ENTRY CHECKLIST ──",
+        text_color=color.new(#00e5ff, 0), text_size=ts, bgcolor=H)
+    table.cell(t, 1, 9, "",
+        text_color=tc, text_size=ts, bgcolor=H)
+
+    // Instructions
+    table.cell(t, 0, 10, si1, text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 10, "",  text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 11, si2, text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 11, "",  text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 12, si3, text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 12, "",  text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 13, si4, text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 13, "",  text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 14, si5, text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 1, 14, "",  text_color=tc, text_size=ts, bgcolor=R)
+
+    // SL / TP row
+    table.cell(t, 0, 15, "── TRADE LEVELS ──",
+        text_color=color.new(#00e5ff, 0), text_size=ts, bgcolor=H)
+    table.cell(t, 1, 15, "",
+        text_color=tc, text_size=ts, bgcolor=H)
+    table.cell(t, 0, 16, "🔴 " + siSL, text_color=color.new(#ef9a9a, 0), text_size=ts, bgcolor=R)
+    table.cell(t, 1, 16, "",            text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 17, "🟢 " + siTP, text_color=color.new(#a5d6a7, 0), text_size=ts, bgcolor=R)
+    table.cell(t, 1, 17, "",            text_color=tc, text_size=ts, bgcolor=R)
+
+    // Best TF / Session
+    table.cell(t, 0, 18, "── EXECUTION NOTES ──",
+        text_color=color.new(#00e5ff, 0), text_size=ts, bgcolor=H)
+    table.cell(t, 1, 18, "",
+        text_color=tc, text_size=ts, bgcolor=H)
+    table.cell(t, 0, 19, "📐 TF:   " + siTF,
+        text_color=color.new(#8b949e, 0), text_size=ts, bgcolor=R)
+    table.cell(t, 1, 19, "",
+        text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 20, "🕐 When: " + siSess,
+        text_color=color.new(#8b949e, 0), text_size=ts, bgcolor=R)
+    table.cell(t, 1, 20, "",
+        text_color=tc, text_size=ts, bgcolor=R)
+    table.cell(t, 0, 21, "⚠️  NO trades during lunch (12–1 PM ET)",
+        text_color=color.new(#ffb74d, 0), text_size=ts, bgcolor=H)
+    table.cell(t, 1, 21, "",
+        text_color=tc, text_size=ts, bgcolor=H)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ALERTS
+// ─────────────────────────────────────────────────────────────────────────────
+alertcondition(bullTrigger,
+    "⚡ Scalp Long Signal",
+    "SCALP LONG — {{ticker}} | Setup: " + i_setup + " | Check chart for SL/TP levels")
+
+alertcondition(bearTrigger,
+    "⚡ Scalp Short Signal",
+    "SCALP SHORT — {{ticker}} | Setup: " + i_setup + " | Check chart for SL/TP levels")
+
+alertcondition(orJustClosed,
+    "📐 Opening Range Set",
+    "Opening Range locked in on {{ticker}} — watch for breakout or fade setup")
+
+alertcondition(bullTrigger and isHighVol,
+    "🔥 High-Volume Scalp Long",
+    "HIGH VOLUME Scalp Long on {{ticker}} — strongest signal type")
+
+alertcondition(bearTrigger and isHighVol,
+    "🔥 High-Volume Scalp Short",
+    "HIGH VOLUME Scalp Short on {{ticker}} — strongest signal type")

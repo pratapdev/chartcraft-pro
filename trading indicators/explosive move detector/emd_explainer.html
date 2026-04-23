@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Explosive Move Detector [1M] — Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #080c10;
+    --surface:   #0d1117;
+    --panel:     #111820;
+    --border:    #1e2d3d;
+    --green:     #00e676;
+    --green-dim: rgba(0,230,118,.12);
+    --red:       #ff1744;
+    --red-dim:   rgba(255,23,68,.12);
+    --yellow:    #ffd600;
+    --yellow-dim:rgba(255,214,0,.10);
+    --cyan:      #00bcd4;
+    --cyan-dim:  rgba(0,188,212,.10);
+    --orange:    #ff6f00;
+    --white:     #e8edf2;
+    --muted:     #546e7a;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--sans);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Noise texture overlay ── */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  /* ── Layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; position: relative; z-index:1; }
+  section { padding: 5rem 0; }
+
+  /* ── Nav ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(8,12,16,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: .8rem 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-logo { font-family: var(--mono); color: var(--green); font-size: .8rem; letter-spacing: .1em; }
+  .nav-links { display: flex; gap: 1.5rem; }
+  .nav-links a {
+    font-family: var(--mono); font-size: .72rem; color: var(--muted);
+    text-decoration: none; letter-spacing: .08em; transition: color .2s;
+  }
+  .nav-links a:hover { color: var(--white); }
+
+  /* ── Hero ── */
+  .hero {
+    min-height: 92vh; display: flex; flex-direction: column;
+    justify-content: center; padding: 6rem 0 3rem;
+    position: relative;
+  }
+  .hero-tag {
+    font-family: var(--mono); font-size: .72rem; color: var(--green);
+    letter-spacing: .15em; margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: .5rem;
+  }
+  .hero-tag::before { content:''; width: 28px; height: 1px; background: var(--green); }
+  .hero h1 {
+    font-size: clamp(2.8rem, 6vw, 5.5rem); font-weight: 800; line-height: 1.0;
+    letter-spacing: -.03em; margin-bottom: 1.5rem;
+  }
+  .hero h1 span { color: var(--green); }
+  .hero-sub {
+    font-size: 1.05rem; color: var(--muted); max-width: 560px;
+    font-weight: 400; line-height: 1.7; margin-bottom: 2.5rem;
+  }
+  .hero-chips { display: flex; gap: .7rem; flex-wrap: wrap; margin-bottom: 3rem; }
+  .chip {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .06em;
+    padding: .25rem .7rem; border-radius: 2px; border: 1px solid;
+  }
+  .chip-green { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .chip-cyan  { border-color: var(--cyan);  color: var(--cyan);  background: var(--cyan-dim);  }
+  .chip-orange{ border-color: var(--orange);color: var(--orange);background: rgba(255,111,0,.1); }
+
+  /* ── Live Histogram Demo ── */
+  .histogram-demo {
+    width: 100%; height: 180px; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 4px;
+    display: flex; align-items: flex-end; gap: 3px; padding: 16px 16px 36px;
+    position: relative; overflow: hidden;
+  }
+  .histogram-demo::after {
+    content:'VOL RATIO'; font-family: var(--mono); font-size: .6rem;
+    color: var(--muted); position: absolute; bottom: 10px; left: 16px; letter-spacing: .1em;
+  }
+  .hbar {
+    flex: 1; border-radius: 1px 1px 0 0; min-width: 8px;
+    transform-origin: bottom; animation: barGrow .6s ease-out both;
+  }
+  @keyframes barGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  .threshold-line {
+    position: absolute; left: 16px; right: 16px;
+    height: 1px; background: var(--orange); opacity: .8;
+    border-top: 1px dashed var(--orange);
+  }
+  .threshold-label {
+    position: absolute; right: 16px; font-family: var(--mono);
+    font-size: .6rem; color: var(--orange); background: var(--surface);
+    padding: 0 4px;
+  }
+
+  /* ── Section titles ── */
+  .sec-label {
+    font-family: var(--mono); font-size: .68rem; color: var(--muted);
+    letter-spacing: .15em; margin-bottom: .6rem;
+  }
+  .sec-title {
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 800;
+    letter-spacing: -.02em; margin-bottom: 1rem; line-height: 1.1;
+  }
+  .sec-desc { color: var(--muted); max-width: 600px; line-height: 1.75; }
+
+  /* ── Architecture diagram ── */
+  .arch-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 2.5rem; }
+  @media(max-width:700px){ .arch-grid { grid-template-columns: 1fr; } }
+  .arch-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1.5rem;
+    position: relative; overflow: hidden; transition: border-color .3s, transform .3s;
+  }
+  .arch-card:hover { transform: translateY(-3px); }
+  .arch-card.green { border-color: rgba(0,230,118,.3); }
+  .arch-card.cyan  { border-color: rgba(0,188,212,.3); }
+  .arch-card.orange{ border-color: rgba(255,111,0,.3); }
+  .arch-card::before {
+    content:''; position: absolute; top:0; left:0; right:0; height:2px;
+  }
+  .arch-card.green::before  { background: var(--green);  }
+  .arch-card.cyan::before   { background: var(--cyan);   }
+  .arch-card.orange::before { background: var(--orange); }
+  .arch-icon { font-size: 1.8rem; margin-bottom: .8rem; }
+  .arch-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: .4rem; }
+  .arch-card.green h3  { color: var(--green);  }
+  .arch-card.cyan h3   { color: var(--cyan);   }
+  .arch-card.orange h3 { color: var(--orange); }
+  .arch-card p { font-size: .82rem; color: var(--muted); line-height: 1.65; }
+  .arch-formula {
+    margin-top: .8rem; padding: .5rem .75rem;
+    background: var(--bg); border-radius: 3px;
+    font-family: var(--mono); font-size: .72rem; color: var(--white);
+    border-left: 2px solid;
+  }
+  .arch-card.green .arch-formula   { border-color: var(--green);  }
+  .arch-card.cyan .arch-formula    { border-color: var(--cyan);   }
+  .arch-card.orange .arch-formula  { border-color: var(--orange); }
+
+  /* ── Signal matrix ── */
+  .matrix-wrapper { margin-top: 2.5rem; overflow-x: auto; }
+  .matrix {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--mono); font-size: .78rem;
+  }
+  .matrix th {
+    padding: .8rem 1rem; background: var(--panel);
+    border: 1px solid var(--border); color: var(--muted);
+    font-weight: 700; letter-spacing: .08em; text-align: left;
+  }
+  .matrix td {
+    padding: .75rem 1rem; border: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .matrix tr:hover td { background: rgba(255,255,255,.02); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot-green  { background: var(--green);  }
+  .dot-red    { background: var(--red);    }
+  .dot-yellow { background: var(--yellow); }
+  .dot-gray   { background: var(--muted);  }
+  .dot-check  { color: var(--green);  }
+  .dot-cross  { color: var(--muted);  }
+  .sig-bull { color: var(--green);  font-weight: 700; }
+  .sig-bear { color: var(--red);    font-weight: 700; }
+  .sig-warn { color: var(--yellow); font-weight: 700; }
+  .sig-flat { color: var(--muted);  }
+
+  /* ── Interactive Simulator ── */
+  .sim-wrapper {
+    margin-top: 2.5rem; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  .sim-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .sim-header-title { font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+  .sim-dot-row { display: flex; gap: .4rem; }
+  .sim-dot-ctrl { width: 10px; height: 10px; border-radius: 50%; }
+  .sim-body { padding: 1.5rem; }
+  .slider-group { margin-bottom: 1.2rem; }
+  .slider-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: .72rem; margin-bottom: .4rem;
+  }
+  .slider-label span:first-child { color: var(--muted); }
+  .slider-val { color: var(--white); font-weight: 700; }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; cursor: pointer; border: 2px solid var(--bg);
+  }
+  .slider-vol-ratio::-webkit-slider-thumb   { background: var(--orange); }
+  .slider-mom-ratio::-webkit-slider-thumb   { background: #e040fb; }
+  .slider-rvol::-webkit-slider-thumb        { background: var(--cyan);   }
+  .sim-result {
+    margin-top: 1.5rem; padding: 1.25rem 1.5rem;
+    border-radius: 4px; display: flex; align-items: center; gap: 1rem;
+    transition: all .3s ease;
+  }
+  .sim-result-icon { font-size: 2rem; line-height: 1; }
+  .sim-result-text { flex: 1; }
+  .sim-result-title { font-size: 1.1rem; font-weight: 700; margin-bottom: .2rem; }
+  .sim-result-desc  { font-size: .8rem; opacity: .8; font-family: var(--mono); }
+  .result-bull  { background: var(--green-dim);  border: 1px solid rgba(0,230,118,.3);  }
+  .result-bear  { background: var(--red-dim);    border: 1px solid rgba(255,23,68,.3);   }
+  .result-warn  { background: var(--yellow-dim); border: 1px solid rgba(255,214,0,.3);   }
+  .result-flat  { background: rgba(84,110,122,.08); border: 1px solid var(--border);     }
+  .sim-bars-row {
+    display: flex; gap: .6rem; margin: 1rem 0 0; align-items: flex-end; height: 60px;
+  }
+  .sim-bar { border-radius: 2px 2px 0 0; min-width: 24px; flex: 1; transition: height .3s, background .3s; }
+
+  /* ── Settings table ── */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2rem; }
+  @media(max-width:700px){ .settings-grid { grid-template-columns: 1fr; } }
+  .setting-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1.2rem 1.4rem;
+  }
+  .setting-name { font-family: var(--mono); font-size: .8rem; color: var(--cyan); margin-bottom: .3rem; }
+  .setting-default { font-family: var(--mono); font-size: .7rem; color: var(--muted); margin-bottom: .5rem; }
+  .setting-default b { color: var(--orange); }
+  .setting-desc { font-size: .83rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── Usage tips ── */
+  .tips-list { list-style: none; margin-top: 2rem; display: flex; flex-direction: column; gap: .8rem; }
+  .tips-list li {
+    display: flex; gap: 1rem; align-items: flex-start;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1rem 1.2rem;
+  }
+  .tip-num {
+    font-family: var(--mono); font-size: .72rem; color: var(--green);
+    min-width: 1.8rem; padding-top: .1rem;
+  }
+  .tip-text { font-size: .88rem; color: var(--muted); line-height: 1.65; }
+  .tip-text b { color: var(--white); }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1.2rem 1.5rem; margin-top: 1rem;
+    font-family: var(--mono); font-size: .77rem; line-height: 1.75;
+    overflow-x: auto; position: relative;
+  }
+  .code-block .kw  { color: #82aaff; }
+  .code-block .fn  { color: var(--cyan); }
+  .code-block .str { color: var(--green); }
+  .code-block .cmt { color: var(--muted); font-style: italic; }
+  .code-block .num { color: var(--orange); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border); padding: 2.5rem 0;
+    font-family: var(--mono); font-size: .7rem; color: var(--muted);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 1rem;
+  }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--white); }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+  /* ── Glow pulse animation for hero ── */
+  .glow-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); margin-right: .5rem;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,230,118,.5); }
+    50%      { box-shadow: 0 0 0 8px rgba(0,230,118,0); }
+  }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex; align-items: stretch; gap: 0; margin-top: 2.5rem;
+    overflow-x: auto; padding-bottom: .5rem;
+  }
+  .flow-step {
+    flex: 1; min-width: 120px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 3px;
+    padding: 1rem .8rem; text-align: center; position: relative;
+  }
+  .flow-step + .flow-step { border-left: none; }
+  .flow-step::after {
+    content: '→'; position: absolute; right: -14px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); font-size: 1.1rem;
+    z-index: 2;
+  }
+  .flow-step:last-child::after { display: none; }
+  .flow-icon { font-size: 1.4rem; margin-bottom: .4rem; }
+  .flow-title { font-size: .72rem; font-weight: 700; margin-bottom: .3rem; }
+  .flow-desc  { font-size: .68rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── Responsive adjustments ── */
+  @media(max-width: 700px) {
+    nav { padding: .7rem 1rem; }
+    .nav-links { gap: 1rem; }
+    .container { padding: 0 1rem; }
+    section { padding: 3rem 0; }
+    .flow-step::after { display: none; }
+    .flow { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-logo"><span class="glow-dot"></span>EMD [1M] — INDICATOR GUIDE</div>
+  <div class="nav-links">
+    <a href="#concept">CONCEPT</a>
+    <a href="#pillars">PILLARS</a>
+    <a href="#signals">SIGNALS</a>
+    <a href="#simulator">SIMULATOR</a>
+    <a href="#settings">SETTINGS</a>
+    <a href="#usage">USAGE</a>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-tag">TRADINGVIEW PINE SCRIPT v5</div>
+    <h1>EXPLOSIVE<br>MOVE<br><span>DETECTOR</span></h1>
+    <p class="hero-sub">
+      Detects abnormal price volatility, momentum bursts, and volume surges on
+      <strong>1-minute bars</strong> — regardless of the chart timeframe you're trading on.
+      Three signals. One verdict.
+    </p>
+    <div class="hero-chips">
+      <span class="chip chip-green">⚡ Volatility Ratio</span>
+      <span class="chip chip-green">🚀 Momentum Burst</span>
+      <span class="chip chip-cyan">📊 Relative Volume</span>
+      <span class="chip chip-orange">No Repaint</span>
+      <span class="chip chip-orange">Any Timeframe</span>
+    </div>
+
+    <!-- Live animated histogram -->
+    <div class="histogram-demo" id="heroHistogram">
+      <div class="threshold-line" style="bottom: calc(36px + 56%);"></div>
+      <div class="threshold-label" style="bottom: calc(36px + 57%);">×2.0 THRESHOLD</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Core Concept ────────────────────────────────────────────────── -->
+<section id="concept">
+  <div class="container">
+    <div class="sec-label">// CORE CONCEPT</div>
+    <h2 class="sec-title">One question.<br>Three data streams.</h2>
+    <p class="sec-desc">
+      The indicator answers a single question on every 1-minute bar:<br>
+      <strong style="color:var(--white)">"Is price moving faster and more violently than usual — and is volume confirming it?"</strong>
+    </p>
+
+    <!-- Data flow diagram -->
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-icon">📡</div>
+        <div class="flow-title" style="color:var(--cyan)">1M DATA</div>
+        <div class="flow-desc">request.security pulls OHLCV on 1-min bars regardless of chart TF</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">📐</div>
+        <div class="flow-title" style="color:var(--orange)">VOLATILITY</div>
+        <div class="flow-desc">True Range ÷ rolling ATR baseline → Vol Ratio</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">🏎️</div>
+        <div class="flow-title" style="color:#e040fb)">MOMENTUM</div>
+        <div class="flow-desc">|ROC| ÷ rolling ROC baseline → Mom Ratio</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">📊</div>
+        <div class="flow-title" style="color:var(--cyan)">VOLUME</div>
+        <div class="flow-desc">1M volume ÷ rolling avg volume → RVOL</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon">⚡</div>
+        <div class="flow-title" style="color:var(--green)">SIGNAL</div>
+        <div class="flow-desc">All three gates passed → Explosive Move confirmed</div>
+      </div>
+    </div>
+
+    <br>
+    <p class="sec-desc" style="margin-top: 1rem;">
+      All calculations run on <strong style="color:var(--green)">1-minute bars via <code style="font-family:var(--mono);color:var(--cyan)">request.security()</code></strong> with
+      <code style="font-family:var(--mono);color:var(--orange)">lookahead_off</code> to guarantee zero repainting. Whether your chart is on the 1m, 5m, 15m, or daily — the detector always sees the same underlying 1-minute microstructure.
+    </p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Three Pillars ───────────────────────────────────────────────── -->
+<section id="pillars">
+  <div class="container">
+    <div class="sec-label">// THREE PILLARS</div>
+    <h2 class="sec-title">The engine under the hood.</h2>
+    <p class="sec-desc">Each pillar measures a different dimension of market behavior. All three must align for a confirmed signal.</p>
+
+    <div class="arch-grid">
+
+      <!-- Volatility -->
+      <div class="arch-card green">
+        <div class="arch-icon">📐</div>
+        <h3>VOLATILITY</h3>
+        <p>Measures how violently price is moving relative to its own history. Uses <strong>True Range</strong> (the widest of bar range, high-to-prev-close, and low-to-prev-close) normalized against a rolling ATR baseline.</p>
+        <div class="arch-formula">
+          vol_ratio = TR ÷ SMA(TR, lookback)<br>
+          spike ✓ if vol_ratio ≥ threshold
+        </div>
+        <p style="margin-top:.8rem; font-size:.78rem; color:var(--muted)">A ratio of 2.0 means the bar's range is twice the recent average. This catches breakouts, liquidity sweeps, and news-driven candles.</p>
+      </div>
+
+      <!-- Momentum -->
+      <div class="arch-card cyan">
+        <div class="arch-icon">🚀</div>
+        <h3>MOMENTUM</h3>
+        <p>Measures the <strong>speed of directional price movement</strong>, not just range. Uses Rate of Change: close minus close[n] bars ago, compared to its own rolling mean magnitude.</p>
+        <div class="arch-formula">
+          mom_ratio = |ROC| ÷ SMA(|ROC|, lookback)<br>
+          spike ✓ if mom_ratio ≥ threshold
+        </div>
+        <p style="margin-top:.8rem; font-size:.78rem; color:var(--muted)">Direction is captured separately — positive ROC = bullish burst, negative = bearish. This prevents large-range doji candles (high vol, zero momentum) from triggering false positives.</p>
+      </div>
+
+      <!-- Volume -->
+      <div class="arch-card orange">
+        <div class="arch-icon">📊</div>
+        <h3>VOLUME (RVOL)</h3>
+        <p>The <strong>confirmation gate</strong>. A price move without volume is noise; a price move with elevated volume is conviction. Relative Volume (RVOL) compares current 1-min volume to its rolling average.</p>
+        <div class="arch-formula">
+          rvol = volume ÷ SMA(volume, lookback)<br>
+          confirmed ✓ if rvol ≥ threshold
+        </div>
+        <p style="margin-top:.8rem; font-size:.78rem; color:var(--muted)">Without volume confirmation, signals show as yellow (unconfirmed). Volume confirmation is the final gate that separates real moves from thin-market noise.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Signal Matrix ────────────────────────────────────────────────── -->
+<section id="signals">
+  <div class="container">
+    <div class="sec-label">// SIGNAL MATRIX</div>
+    <h2 class="sec-title">Every possible output.</h2>
+    <p class="sec-desc">The indicator produces exactly four visual states. Here is the complete decision matrix.</p>
+
+    <div class="matrix-wrapper">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>BAR COLOR</th>
+            <th>VOL SPIKE</th>
+            <th>MOM SPIKE</th>
+            <th>DIRECTION</th>
+            <th>VOL CONFIRM</th>
+            <th>SIGNAL</th>
+            <th>ACTION</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="dot dot-green"></span></td>
+            <td class="dot-check">✓ YES</td>
+            <td class="dot-check">✓ YES</td>
+            <td style="color:var(--green)">▲ BULL</td>
+            <td class="dot-check">✓ YES</td>
+            <td class="sig-bull">🟢 BULLISH EXPLOSIVE</td>
+            <td style="color:var(--muted); font-size:.75rem">Alert fires. Triangle ▲ marker. Green background glow.</td>
+          </tr>
+          <tr>
+            <td><span class="dot dot-red"></span></td>
+            <td class="dot-check">✓ YES</td>
+            <td class="dot-check">✓ YES</td>
+            <td style="color:var(--red)">▼ BEAR</td>
+            <td class="dot-check">✓ YES</td>
+            <td class="sig-bear">🔴 BEARISH EXPLOSIVE</td>
+            <td style="color:var(--muted); font-size:.75rem">Alert fires. Triangle ▼ marker. Red background glow.</td>
+          </tr>
+          <tr>
+            <td><span class="dot dot-yellow"></span></td>
+            <td class="dot-check">✓ YES</td>
+            <td class="dot-cross">— ANY</td>
+            <td style="color:var(--muted)">— ANY</td>
+            <td class="dot-cross">✗ NO</td>
+            <td class="sig-warn">🟡 UNCONFIRMED SPIKE</td>
+            <td style="color:var(--muted); font-size:.75rem">Optional alert. Watch the cyan RVOL line for confirmation.</td>
+          </tr>
+          <tr>
+            <td><span class="dot dot-gray"></span></td>
+            <td class="dot-cross">✗ NO</td>
+            <td class="dot-cross">✗ NO</td>
+            <td style="color:var(--muted)">— N/A</td>
+            <td class="dot-cross">— ANY</td>
+            <td class="sig-flat">⬜ NORMAL CONDITIONS</td>
+            <td style="color:var(--muted); font-size:.75rem">No action needed. Market within normal parameters.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Visual signal legend -->
+    <div style="display:flex; gap:1rem; margin-top:1.5rem; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.72rem;">
+        <div style="width:16px; height:32px; background:rgba(0,230,118,.15); border:1px solid rgba(0,230,118,.4); border-radius:2px;"></div>
+        <span style="color:var(--green)">Green column</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.72rem;">
+        <div style="width:16px; height:32px; background:rgba(255,23,68,.15); border:1px solid rgba(255,23,68,.4); border-radius:2px;"></div>
+        <span style="color:var(--red)">Red column</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.72rem;">
+        <div style="width:16px; height:32px; background:rgba(255,214,0,.12); border:1px solid rgba(255,214,0,.4); border-radius:2px;"></div>
+        <span style="color:var(--yellow)">Yellow column</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.72rem;">
+        <div style="width:16px; height:32px; background:rgba(84,110,122,.12); border:1px solid rgba(84,110,122,.3); border-radius:2px;"></div>
+        <span style="color:var(--muted)">Gray column</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.72rem;">
+        <div style="width:32px; height:4px; background:var(--orange); border-radius:1px; border-top:2px dashed var(--orange);"></div>
+        <span style="color:var(--orange)">Orange dashed = Vol threshold</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.72rem;">
+        <div style="width:32px; height:4px; background:var(--cyan); border-radius:1px; border-top:2px dashed var(--cyan);"></div>
+        <span style="color:var(--cyan)">Cyan dashed = RVOL threshold</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Interactive Simulator ─────────────────────────────────────────── -->
+<section id="simulator">
+  <div class="container">
+    <div class="sec-label">// INTERACTIVE SIMULATOR</div>
+    <h2 class="sec-title">See the logic in action.</h2>
+    <p class="sec-desc">Drag the sliders to simulate different market conditions. Watch the signal update in real time.</p>
+
+    <div class="sim-wrapper">
+      <div class="sim-header">
+        <span class="sim-header-title">SIGNAL SIMULATOR — LIVE PREVIEW</span>
+        <div class="sim-dot-row">
+          <div class="sim-dot-ctrl" style="background:#ff5f56"></div>
+          <div class="sim-dot-ctrl" style="background:#ffbd2e"></div>
+          <div class="sim-dot-ctrl" style="background:#27c93f"></div>
+        </div>
+      </div>
+      <div class="sim-body">
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>⚡ VOLATILITY RATIO (current ÷ baseline ATR)</span>
+            <span class="slider-val" id="volRatioVal">1.00×</span>
+          </div>
+          <input type="range" class="slider-vol-ratio" id="volRatioSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>🚀 MOMENTUM RATIO (|ROC| ÷ baseline)</span>
+            <span class="slider-val" id="momRatioVal">1.00×</span>
+          </div>
+          <input type="range" class="slider-mom-ratio" id="momRatioSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>📊 RELATIVE VOLUME — RVOL (current ÷ avg vol)</span>
+            <span class="slider-val" id="rvolVal">1.00×</span>
+          </div>
+          <input type="range" class="slider-rvol" id="rvolSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>🧭 MOMENTUM DIRECTION</span>
+            <span class="slider-val" id="dirVal">↑ BULLISH</span>
+          </div>
+          <input type="range" id="dirSlider" min="0" max="1" step="1" value="1"
+            style="background: linear-gradient(to right, #ff1744, #00e676)">
+        </div>
+
+        <!-- Mini histogram preview -->
+        <div class="sim-bars-row" id="simBarsRow"></div>
+
+        <!-- Result card -->
+        <div class="sim-result result-flat" id="simResult">
+          <div class="sim-result-icon" id="simIcon">⬜</div>
+          <div class="sim-result-text">
+            <div class="sim-result-title" id="simTitle">Normal Market Conditions</div>
+            <div class="sim-result-desc" id="simDesc">Adjust the sliders to see different signal states.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Settings Reference ─────────────────────────────────────────────── -->
+<section id="settings">
+  <div class="container">
+    <div class="sec-label">// INPUT SETTINGS</div>
+    <h2 class="sec-title">What every knob does.</h2>
+    <p class="sec-desc">Six inputs control the entire detector. Here's when and why to adjust each one.</p>
+
+    <div class="settings-grid">
+
+      <div class="setting-card">
+        <div class="setting-name">vol_lookback</div>
+        <div class="setting-default">DEFAULT: <b>100 bars</b></div>
+        <div class="setting-desc">How many 1-minute bars define "normal" volatility. Larger = slower baseline adaptation, more resistant to regime changes. Smaller = faster adaptation, catches shifting volatility regimes (e.g., post-earnings). <br><br><strong style="color:var(--white)">Try:</strong> 50 for fast stocks, 200 for indices or slow instruments.</div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-name">vol_threshold</div>
+        <div class="setting-default">DEFAULT: <b>2.0×</b></div>
+        <div class="setting-desc">Minimum volatility ratio to flag a spike. 2.0 = bar's true range is twice the average — already quite unusual. Lower to 1.5 for more signals; raise to 3.0 for only extreme events (e.g., circuit breakers, flash crashes).<br><br><strong style="color:var(--white)">Never:</strong> set below 1.2 — too many false positives.</div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-name">mom_lookback</div>
+        <div class="setting-default">DEFAULT: <b>14 bars</b></div>
+        <div class="setting-desc">The lookback period for Rate of Change: measures close vs. close[n]. 14 bars = 14 minutes of directional movement. Shorter values (5–8) detect very short-term momentum bursts; longer (20–30) detect sustained trending momentum.</div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-name">mom_threshold</div>
+        <div class="setting-default">DEFAULT: <b>2.0×</b></div>
+        <div class="setting-desc">Minimum momentum ratio to flag abnormal speed. Works the same way as vol_threshold but for directional movement. Keep this equal to or slightly above vol_threshold to avoid momentum dominating the composite signal.</div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-name">rvol_lookback</div>
+        <div class="setting-default">DEFAULT: <b>50 bars</b></div>
+        <div class="setting-desc">Baseline window for average 1-minute volume. 50 bars ≈ last ~50 minutes of volume. Shorter windows react faster to intraday volume shifts; longer windows compare against a more stable "session average." Consider 100+ for equities with clear session volume patterns.</div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-name">rvol_threshold</div>
+        <div class="setting-default">DEFAULT: <b>1.5×</b></div>
+        <div class="setting-desc">Volume must exceed this multiple of the rolling average to confirm a signal. 1.5 is intentionally lower than the vol/mom thresholds — volume surges slightly before or alongside price in genuine explosive moves. Raise to 2.0 for very liquid instruments where 1.5× is routine.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ── Usage Tips ──────────────────────────────────────────────────────── -->
+<section id="usage">
+  <div class="container">
+    <div class="sec-label">// USAGE GUIDE</div>
+    <h2 class="sec-title">How to actually trade this.</h2>
+    <p class="sec-desc">The indicator is a context detector, not an entry system. Here's how to integrate it properly.</p>
+
+    <ul class="tips-list">
+      <li>
+        <span class="tip-num">01.</span>
+        <span class="tip-text"><b>Add it as a separate pane below your main chart.</b> Never overlay it — the histogram values are ratios (dimensionless), not price. The orange dashed line is your threshold; anything above it is elevated.</span>
+      </li>
+      <li>
+        <span class="tip-num">02.</span>
+        <span class="tip-text"><b>Green confirmed = momentum entry window.</b> When a bullish explosive bar fires, the next 1–3 minutes often show continuation. Use it to time entries during breakouts, not as a standalone signal. Look left for a support level or a base — explosive moves from structure are more reliable.</span>
+      </li>
+      <li>
+        <span class="tip-num">03.</span>
+        <span class="tip-text"><b>Yellow = stand by, not act.</b> An unconfirmed spike (yellow bar) means price is moving but institutions aren't behind it yet. Watch the cyan RVOL line. If it crosses its dashed threshold on the next bar while volatility is still elevated — that's your confirmation sequence in real time.</span>
+      </li>
+      <li>
+        <span class="tip-num">04.</span>
+        <span class="tip-text"><b>Clusters of confirmed signals = regime change, not entry.</b> If you see 5–8 consecutive green/red bars, the instrument has shifted into a high-volatility regime. Widen your stops. ATR-based sizing becomes critical here. Avoid chasing — the move is likely already extended.</span>
+      </li>
+      <li>
+        <span class="tip-num">05.</span>
+        <span class="tip-text"><b>First N bars of the session will show false readings.</b> The rolling baselines need vol_lookback and rvol_lookback bars to populate. On a fresh session or symbol load, wait 50–100 bars before trusting the signals. The indicator inherits Pine Script's built-in na() guard for these early bars.</span>
+      </li>
+      <li>
+        <span class="tip-num">06.</span>
+        <span class="tip-text"><b>Low-liquidity instruments need higher thresholds.</b> Penny stocks, small-cap futures, or crypto altcoins naturally have erratic volume. Raise vol_threshold to 3.0 and rvol_threshold to 2.5 to cut through the noise. The defaults are calibrated for liquid instruments (large-cap equities, major FX pairs, index futures).</span>
+      </li>
+      <li>
+        <span class="tip-num">07.</span>
+        <span class="tip-text"><b>Alerts are your real-time trigger.</b> Set TradingView alerts on "Bullish Explosive Move" and "Bearish Explosive Move" with webhook or push notification. The alert message includes the ticker, close price, and ratio values so you have full context without watching the chart.</span>
+      </li>
+    </ul>
+
+    <!-- Code snippet: how to add alerts -->
+    <div style="margin-top:2rem">
+      <div class="sec-label" style="margin-bottom:.5rem">// ALERT MESSAGE FORMAT (sent automatically)</div>
+      <div class="code-block">
+<span class="cmt">// Bullish alert example:</span>
+<span class="str">"[EMD] ⬆ BULLISH EXPLOSIVE MOVE — AAPL @ 182.50"</span>
+<span class="str">"  | 1M Vol×3.2 | RVOL×2.1"</span>
+<span class="str">"  | Volatility + Momentum + Volume ALL confirmed!"</span>
+
+<span class="cmt">// Bearish alert example:</span>
+<span class="str">"[EMD] ⬇ BEARISH EXPLOSIVE MOVE — ES1! @ 5240.00"</span>
+<span class="str">"  | 1M Vol×2.8 | RVOL×1.9 | All conditions confirmed."</span>
+      </div>
+    </div>
+
+    <!-- Non-repaint note -->
+    <div style="margin-top:1.5rem; padding:1rem 1.2rem; background:var(--panel); border:1px solid rgba(0,188,212,.3); border-radius:4px;">
+      <div style="font-family:var(--mono); font-size:.72rem; color:var(--cyan); margin-bottom:.4rem;">// NO-REPAINT GUARANTEE</div>
+      <p style="font-size:.85rem; color:var(--muted); line-height:1.7;">
+        The indicator uses <code style="font-family:var(--mono); color:var(--white)">request.security(..., lookahead=barmerge.lookahead_off)</code> which ensures Pine Script <strong style="color:var(--white)">never</strong> uses future-bar data to compute current-bar values. What you see on a historical bar is exactly what you would have seen in real time. This is the most critical anti-repaint safeguard in Pine Script.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ──────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container" style="display:flex; justify-content:space-between; width:100%; flex-wrap:wrap; gap:1rem;">
+    <div>EMD [1M] — EXPLOSIVE MOVE DETECTOR &nbsp;|&nbsp; Pine Script v5 &nbsp;|&nbsp; TradingView</div>
+    <div style="color:var(--muted)">VOLATILITY · MOMENTUM · VOLUME · NO REPAINT</div>
+  </div>
+</footer>
+
+<script>
+// ── Animated Hero Histogram ────────────────────────────────────────────────
+(function buildHistogram() {
+  const container = document.getElementById('heroHistogram');
+  const data = [
+    {h:22,type:'gray'},{h:18,type:'gray'},{h:25,type:'gray'},{h:15,type:'gray'},
+    {h:20,type:'gray'},{h:28,type:'gray'},{h:17,type:'gray'},{h:22,type:'gray'},
+    {h:19,type:'gray'},{h:24,type:'gray'},{h:30,type:'gray'},{h:20,type:'gray'},
+    {h:26,type:'gray'},{h:22,type:'gray'},{h:18,type:'gray'},{h:21,type:'gray'},
+    {h:25,type:'yellow'},{h:35,type:'yellow'},{h:48,type:'yellow'},
+    {h:72,type:'bull'},{h:85,type:'bull'},{h:65,type:'bull'},
+    {h:42,type:'gray'},{h:30,type:'gray'},{h:22,type:'gray'},
+    {h:19,type:'gray'},{h:24,type:'gray'},{h:20,type:'gray'},
+    {h:75,type:'bear'},{h:92,type:'bear'},{h:68,type:'bear'},
+    {h:40,type:'yellow'},{h:28,type:'gray'},{h:22,type:'gray'},
+    {h:18,type:'gray'},{h:24,type:'gray'},{h:20,type:'gray'},
+  ];
+
+  const colors = {
+    bull:   '#00e676', bear: '#ff1744',
+    yellow: '#ffd600', gray: 'rgba(84,110,122,0.4)'
+  };
+
+  data.forEach((d, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'hbar';
+    bar.style.height = d.h + '%';
+    bar.style.background = colors[d.type];
+    bar.style.animationDelay = (i * 0.04) + 's';
+    if (d.type === 'bull') bar.style.boxShadow = '0 0 6px rgba(0,230,118,.4)';
+    if (d.type === 'bear') bar.style.boxShadow = '0 0 6px rgba(255,23,68,.4)';
+    container.appendChild(bar);
+  });
+})();
+
+// ── Interactive Simulator ──────────────────────────────────────────────────
+(function buildSimulator() {
+  const VOL_THRESHOLD  = 2.0;
+  const MOM_THRESHOLD  = 2.0;
+  const RVOL_THRESHOLD = 1.5;
+
+  const volSlider  = document.getElementById('volRatioSlider');
+  const momSlider  = document.getElementById('momRatioSlider');
+  const rvolSlider = document.getElementById('rvolSlider');
+  const dirSlider  = document.getElementById('dirSlider');
+
+  const volVal    = document.getElementById('volRatioVal');
+  const momVal    = document.getElementById('momRatioVal');
+  const rvolVal   = document.getElementById('rvolVal');
+  const dirVal    = document.getElementById('dirVal');
+  const simResult = document.getElementById('simResult');
+  const simIcon   = document.getElementById('simIcon');
+  const simTitle  = document.getElementById('simTitle');
+  const simDesc   = document.getElementById('simDesc');
+  const simBarsRow = document.getElementById('simBarsRow');
+
+  // Build mini bar preview
+  const barCount = 14;
+  const simBars = [];
+  for (let i = 0; i < barCount; i++) {
+    const b = document.createElement('div');
+    b.className = 'sim-bar';
+    b.style.height = (20 + Math.random() * 30) + '%';
+    b.style.background = 'rgba(84,110,122,0.4)';
+    simBarsRow.appendChild(b);
+    simBars.push(b);
+  }
+
+  function update() {
+    const vr   = parseFloat(volSlider.value);
+    const mr   = parseFloat(momSlider.value);
+    const rv   = parseFloat(rvolSlider.value);
+    const bull = parseInt(dirSlider.value) === 1;
+
+    volVal.textContent  = vr.toFixed(2) + '×';
+    momVal.textContent  = mr.toFixed(2) + '×';
+    rvolVal.textContent = rv.toFixed(2) + '×';
+    dirVal.textContent  = bull ? '↑ BULLISH' : '↓ BEARISH';
+    dirVal.style.color  = bull ? 'var(--green)' : 'var(--red)';
+
+    const isVolSpike  = vr >= VOL_THRESHOLD;
+    const isMomSpike  = mr >= MOM_THRESHOLD;
+    const isConfirmed = rv >= RVOL_THRESHOLD;
+    const isExplBull  = isVolSpike && isMomSpike && bull  && isConfirmed;
+    const isExplBear  = isVolSpike && isMomSpike && !bull && isConfirmed;
+    const isUnconf    = (isVolSpike || isMomSpike) && !isConfirmed;
+
+    let barColor, resultClass, icon, title, desc;
+
+    if (isExplBull) {
+      barColor    = '#00e676'; resultClass = 'result-bull';
+      icon = '🟢'; title = 'BULLISH EXPLOSIVE MOVE — CONFIRMED';
+      desc = `Vol ratio ${vr.toFixed(2)}× ≥ ${VOL_THRESHOLD}× ✓  |  Mom ratio ${mr.toFixed(2)}× ≥ ${MOM_THRESHOLD}× ✓  |  RVOL ${rv.toFixed(2)}× ≥ ${RVOL_THRESHOLD}× ✓  |  Direction: BULL ✓ → Alert fires. ▲ marker appears.`;
+    } else if (isExplBear) {
+      barColor    = '#ff1744'; resultClass = 'result-bear';
+      icon = '🔴'; title = 'BEARISH EXPLOSIVE MOVE — CONFIRMED';
+      desc = `Vol ratio ${vr.toFixed(2)}× ≥ ${VOL_THRESHOLD}× ✓  |  Mom ratio ${mr.toFixed(2)}× ≥ ${MOM_THRESHOLD}× ✓  |  RVOL ${rv.toFixed(2)}× ≥ ${RVOL_THRESHOLD}× ✓  |  Direction: BEAR ✓ → Alert fires. ▼ marker appears.`;
+    } else if (isUnconf) {
+      barColor    = '#ffd600'; resultClass = 'result-warn';
+      icon = '🟡'; title = 'SPIKE DETECTED — AWAITING VOLUME';
+      desc = `${isVolSpike ? 'Vol spike ✓' : 'Vol OK'} | ${isMomSpike ? 'Mom spike ✓' : 'Mom OK'} | RVOL ${rv.toFixed(2)}× < ${RVOL_THRESHOLD}× ✗ — Volume not confirming. Watch for RVOL to breach ${RVOL_THRESHOLD}×.`;
+    } else {
+      barColor    = 'rgba(84,110,122,0.4)'; resultClass = 'result-flat';
+      icon = '⬜'; title = 'NORMAL MARKET CONDITIONS';
+      desc = `Vol ratio ${vr.toFixed(2)}× (need ≥${VOL_THRESHOLD}×)  |  Mom ratio ${mr.toFixed(2)}× (need ≥${MOM_THRESHOLD}×)  |  No spike detected. Gray bar.`;
+    }
+
+    simResult.className = 'sim-result ' + resultClass;
+    simIcon.textContent  = icon;
+    simTitle.textContent = title;
+    simDesc.textContent  = desc;
+
+    // Update mini bars — last bar is "current"
+    simBars.forEach((b, i) => {
+      if (i === simBars.length - 1) {
+        const h = Math.min(95, Math.max(10, vr * 20));
+        b.style.height = h + '%';
+        b.style.background = barColor;
+        b.style.boxShadow = (isExplBull || isExplBear) ? `0 0 8px ${barColor}66` : 'none';
+      }
+    });
+  }
+
+  [volSlider, momSlider, rvolSlider, dirSlider].forEach(s => s.addEventListener('input', update));
+  update();
+})();
+</script>
+</body>
+</html>

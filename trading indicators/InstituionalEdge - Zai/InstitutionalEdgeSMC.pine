@@ -1,0 +1,458 @@
+// This Pine Script™ v5 indicator is subject to the terms of the Mozilla Public License 2.0
+// © InstitutionalEdge Labs
+
+//@version=5
+indicator("Institutional Edge SMC [Prop Firm Grade]", overlay=true, max_labels_count=500, max_lines_count=500, max_boxes_count=500)
+
+// ============================================================================
+// INSTITUTIONAL EDGE - SMART MONEY CONCEPTS COMPOSITE INDICATOR
+// ============================================================================
+// This indicator combines 6 institutional-grade edge components into one
+// confluence system that prop firms actually use. No single edge works
+// alone - the power is in the alignment.
+//
+// COMPONENTS:
+// 1. Market Structure (BOS/CHoCH) - Trend direction
+// 2. Order Blocks - Institutional accumulation zones
+// 3. Fair Value Gaps - Imbalance entry zones
+// 4. Liquidity Sweeps - Stop hunts before real moves
+// 5. Volume Anomaly Detection - Institutional footprints
+// 6. VWAP + Deviation Bands - Fair value reference
+// + ATR Dynamic Risk Management (SL/TP)
+// + Confluence Scoring System
+// ============================================================================
+
+// ============================================================================
+// INPUTS
+// ============================================================================
+// --- Market Structure ---
+grp_structure = "MARKET STRUCTURE"
+pivotLen      = input.int(5, "Pivot Lookback", minval=2, maxval=50, group=grp_structure, tooltip="Number of bars left/right to confirm swing highs/lows")
+showBOS       = input.bool(true, "Show Break of Structure", group=grp_structure)
+showCHoCH     = input.bool(true, "Show Change of Character", group=grp_structure)
+bosColor      = input.color(color.new(#00E676, 30), "BOS Color", group=grp_structure)
+chochColor    = input.color(color.new(#FF5252, 30), "CHoCH Color", group=grp_structure)
+
+// --- Order Blocks ---
+grp_ob = "ORDER BLOCKS"
+showOB       = input.bool(true, "Show Order Blocks", group=grp_ob)
+obATRMulti   = input.float(2.0, "OB Ext. ATR Multiplier", minval=0.5, maxval=5.0, step=0.1, group=grp_ob, tooltip="How far OB extends based on ATR")
+obMaxBoxes   = input.int(5, "Max OB Boxes", minval=1, maxval=20, group=grp_ob)
+bullOBColor  = input.color(color.new(#2962FF, 80), "Bullish OB", group=grp_ob)
+bearOBColor  = input.color(color.new(#FF1744, 80), "Bearish OB", group=grp_ob)
+
+// --- Fair Value Gaps ---
+grp_fvg = "FAIR VALUE GAPS"
+showFVG      = input.bool(true, "Show FVG", group=grp_fvg)
+fvgMaxBoxes  = input.int(5, "Max FVG Boxes", minval=1, maxval=20, group=grp_fvg)
+bullFVGColor = input.color(color.new(#00B0FF, 85), "Bullish FVG", group=grp_fvg)
+bearFVGColor = input.color(color.new(#FF6D00, 85), "Bearish FVG", group=grp_fvg)
+
+// --- Liquidity Sweeps ---
+grp_liq = "LIQUIDITY SWEEPS"
+showLiq      = input.bool(true, "Show Liquidity Sweeps", group=grp_liq)
+liqLookback  = input.int(20, "Liquidity Pool Lookback", minval=5, maxval=100, group=grp_liq)
+liqSweepATR  = input.float(0.3, "Sweep Min ATR Multiplier", minval=0.1, maxval=2.0, step=0.1, group=grp_liq, tooltip="Min wick length beyond level as ATR multiple")
+sweepBullCol = input.color(color.new(#00E5FF, 20), "Bull Sweep", group=grp_liq)
+sweepBearCol = input.color(color.new(#D500F9, 20), "Bear Sweep", group=grp_liq)
+
+// --- Volume Anomaly ---
+grp_vol = "VOLUME ANOMALY"
+showVolAnom  = input.bool(true, "Show Volume Anomalies", group=grp_vol)
+volMAPeriod  = input.int(20, "Volume MA Period", minval=5, maxval=100, group=grp_vol)
+volThreshold = input.float(2.0, "Volume Spike Threshold", minval=1.2, maxval=5.0, step=0.1, group=grp_vol, tooltip="How many times above volume MA to flag anomaly")
+anomBullCol  = input.color(color.new(#76FF03, 0), "Bullish Anomaly Dot", group=grp_vol)
+anomBearCol  = input.color(color.new(#FF1744, 0), "Bearish Anomaly Dot", group=grp_vol)
+
+// --- VWAP ---
+grp_vwap = "VWAP"
+showVWAP     = input.bool(true, "Show VWAP", group=grp_vwap)
+vwapDev1     = input.float(1.0, "Band 1 Deviation", minval=0.5, maxval=3.0, step=0.1, group=grp_vwap)
+vwapDev2     = input.float(2.0, "Band 2 Deviation", minval=1.0, maxval=4.0, step=0.1, group=grp_vwap)
+vwapColor    = input.color(color.new(#FFD600, 50), "VWAP Color", group=grp_vwap)
+vwapBand1Col = input.color(color.new(#FFD600, 85), "Band 1 Color", group=grp_vwap)
+vwapBand2Col = input.color(color.new(#FFD600, 92), "Band 2 Color", group=grp_vwap)
+
+// --- Confluence Signal ---
+grp_signal = "CONFLUENCE SIGNAL"
+minConfluence = input.int(3, "Min Confluence Score for Signal", minval=2, maxval=6, group=grp_signal, tooltip="How many edges must align to trigger signal")
+showSignals   = input.bool(true, "Show Buy/Sell Signals", group=grp_signal)
+signalBuyCol  = input.color(color.new(#00E676, 0), "Buy Signal", group=grp_signal)
+signalSellCol = input.color(color.new(#FF1744, 0), "Sell Signal", group=grp_signal)
+
+// --- Risk Management ---
+grp_risk = "RISK MANAGEMENT"
+useATRSL    = input.bool(true, "Show ATR SL/TP Lines", group=grp_risk)
+atrPeriod   = input.int(14, "ATR Period", minval=5, maxval=50, group=grp_risk)
+slMulti     = input.float(1.5, "SL ATR Multiplier", minval=0.5, maxval=5.0, step=0.1, group=grp_risk)
+tpMulti     = input.float(3.0, "TP ATR Multiplier", minval=1.0, maxval=10.0, step=0.1, group=grp_risk, tooltip="Default 1:2 RR ratio")
+slColor     = input.color(color.new(#FF5252, 40), "SL Line", group=grp_risk)
+tpColor     = input.color(color.new(#00E676, 40), "TP Line", group=grp_risk)
+
+// --- Info Table ---
+grp_ui = "UI SETTINGS"
+showTable   = input.bool(true, "Show Confluence Table", group=grp_ui)
+tablePos    = input.string("top_right", "Table Position", options=["top_left","top_right","bottom_left","bottom_right"], group=grp_ui)
+tableSize   = input.string("small", "Table Size", options=["auto","tiny","small","normal"], group=grp_ui)
+
+// ============================================================================
+// CORE CALCULATIONS
+// ============================================================================
+atrValue = ta.atr(atrPeriod)
+
+// ============================================================================
+// 1. MARKET STRUCTURE - BOS & CHoCH DETECTION
+// ============================================================================
+pivotHigh = ta.pivothigh(high, pivotLen, pivotLen)
+pivotLow  = ta.pivotlow(low, pivotLen, pivotLen)
+
+var float lastSwingHigh = na
+var float lastSwingLow  = na
+var float prevSwingHigh = na
+var float prevSwingLow  = na
+var int   structureTrend = 0  // 1 = bullish, -1 = bearish, 0 = undefined
+var bool  lastBrokeHigh  = na
+var bool  lastBrokeLow   = na
+
+// Update swings
+if not na(pivotHigh)
+    prevSwingHigh := lastSwingHigh
+    lastSwingHigh := pivotHigh
+
+if not na(pivotLow)
+    prevSwingLow := lastSwingLow
+    lastSwingLow := pivotLow
+
+// BOS: Price breaks previous swing in the direction of the trend
+bullBOS = not na(lastSwingHigh) and not na(prevSwingHigh) and close > lastSwingHigh and structureTrend == 1
+bearBOS = not na(lastSwingLow) and not na(prevSwingLow) and close < lastSwingLow and structureTrend == -1
+
+// CHoCH: Price breaks previous swing AGAINST the trend (trend reversal signal)
+bullCHoCH = not na(lastSwingLow) and not na(prevSwingLow) and close > lastSwingHigh and structureTrend == -1
+bearCHoCH = not na(lastSwingHigh) and not na(prevSwingHigh) and close < lastSwingLow and structureTrend == 1
+
+// Update trend
+if bullCHoCH
+    structureTrend := 1
+else if bearCHoCH
+    structureTrend := -1
+else if bullBOS
+    structureTrend := 1
+else if bearBOS
+    structureTrend := -1
+
+// Default if not yet set
+if structureTrend == 0
+    if close > open
+        structureTrend := 1
+    else
+        structureTrend := -1
+
+// Plot BOS/CHoCH labels
+if showBOS and bullBOS
+    label.new(bar_index, lastSwingHigh, "BOS▲", style=label.style_label_down, color=bosColor, textcolor=color.white, size=size.tiny)
+if showBOS and bearBOS
+    label.new(bar_index, lastSwingLow, "BOS▼", style=label.style_label_up, color=bosColor, textcolor=color.white, size=size.tiny)
+if showCHoCH and bullCHoCH
+    label.new(bar_index, lastSwingHigh, "CHoCH▲", style=label.style_label_down, color=chochColor, textcolor=color.white, size=size.tiny)
+if showCHoCH and bearCHoCH
+    label.new(bar_index, lastSwingLow, "CHoCH▼", style=label.style_label_up, color=chochColor, textcolor=color.white, size=size.tiny)
+
+// ============================================================================
+// 2. ORDER BLOCKS
+// ============================================================================
+var array<box> bullOBBoxes = array.new<box>()
+var array<box> bearOBBoxes = array.new<box>()
+var float lastBullOBTop = na
+var float lastBullOBBot = na
+var float lastBearOBTop = na
+var float lastBearOBBot = na
+
+// Detect strong impulse moves (institutional footprints)
+isBullishImpulse = close > open and (close - open) > atrValue * 0.8 and close[1] < open[1]
+isBearishImpulse = close < open and (open - close) > atrValue * 0.8 and close[1] > open[1]
+
+if showOB
+    // Bullish Order Block: Last bearish candle before bullish impulse
+    if isBullishImpulse
+        obTop = math.max(close[1], open[1])
+        obBot = math.min(close[1], open[1])
+        obExtBot = obBot - atrValue * obATRMulti * 0.3
+        lastBullOBTop := obTop
+        lastBullOBBot := obBot
+        newBox = box.new(bar_index - 1, obTop, bar_index + 10, obExtBot, bgcolor=bullOBColor, border_color=color.new(#2962FF, 50), border_width=1)
+        array.push(bullOBBoxes, newBox)
+        if array.size(bullOBBoxes) > obMaxBoxes
+            box.delete(array.shift(bullOBBoxes))
+
+    // Bearish Order Block: Last bullish candle before bearish impulse
+    if isBearishImpulse
+        obTop = math.max(close[1], open[1])
+        obBot = math.min(close[1], open[1])
+        obExtTop = obTop + atrValue * obATRMulti * 0.3
+        lastBearOBTop := obTop
+        lastBearOBBot := obBot
+        newBox = box.new(bar_index - 1, obExtTop, bar_index + 10, obBot, bgcolor=bearOBColor, border_color=color.new(#FF1744, 50), border_width=1)
+        array.push(bearOBBoxes, newBox)
+        if array.size(bearOBBoxes) > obMaxBoxes
+            box.delete(array.shift(bearOBBoxes))
+
+// Check if price is in Order Block zone
+priceInBullOB = not na(lastBullOBTop) and low <= lastBullOBTop and close >= lastBullOBBot
+priceInBearOB = not na(lastBearOBTop) and high >= lastBearOBBot and close <= lastBearOBTop
+
+// ============================================================================
+// 3. FAIR VALUE GAPS
+// ============================================================================
+var array<box> bullFVGBoxes = array.new<box>()
+var array<box> bearFVGBoxes = array.new<box>()
+var float lastBullFVGTop = na
+var float lastBullFVGBot = na
+var float lastBearFVGTop = na
+var float lastBearFVGBot = na
+
+// Bullish FVG: Gap between high of bar[2] and low of current bar
+bullFVG = low > high[2] and close > open
+// Bearish FVG: Gap between low of bar[2] and high of current bar
+bearFVG = high < low[2] and close < open
+
+if showFVG
+    if bullFVG
+        fvgTop = low
+        fvgBot = high[2]
+        lastBullFVGTop := fvgTop
+        lastBullFVGBot := fvgBot
+        newBox = box.new(bar_index - 2, fvgTop, bar_index + 5, fvgBot, bgcolor=bullFVGColor, border_color=color.new(#00B0FF, 60), border_width=1)
+        array.push(bullFVGBoxes, newBox)
+        if array.size(bullFVGBoxes) > fvgMaxBoxes
+            box.delete(array.shift(bullFVGBoxes))
+
+    if bearFVG
+        fvgTop = low[2]
+        fvgBot = high
+        lastBearFVGTop := fvgTop
+        lastBearFVGBot := fvgBot
+        newBox = box.new(bar_index - 2, fvgTop, bar_index + 5, fvgBot, bgcolor=bearFVGColor, border_color=color.new(#FF6D00, 60), border_width=1)
+        array.push(bearFVGBoxes, newBox)
+        if array.size(bearFVGBoxes) > fvgMaxBoxes
+            box.delete(array.shift(bearFVGBoxes))
+
+// Check if price is in FVG zone
+priceInBullFVG = not na(lastBullFVGTop) and low <= lastBullFVGTop and close >= lastBullFVGBot
+priceInBearFVG = not na(lastBearFVGTop) and high >= lastBearFVGBot and close <= lastBearFVGTop
+
+// ============================================================================
+// 4. LIQUIDITY SWEEPS
+// ============================================================================
+var float highPool = na
+var float lowPool  = na
+var bool  bullSweep = false
+var bool  bearSweep = false
+
+// Track recent swing highs/lows as liquidity pools
+highPool := ta.highest(high, liqLookback)
+lowPool  := ta.lowest(low, liqLookback)
+
+// Bullish liquidity sweep: price wicks below the low pool then closes above
+// This is the "stop hunt" - institutions grab sell-side liquidity then reverse
+bullSweep := low < lowPool[1] and close > lowPool[1] and (lowPool[1] - low) > atrValue * liqSweepATR
+
+// Bearish liquidity sweep: price wicks above the high pool then closes below
+// Institutions grab buy-side liquidity then reverse
+bearSweep := high > highPool[1] and close < highPool[1] and (high - highPool[1]) > atrValue * liqSweepATR
+
+if showLiq and bullSweep
+    label.new(bar_index, low, "💎", style=label.style_label_up, color=sweepBullCol, textcolor=color.white, size=size.tiny)
+if showLiq and bearSweep
+    label.new(bar_index, high, "💎", style=label.style_label_down, color=sweepBearCol, textcolor=color.white, size=size.tiny)
+
+// ============================================================================
+// 5. VOLUME ANOMALY DETECTION
+// ============================================================================
+volMA     = ta.sma(volume, volMAPeriod)
+volRatio  = volume / volMA
+isVolSpike = volRatio > volThreshold
+
+// Volume anomaly with direction
+bullVolAnom = isVolSpike and close > open and close > close[1]
+bearVolAnom = isVolSpike and close < open and close < close[1]
+
+if showVolAnom and bullVolAnom
+    label.new(bar_index, low, "●", style=label.style_label_up, color=anomBullCol, textcolor=anomBullCol, size=size.tiny)
+if showVolAnom and bearVolAnom
+    label.new(bar_index, high, "●", style=label.style_label_down, color=anomBearCol, textcolor=anomBearCol, size=size.tiny)
+
+// ============================================================================
+// 6. VWAP WITH DEVIATION BANDS
+// ============================================================================
+vwapValue    = ta.vwap(hlc3)
+vwapStdDev   = ta.stdev(hlc3, 20)
+
+vwapUpper1 = vwapValue + vwapStdDev * vwapDev1
+vwapLower1 = vwapValue - vwapStdDev * vwapDev1
+vwapUpper2 = vwapValue + vwapStdDev * vwapDev2
+vwapLower2 = vwapValue - vwapStdDev * vwapDev2
+
+plot(showVWAP ? vwapValue : na, "VWAP", color=vwapColor, linewidth=2)
+plot(showVWAP ? vwapUpper1 : na, "VWAP Upper 1", color=vwapBand1Col, linewidth=1)
+plot(showVWAP ? vwapLower1 : na, "VWAP Lower 1", color=vwapBand1Col, linewidth=1)
+plot(showVWAP ? vwapUpper2 : na, "VWAP Upper 2", color=vwapBand2Col, linewidth=1, style=plot.style_circles)
+plot(showVWAP ? vwapLower2 : na, "VWAP Lower 2", color=vwapBand2Col, linewidth=1, style=plot.style_circles)
+
+// Price relative to VWAP - institutional fair value
+priceAboveVWAP = close > vwapValue
+priceBelowVWAP = close < vwapValue
+priceAtVWAPLower2 = close <= vwapLower2  // Extreme oversold - mean reversion
+priceAtVWAPUpper2 = close >= vwapUpper2   // Extreme overbought - mean reversion
+
+// ============================================================================
+// CONFLUENCE SCORING ENGINE
+// ============================================================================
+// Each edge contributes 1 point. Max score = 6.
+// The hidden truth: No single edge is enough. Confluence IS the edge.
+
+// BULLISH CONFLUENCE
+bullEdge1 = structureTrend == 1 ? 1 : 0                                    // Market structure bullish
+bullEdge2 = priceInBullOB ? 1 : 0                                          // Price in bullish order block
+bullEdge3 = priceInBullFVG ? 1 : 0                                         // Price in bullish FVG
+bullEdge4 = bullSweep ? 1 : 0                                              // Bullish liquidity sweep just happened
+bullEdge5 = bullVolAnom ? 1 : 0                                            // Bullish volume anomaly
+bullEdge6 = priceBelowVWAP or priceAtVWAPLower2 ? 1 : 0                   // Below VWAP (mean reversion edge)
+
+bullScore = bullEdge1 + bullEdge2 + bullEdge3 + bullEdge4 + bullEdge5 + bullEdge6
+
+// BEARISH CONFLUENCE
+bearEdge1 = structureTrend == -1 ? 1 : 0                                   // Market structure bearish
+bearEdge2 = priceInBearOB ? 1 : 0                                          // Price in bearish order block
+bearEdge3 = priceInBearFVG ? 1 : 0                                         // Price in bearish FVG
+bearEdge4 = bearSweep ? 1 : 0                                              // Bearish liquidity sweep just happened
+bearEdge5 = bearVolAnom ? 1 : 0                                            // Bearish volume anomaly
+bearEdge6 = priceAboveVWAP or priceAtVWAPUpper2 ? 1 : 0                   // Above VWAP (mean reversion edge)
+
+bearScore = bearEdge1 + bearEdge2 + bearEdge3 + bearEdge4 + bearEdge5 + bearEdge6
+
+// ============================================================================
+// SIGNAL GENERATION
+// ============================================================================
+// Buy Signal: Bullish confluence >= threshold AND bearish confluence < 2
+// Sell Signal: Bearish confluence >= threshold AND bullish confluence < 2
+// This cross-filter prevents false signals from opposing edges
+
+var float lastBuyBar  = na
+var float lastSellBar = na
+
+buySignal  = showSignals and bullScore >= minConfluence and bearScore < 2 and (na(lastBuyBar) or bar_index - lastBuyBar > 3)
+sellSignal = showSignals and bearScore >= minConfluence and bullScore < 2 and (na(lastSellBar) or bar_index - lastSellBar > 3)
+
+if buySignal
+    lastBuyBar := bar_index
+if sellSignal
+    lastSellBar := bar_index
+
+// Plot signals
+plotshape(buySignal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=signalBuyCol, size=size.normal, text="BUY")
+plotshape(sellSignal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=signalSellCol, size=size.normal, text="SELL")
+
+// ============================================================================
+// ATR-BASED DYNAMIC SL/TP
+// ============================================================================
+var float currentSL = na
+var float currentTP = na
+var int   signalDir = 0  // 1 = long, -1 = short
+
+if buySignal
+    currentSL := close - atrValue * slMulti
+    currentTP := close + atrValue * tpMulti
+    signalDir := 1
+else if sellSignal
+    currentSL := close + atrValue * slMulti
+    currentTP := close - atrValue * tpMulti
+    signalDir := -1
+
+// Track and update SL/TP until hit or new signal
+var float activeSL = na
+var float activeTP = na
+var int   activeDir = 0
+
+if buySignal or sellSignal
+    activeSL  := currentSL
+    activeTP  := currentTP
+    activeDir := signalDir
+
+// Check if SL/TP hit
+slHit = not na(activeSL) and ((activeDir == 1 and close < activeSL) or (activeDir == -1 and close > activeSL))
+tpHit = not na(activeTP) and ((activeDir == 1 and close > activeTP) or (activeDir == -1 and close < activeTP))
+
+if slHit or tpHit
+    activeSL  := na
+    activeTP  := na
+    activeDir := 0
+
+// Plot SL/TP lines
+plot(useATRSL and not na(activeSL) ? activeSL : na, "Stop Loss", color=slColor, linewidth=2, style=plot.style_linebr)
+plot(useATRSL and not na(activeTP) ? activeTP : na, "Take Profit", color=tpColor, linewidth=2, style=plot.style_linebr)
+
+// SL/TP hit labels
+if slHit and not na(activeSL)
+    label.new(bar_index, activeSL, "SL HIT", style=label.style_label_up, color=color.new(#FF5252, 20), textcolor=color.white, size=size.tiny)
+if tpHit and not na(activeTP)
+    label.new(bar_index, activeTP, "TP HIT", style=label.style_label_down, color=color.new(#00E676, 20), textcolor=color.white, size=size.tiny)
+
+// ============================================================================
+// CONFLUENCE TABLE
+// ============================================================================
+if showTable and barstate.islast
+    pos = tablePos == "top_right" ? position.top_right : tablePos == "top_left" ? position.top_left : tablePos == "bottom_right" ? position.bottom_right : position.bottom_left
+    sz  = tableSize == "auto" ? size.auto : tableSize == "tiny" ? size.tiny : tableSize == "small" ? size.small : size.normal
+
+    var table confTable = table.new(pos, 3, 9, bgcolor=color.new(#1E1E1E, 10), border_color=color.new(#555555, 50), border_width=1, frame_color=color.new(#888888, 30), frame_width=2)
+
+    // Header
+    table.cell(confTable, 0, 0, "EDGE", text_color=color.gray, text_size=sz, bgcolor=color.new(#333333, 20))
+    table.cell(confTable, 1, 0, "BULL", text_color=color.gray, text_size=sz, bgcolor=color.new(#333333, 20))
+    table.cell(confTable, 2, 0, "BEAR", text_color=color.gray, text_size=sz, bgcolor=color.new(#333333, 20))
+
+    // Row data
+    // edges = array.new<string>(["Structure", "Order Block", "FVG", "Liq Sweep", "Vol Anomaly", "VWAP Edge"])
+    // bullEdges = array.new<bool>([bullEdge1 == 1, bullEdge2 == 1, bullEdge3 == 1, bullEdge4 == 1, bullEdge5 == 1, bullEdge6 == 1])
+    // bearEdges = array.new<bool>([bearEdge1 == 1, bearEdge2 == 1, bearEdge3 == 1, bearEdge4 == 1, bearEdge5 == 1, bearEdge6 == 1])
+    edges = array.from("Structure", "Order Block", "FVG", "Liq Sweep", "Vol Anomaly", "VWAP Edge")
+
+    bullEdges = array.from(bullEdge1 == 1,bullEdge2 == 1,bullEdge3 == 1,bullEdge4 == 1,bullEdge5 == 1,bullEdge6 == 1)
+
+    bearEdges = array.from(bearEdge1 == 1,bearEdge2 == 1,bearEdge3 == 1,bearEdge4 == 1,bearEdge5 == 1,bearEdge6 == 1)
+    for i = 0 to 5
+        edgeName = array.get(edges, i)
+        bE = array.get(bullEdges, i)
+        sE = array.get(bearEdges, i)
+        table.cell(confTable, 0, i + 1, edgeName, text_color=color.white, text_size=sz)
+        table.cell(confTable, 1, i + 1, bE ? "✓" : "—", text_color=bE ? color.lime : color.gray, text_size=sz)
+        table.cell(confTable, 2, i + 1, sE ? "✓" : "—", text_color=sE ? color.red : color.gray, text_size=sz)
+
+    // Score row
+    table.cell(confTable, 0, 7, "SCORE", text_color=color.yellow, text_size=sz, bgcolor=color.new(#333333, 20))
+    table.cell(confTable, 1, 7, str.tostring(bullScore) + "/6", text_color=bullScore >= minConfluence ? color.lime : color.white, text_size=sz, bgcolor=bullScore >= minConfluence ? color.new(#00E676, 85) : color.new(#333333, 30))
+    table.cell(confTable, 2, 7, str.tostring(bearScore) + "/6", text_color=bearScore >= minConfluence ? color.red : color.white, text_size=sz, bgcolor=bearScore >= minConfluence ? color.new(#FF1744, 85) : color.new(#333333, 30))
+
+    // Status
+    statusText = bullScore >= minConfluence ? "LONG BIAS" : bearScore >= minConfluence ? "SHORT BIAS" : "NO EDGE"
+    statusCol  = bullScore >= minConfluence ? color.lime : bearScore >= minConfluence ? color.red : color.gray
+    table.cell(confTable, 0, 8, "STATUS", text_color=color.yellow, text_size=sz, bgcolor=color.new(#333333, 20))
+    table.merge_cells(confTable, 1, 8, 2, 8)
+    table.cell(confTable, 1, 8, statusText, text_color=statusCol, text_size=sz, bgcolor=color.new(#1E1E1E, 10))
+
+// ============================================================================
+// BACKGROUND TINT - Subtle directional bias
+// ============================================================================
+bgColor = bullScore >= minConfluence ? color.new(#00E676, 95) : bearScore >= minConfluence ? color.new(#FF1744, 95) : na
+bgcolor(bgColor, title="Directional Bias Background")
+
+// ============================================================================
+// ALERTS
+// ============================================================================
+alertcondition(buySignal, title="Buy Signal", message="INSTITUTIONAL EDGE: BUY Signal - Bull confluence {{plot_0}}/6")
+alertcondition(sellSignal, title="Sell Signal", message="INSTITUTIONAL EDGE: SELL Signal - Bear confluence {{plot_0}}/6")
+alertcondition(bullSweep, title="Bullish Liquidity Sweep", message="INSTITUTIONAL EDGE: Bullish liquidity sweep detected")
+alertcondition(bearSweep, title="Bearish Liquidity Sweep", message="INSTITUTIONAL EDGE: Bearish liquidity sweep detected")
+alertcondition(bullScore >= minConfluence, title="Bull Confluence Hit", message="INSTITUTIONAL EDGE: Bull confluence threshold reached")
+alertcondition(bearScore >= minConfluence, title="Bear Confluence Hit", message="INSTITUTIONAL EDGE: Bear confluence threshold reached")

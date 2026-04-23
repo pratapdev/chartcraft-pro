@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChartStore } from '@/stores/chartStore';
+import { useMultiPanelStore } from '@/stores/multiPanelStore';
 import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft, RefreshCw, CloudOff, Cloud, List, Grid3X3 } from 'lucide-react';
 import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition, PctDiffDonLine } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
@@ -27,8 +28,16 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'IMBALANCE', label: 'Imbalance Detection', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
 ];
 
-const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
+const IndicatorRow: React.FC<{
+  ind: IndicatorConfig;
+  onToggle?: (id: string) => void;
+  onRemove?: (id: string) => void;
+  onUpdate?: (id: string, updates: Partial<IndicatorConfig>) => void;
+}> = ({ ind, onToggle, onRemove, onUpdate }) => {
   const { toggleIndicator, removeIndicator, updateIndicator } = useChartStore();
+  const handleToggle = onToggle ?? toggleIndicator;
+  const handleRemove = onRemove ?? removeIndicator;
+  const handleUpdate = onUpdate ?? updateIndicator;
   const [editing, setEditing] = useState(false);
 
   return (
@@ -45,10 +54,10 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
           <ChevronDown size={10} className={`text-muted-foreground transition-transform ${editing ? 'rotate-180' : ''}`} />
         </button>
         <div className="flex items-center gap-1">
-          <button onClick={() => toggleIndicator(ind.id)} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => handleToggle(ind.id)} className="text-muted-foreground hover:text-foreground">
             {ind.visible ? <Eye size={12} /> : <EyeOff size={12} />}
           </button>
-          <button onClick={() => { if (window.confirm(`Remove ${ind.type}(${ind.period})?`)) removeIndicator(ind.id); }} className="text-muted-foreground hover:text-destructive">
+          <button onClick={() => { if (window.confirm(`Remove ${ind.type}(${ind.period})?`)) handleRemove(ind.id); }} className="text-muted-foreground hover:text-destructive">
             <Trash2 size={12} />
           </button>
         </div>
@@ -63,7 +72,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               min={1}
               max={500}
               value={ind.period}
-              onChange={(e) => updateIndicator(ind.id, { period: Math.max(1, parseInt(e.target.value) || 1) })}
+              onChange={(e) => handleUpdate(ind.id, { period: Math.max(1, parseInt(e.target.value) || 1) })}
               className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
             />
           </div>
@@ -72,7 +81,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
             <input
               type="color"
               value={ind.color}
-              onChange={(e) => updateIndicator(ind.id, { color: e.target.value })}
+              onChange={(e) => handleUpdate(ind.id, { color: e.target.value })}
               className="w-6 h-5 rounded cursor-pointer border-0 bg-transparent"
             />
           </div>
@@ -82,7 +91,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               {[1, 2, 3, 4].map((w) => (
                 <button
                   key={w}
-                  onClick={() => updateIndicator(ind.id, { lineWidth: w })}
+                  onClick={() => handleUpdate(ind.id, { lineWidth: w })}
                   className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${(ind.lineWidth ?? 1) === w ? 'bg-accent' : 'hover:bg-accent/50'}`}
                 >
                   <div className="rounded-full" style={{ width: 14, height: w, background: ind.color }} />
@@ -100,7 +109,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
               ]).map((s) => (
                 <button
                   key={s.value}
-                  onClick={() => updateIndicator(ind.id, { lineStyle: s.value })}
+                  onClick={() => handleUpdate(ind.id, { lineStyle: s.value })}
                   className={`w-8 h-6 rounded flex items-center justify-center transition-colors ${(ind.lineStyle ?? 'solid') === s.value ? 'bg-accent' : 'hover:bg-accent/50'}`}
                 >
                   <svg width="20" height="4" viewBox="0 0 20 4">
@@ -119,7 +128,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                   min={1}
                   max={50}
                   value={ind.kPeriod ?? 3}
-                  onChange={(e) => updateIndicator(ind.id, { kPeriod: Math.max(1, parseInt(e.target.value) || 1) })}
+                  onChange={(e) => handleUpdate(ind.id, { kPeriod: Math.max(1, parseInt(e.target.value) || 1) })}
                   className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
                 />
               </div>
@@ -130,7 +139,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                   min={1}
                   max={50}
                   value={ind.dPeriod ?? 3}
-                  onChange={(e) => updateIndicator(ind.id, { dPeriod: Math.max(1, parseInt(e.target.value) || 1) })}
+                  onChange={(e) => handleUpdate(ind.id, { dPeriod: Math.max(1, parseInt(e.target.value) || 1) })}
                   className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
                 />
               </div>
@@ -139,7 +148,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 <input
                   type="color"
                   value={ind.color2 ?? '#FF5722'}
-                  onChange={(e) => updateIndicator(ind.id, { color2: e.target.value })}
+                  onChange={(e) => handleUpdate(ind.id, { color2: e.target.value })}
                   className="w-6 h-5 rounded cursor-pointer border-0 bg-transparent"
                 />
               </div>
@@ -154,7 +163,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 max={5}
                 step={0.5}
                 value={ind.stdDev ?? 2}
-                onChange={(e) => updateIndicator(ind.id, { stdDev: Math.max(0.5, parseFloat(e.target.value) || 2) })}
+                onChange={(e) => handleUpdate(ind.id, { stdDev: Math.max(0.5, parseFloat(e.target.value) || 2) })}
                 className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
               />
             </div>
@@ -168,7 +177,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                 max={10}
                 step={0.5}
                 value={ind.multiplier ?? 3}
-                onChange={(e) => updateIndicator(ind.id, { multiplier: Math.max(0.5, parseFloat(e.target.value) || 3) })}
+                onChange={(e) => handleUpdate(ind.id, { multiplier: Math.max(0.5, parseFloat(e.target.value) || 3) })}
                 className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
               />
             </div>
@@ -183,7 +192,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                   max={10}
                   step={0.5}
                   value={ind.threshold ?? 3}
-                  onChange={(e) => updateIndicator(ind.id, { threshold: Math.max(1.5, parseFloat(e.target.value) || 3) })}
+                  onChange={(e) => handleUpdate(ind.id, { threshold: Math.max(1.5, parseFloat(e.target.value) || 3) })}
                   className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
                 />
               </div>
@@ -194,7 +203,7 @@ const IndicatorRow: React.FC<{ ind: IndicatorConfig }> = ({ ind }) => {
                   min={2}
                   max={10}
                   value={ind.minStack ?? 3}
-                  onChange={(e) => updateIndicator(ind.id, { minStack: Math.max(2, parseInt(e.target.value) || 3) })}
+                  onChange={(e) => handleUpdate(ind.id, { minStack: Math.max(2, parseInt(e.target.value) || 3) })}
                   className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
                 />
               </div>
@@ -954,7 +963,20 @@ export const RightSidebar: React.FC = () => {
     removeStochRSICrossAlert,
     pctDiffDonCrossAlerts,
     removePctDiffDonCrossAlert,
+    multiTfMode,
   } = useChartStore();
+
+  // Multi-panel store for routing in multi-TF mode
+  const activePanelIndex = useMultiPanelStore((s) => s.activePanelIndex);
+  const activePanel = useMultiPanelStore((s) => s.panels[s.activePanelIndex]);
+  const addPanelIndicator = useMultiPanelStore((s) => s.addPanelIndicator);
+  const removePanelIndicator = useMultiPanelStore((s) => s.removePanelIndicator);
+  const togglePanelIndicator = useMultiPanelStore((s) => s.togglePanelIndicator);
+  const updatePanelIndicator = useMultiPanelStore((s) => s.updatePanelIndicator);
+  const clearPanelIndicators = useMultiPanelStore((s) => s.clearPanelIndicators);
+
+  // Route to correct source
+  const currentIndicators = multiTfMode ? (activePanel?.indicators ?? []) : indicators;
 
   const [showAdd, setShowAdd] = useState(false);
 
@@ -962,7 +984,7 @@ export const RightSidebar: React.FC = () => {
 
   const handleAddIndicator = (preset: typeof INDICATOR_PRESETS[number]) => {
     const id = `${preset.type.toLowerCase()}-${Date.now()}`;
-    addIndicator({
+    const config = {
       id,
       type: preset.type,
       period: preset.defaults.period ?? 14,
@@ -979,16 +1001,37 @@ export const RightSidebar: React.FC = () => {
       donLineDiff: (preset.defaults as any).donLineDiff,
       zigzagLength: (preset.defaults as any).zigzagLength,
       fibFactor: (preset.defaults as any).fibFactor,
-    });
+    };
+    if (multiTfMode) {
+      addPanelIndicator(activePanelIndex, config);
+    } else {
+      addIndicator(config);
+    }
     setShowAdd(false);
+  };
+
+  // Routed actions for IndicatorRow in multi-TF mode
+  const handlePanelToggle = (id: string) => togglePanelIndicator(activePanelIndex, id);
+  const handlePanelRemove = (id: string) => removePanelIndicator(activePanelIndex, id);
+  const handlePanelUpdate = (id: string, updates: Partial<IndicatorConfig>) => updatePanelIndicator(activePanelIndex, id, updates);
+  const handleClearCurrent = () => {
+    if (multiTfMode) clearPanelIndicators(activePanelIndex);
+    else clearAllIndicators();
   };
 
   return (
     <div className="bg-card border-l border-border flex flex-col h-full w-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-panel-header">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {rightPanelTab}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {rightPanelTab}
+          </span>
+          {multiTfMode && (
+            <span className="text-[8px] font-bold text-blue-400 bg-blue-500/15 rounded px-1.5 py-0.5">
+              Panel {activePanelIndex + 1}
+            </span>
+          )}
+        </div>
         <button onClick={() => setRightPanelOpen(false)} className="text-muted-foreground hover:text-foreground">
           <X size={14} />
         </button>
@@ -1112,18 +1155,22 @@ export const RightSidebar: React.FC = () => {
 
         {rightPanelTab === 'indicators' && (
           <div className="space-y-2">
-            {indicators.length > 0 && (
+            {currentIndicators.length > 0 && (
               <div className="flex justify-end px-1">
                 <button
-                  onClick={clearAllIndicators}
+                  onClick={handleClearCurrent}
                   className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
                 >
                   Delete All
                 </button>
               </div>
             )}
-            {indicators.map((ind) => (
-              <IndicatorRow key={ind.id} ind={ind} />
+            {currentIndicators.map((ind) => (
+              <IndicatorRow
+                key={ind.id}
+                ind={ind}
+                {...(multiTfMode ? { onToggle: handlePanelToggle, onRemove: handlePanelRemove, onUpdate: handlePanelUpdate } : {})}
+              />
             ))}
 
             {!showAdd ? (

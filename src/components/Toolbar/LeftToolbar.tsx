@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
+import { useMultiPanelStore } from '@/stores/multiPanelStore';
 import { DrawingTool } from '@/types/trading';
 import {
   MousePointer2,
@@ -42,12 +43,63 @@ export const LeftToolbar: React.FC = () => {
     fibonacciDrawings,
     clearAllDrawings,
     clearAllIndicators,
+    multiTfMode,
   } = useChartStore();
+
+  // Multi-panel store for routing in multi-TF mode
+  const activePanelIndex = useMultiPanelStore((s) => s.activePanelIndex);
+  const activePanel = useMultiPanelStore((s) => s.panels[s.activePanelIndex]);
+  const setPanelActiveTool = useMultiPanelStore((s) => s.setPanelActiveTool);
+  const addPanelIndicator = useMultiPanelStore((s) => s.addPanelIndicator);
+  const clearPanelDrawings = useMultiPanelStore((s) => s.clearPanelDrawings);
+  const clearPanelIndicators = useMultiPanelStore((s) => s.clearPanelIndicators);
+  const removePanelTrendline = useMultiPanelStore((s) => s.removePanelTrendline);
+
+  // Route to the correct state source
+  const currentActiveTool = multiTfMode ? (activePanel?.activeTool ?? 'cursor') : activeTool;
+  const currentIndicators = multiTfMode ? (activePanel?.indicators ?? []) : indicators;
+  const currentTrendlines = multiTfMode ? (activePanel?.trendlines ?? []) : trendlines;
+  const currentFibs = multiTfMode ? (activePanel?.fibonacciDrawings ?? []) : fibonacciDrawings;
+  const currentSelectedId = multiTfMode ? (activePanel?.selectedTrendlineId ?? null) : selectedTrendlineId;
 
   const [confirmDrawings, setConfirmDrawings] = useState(false);
   const [confirmIndicators, setConfirmIndicators] = useState(false);
   const [showHTF, setShowHTF] = useState(false);
   const hasHTF = useChartStore((s) => s.htfOverlay.layers.some(l => l.enabled));
+
+  // ─── Routed actions ──────────────────────────────────────────
+
+  const handleSetTool = (tool: DrawingTool) => {
+    if (multiTfMode) {
+      setPanelActiveTool(activePanelIndex, tool);
+    } else {
+      setActiveTool(tool);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (multiTfMode && currentSelectedId) {
+      removePanelTrendline(activePanelIndex, currentSelectedId);
+    } else if (selectedTrendlineId) {
+      removeTrendline(selectedTrendlineId);
+    }
+  };
+
+  const handleClearDrawings = () => {
+    if (multiTfMode) {
+      clearPanelDrawings(activePanelIndex);
+    } else {
+      clearAllDrawings();
+    }
+  };
+
+  const handleClearIndicators = () => {
+    if (multiTfMode) {
+      clearPanelIndicators(activePanelIndex);
+    } else {
+      clearAllIndicators();
+    }
+  };
 
   const tools: ToolButton[] = [
     { id: 'cursor', icon: <MousePointer2 size={18} />, label: 'Cursor' },
@@ -60,85 +112,105 @@ export const LeftToolbar: React.FC = () => {
   ];
 
   const handleToggleBBands = () => {
-    const existing = indicators.find((i) => i.type === 'BBANDS');
+    const existing = currentIndicators.find((i) => i.type === 'BBANDS');
     if (existing) {
       setRightPanelTab('indicators');
     } else {
-      addIndicator({
+      const ind = {
         id: `bbands-${Date.now()}`,
-        type: 'BBANDS',
+        type: 'BBANDS' as const,
         period: 20,
         color: '#2196F3',
         color2: 'rgba(33,150,243,0.08)',
         visible: true,
         stdDev: 2,
-      });
+      };
+      if (multiTfMode) {
+        addPanelIndicator(activePanelIndex, ind);
+      } else {
+        addIndicator(ind);
+      }
       setRightPanelTab('indicators');
     }
   };
 
   const handleTogglePivotHL = () => {
-    const existing = indicators.find((i) => i.type === 'PIVOT_HL');
+    const existing = currentIndicators.find((i) => i.type === 'PIVOT_HL');
     if (existing) {
       setRightPanelTab('indicators');
     } else {
-      addIndicator({
+      const ind = {
         id: `pivot-hl-${Date.now()}`,
-        type: 'PIVOT_HL',
+        type: 'PIVOT_HL' as const,
         period: 5,
         color: '#22c55e',
         color2: '#ef4444',
         visible: true,
-      });
+      };
+      if (multiTfMode) {
+        addPanelIndicator(activePanelIndex, ind);
+      } else {
+        addIndicator(ind);
+      }
       setRightPanelTab('indicators');
     }
   };
 
   const handleToggleVPVR = () => {
-    const existing = indicators.find((i) => i.type === 'VPVR');
+    const existing = currentIndicators.find((i) => i.type === 'VPVR');
     if (existing) {
       setRightPanelTab('indicators');
     } else {
-      addIndicator({
+      const ind = {
         id: `vpvr-${Date.now()}`,
-        type: 'VPVR',
+        type: 'VPVR' as const,
         period: 1,
         color: '#26a69a',
         visible: true,
-      });
+      };
+      if (multiTfMode) {
+        addPanelIndicator(activePanelIndex, ind);
+      } else {
+        addIndicator(ind);
+      }
     }
   };
 
   const handleToggleImbalance = () => {
-    const existing = indicators.find((i) => i.type === 'IMBALANCE');
+    const existing = currentIndicators.find((i) => i.type === 'IMBALANCE');
     if (existing) {
       setRightPanelTab('indicators');
     } else {
-      addIndicator({
+      const ind = {
         id: `imbalance-${Date.now()}`,
-        type: 'IMBALANCE',
+        type: 'IMBALANCE' as const,
         period: 1,
         color: '#0096FF',
         visible: true,
         threshold: 3,
         minStack: 3,
-      });
+      };
+      if (multiTfMode) {
+        addPanelIndicator(activePanelIndex, ind);
+      } else {
+        addIndicator(ind);
+      }
     }
   };
 
-  const hasBBands = indicators.some((i) => i.type === 'BBANDS' && i.visible);
-  const hasPivotHL = indicators.some((i) => i.type === 'PIVOT_HL' && i.visible);
-  const hasVPVR = indicators.some((i) => i.type === 'VPVR' && i.visible);
-  const hasImbalance = indicators.some((i) => i.type === 'IMBALANCE' && i.visible);
-  const hasDrawings = trendlines.length > 0 || fibonacciDrawings.length > 0;
-  const hasIndicators = indicators.length > 0;
+  const hasBBands = currentIndicators.some((i) => i.type === 'BBANDS' && i.visible);
+  const hasPivotHL = currentIndicators.some((i) => i.type === 'PIVOT_HL' && i.visible);
+  const hasVPVR = currentIndicators.some((i) => i.type === 'VPVR' && i.visible);
+  const hasImbalance = currentIndicators.some((i) => i.type === 'IMBALANCE' && i.visible);
+  const hasDrawings = currentTrendlines.length > 0 || currentFibs.length > 0;
+  const hasIndicators = currentIndicators.length > 0;
 
   const actions: ToolButton[] = [
     { id: 'bbands', icon: <Activity size={18} />, label: 'Bollinger Bands', action: handleToggleBBands },
     { id: 'pivot-hl', icon: <Diamond size={18} />, label: 'Pivot Points H/L', action: handleTogglePivotHL },
     { id: 'vpvr', icon: <BarChart size={18} />, label: 'Volume Profile (VPVR)', action: handleToggleVPVR },
     { id: 'imbalance', icon: <Zap size={18} />, label: 'Imbalance Detection', action: handleToggleImbalance },
-    { id: 'htf-overlay', icon: <Layers size={18} />, label: 'HTF Overlay', action: () => setShowHTF(v => !v) },
+    ...(!multiTfMode ? [{ id: 'htf-overlay', icon: <Layers size={18} />, label: 'HTF Overlay', action: () => setShowHTF(v => !v) }] : []),
     { id: 'alerts', icon: <Bell size={18} />, label: 'Alerts', action: () => setRightPanelTab('alerts') },
     { id: 'indicators', icon: <BarChart3 size={18} />, label: 'Indicators', action: () => setRightPanelTab('indicators') },
     { id: 'settings', icon: <Settings size={18} />, label: 'Settings', action: () => setRightPanelTab('settings') },
@@ -146,13 +218,20 @@ export const LeftToolbar: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center w-11 bg-card border-r border-border py-2 gap-1">
+      {/* Active panel badge (only in multi-TF mode) */}
+      {multiTfMode && (
+        <div className="text-[8px] font-bold text-blue-400 bg-blue-500/15 rounded px-1.5 py-0.5 mb-1">
+          P{activePanelIndex + 1}
+        </div>
+      )}
+
       {/* Drawing tools */}
       {tools.map((tool) => (
         <button
           key={tool.id}
-          onClick={() => setActiveTool(tool.id as DrawingTool)}
+          onClick={() => handleSetTool(tool.id as DrawingTool)}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            activeTool === tool.id
+            currentActiveTool === tool.id
               ? 'bg-primary/15 text-primary'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           }`}
@@ -182,7 +261,7 @@ export const LeftToolbar: React.FC = () => {
 
       <div className="flex-1" />
 
-      {showHTF && <HTFControls onClose={() => setShowHTF(false)} />}
+      {!multiTfMode && showHTF && <HTFControls onClose={() => setShowHTF(false)} />}
 
       {/* Clear all drawings */}
       {hasDrawings && (
@@ -190,7 +269,7 @@ export const LeftToolbar: React.FC = () => {
           <button
             onClick={() => {
               if (confirmDrawings) {
-                clearAllDrawings();
+                handleClearDrawings();
                 setConfirmDrawings(false);
               } else {
                 setConfirmDrawings(true);
@@ -221,7 +300,7 @@ export const LeftToolbar: React.FC = () => {
           <button
             onClick={() => {
               if (confirmIndicators) {
-                clearAllIndicators();
+                handleClearIndicators();
                 setConfirmIndicators(false);
               } else {
                 setConfirmIndicators(true);
@@ -248,9 +327,9 @@ export const LeftToolbar: React.FC = () => {
       )}
 
       {/* Delete selected */}
-      {selectedTrendlineId && (
+      {currentSelectedId && (
         <button
-          onClick={() => removeTrendline(selectedTrendlineId)}
+          onClick={handleDeleteSelected}
           className="w-8 h-8 flex items-center justify-center rounded text-destructive hover:bg-destructive/10 transition-colors"
           title="Delete selected"
         >

@@ -1,0 +1,636 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  STEALTH LIQUIDITY CASCADE ENGINE [SLCE] v1.0
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// THE HIDDEN PROTOCOL — What Top 1% Prop Firms Actually Use
+// ──────────────────────────────────────────────────────────
+// Markets are fractal liquidity engines. Institutional players operate in
+// a repeating 5-stage sequence that leaves identifiable footprints:
+//
+//   ① MAP   — Identify resting liquidity pools (equal highs/lows, swing stops)
+//   ② RAID  — Sweep the pool to fill institutional orders (the "grab")
+//   ③ SHIFT — Market structure changes direction post-sweep
+//   ④ VOID  — Fair Value Gaps form during the impulsive displacement
+//   ⑤ ENTRY — Price retests the void → optimal institutional entry
+//
+// THE SECRET: The CASCADE SCORE
+// ─────────────────────────────
+// Not a single indicator — a multi-dimensional SCORING SYSTEM that rates
+// the entire event chain. It quantifies:
+//   • Grab Intensity   — Wick depth & ratio (how institutional was the sweep?)
+//   • Displacement      — Speed & distance of post-grab move (conviction)
+//   • Volume Anomaly   — Institutional footprint in volume (confirmation)
+//   • Void Quality     — FVG size relative to ATR (significance)
+//
+// Score ≥ 80 → "PERFECT STORM" — Highest probability institutional setup
+// Score 60-80 → "STRONG CASCADE" — Above-average probability
+// Score < 60 → FILTERED OUT — Noise, not institutional
+//
+// Rooted in: Kyle's Lambda, VPIN flow toxicity, fractal market hypothesis,
+//            and ICT Smart Money Concepts
+//
+// © 2024 — For educational purposes only. Not financial advice.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+//@version=5
+indicator("Stealth Liquidity Cascade Engine [SLCE]",
+     overlay         = true,
+     max_lines_count  = 500,
+     max_boxes_count  = 500,
+     max_labels_count = 500,
+     max_bars_back    = 5000)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                              INPUTS                                        │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// ─── Liquidity Pool Detection ───
+string G1       = "⬡ Liquidity Pool Detection"
+i_swingLen      = input.int(5,      "Pivot Lookback Length",      minval=2,    maxval=20,   group=G1,  tooltip="Bars to confirm swing highs/lows as liquidity pools")
+i_maxPools      = input.int(15,     "Max Pools Tracked",          minval=5,    maxval=50,   group=G1)
+i_eqTol         = input.float(0.15, "Equal Level Tolerance %",    minval=0.01, maxval=1.0,  step=0.01, group=G1, tooltip="% threshold for detecting equal highs/lows — premium liquidity targets")
+i_showPools     = input.bool(true,  "Show Liquidity Pool Lines",  group=G1)
+
+// ─── Grab Detection ───
+string G2       = "⬡ Liquidity Grab Detection"
+i_minWick       = input.float(0.30, "Min Wick Ratio",             minval=0.1,  maxval=0.9,  step=0.05, group=G2, tooltip="Minimum wick-to-range ratio to qualify as institutional grab")
+i_cascadeWin    = input.int(5,      "Cascade Window (bars)",      minval=1,    maxval=15,   group=G2,  tooltip="Max bars after grab to link FVGs as cascade events")
+
+// ─── Fair Value Gaps ───
+string G3       = "⬡ Fair Value Gaps (Voids)"
+i_minFVG        = input.float(0.15, "Min FVG Size (ATR×)",        minval=0.05, maxval=2.0,  step=0.05, group=G3)
+i_maxFVG        = input.int(15,     "Max Active FVGs",            minval=1,    maxval=50,   group=G3)
+i_showFVG       = input.bool(true,  "Show FVG Zones",             group=G3)
+i_showMitFVG    = input.bool(false, "Show Mitigated FVGs",        group=G3)
+i_fvgExt        = input.int(80,     "FVG Extension (bars)",       minval=10,   maxval=500,  group=G3)
+
+// ─── Cascade Scoring ───
+string G4       = "⬡ Cascade Score Weights"
+i_wGrab         = input.float(25,   "Weight: Grab Intensity",     minval=0,    maxval=100,  group=G4)
+i_wDisp         = input.float(25,   "Weight: Displacement",       minval=0,    maxval=100,  group=G4)
+i_wVol          = input.float(25,   "Weight: Volume Anomaly",     minval=0,    maxval=100,  group=G4)
+i_wFVG          = input.float(25,   "Weight: FVG Quality",        minval=0,    maxval=100,  group=G4)
+i_minScore      = input.float(60,   "Min Score for Signal",       minval=0,    maxval=100,  group=G4)
+
+// ─── Volume Intelligence ───
+string G5       = "⬡ Volume Intelligence"
+i_volMA         = input.int(20,     "Volume MA Length",            minval=5,    maxval=100,  group=G5)
+i_volSpike      = input.float(1.5,  "Spike Threshold ×",          minval=1.0,  maxval=5.0,  step=0.1,  group=G5)
+
+// ─── Visual Settings ───
+string G6       = "⬡ Visual Settings"
+i_cBullGrab     = input.color(#00E676, "Bullish Signal Color",    group=G6)
+i_cBearGrab     = input.color(#FF1744, "Bearish Signal Color",    group=G6)
+i_cBSL          = input.color(#FF6D00, "Buyside Liquidity",       group=G6)
+i_cSSL          = input.color(#2979FF, "Sellside Liquidity",      group=G6)
+i_cEQ           = input.color(#FFD600, "Equal Levels (EQH/EQL)",  group=G6)
+i_showDash      = input.bool(true,  "Show Dashboard",             group=G6)
+i_showSigs      = input.bool(true,  "Show Entry Signals",         group=G6)
+i_showGrabs     = input.bool(true,  "Show Grab Markers",          group=G6)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                         CORE CALCULATIONS                                  │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+atr14       = nz(ta.atr(14), high - low)
+volSMA      = ta.sma(volume, i_volMA)
+volRatio    = nz(volume / volSMA, 1.0)
+isVolSpike  = volRatio >= i_volSpike
+
+bodySize    = math.abs(close - open)
+upperWick   = high - math.max(close, open)
+lowerWick   = math.min(close, open) - low
+barRange    = high - low
+isBullBar   = close >= open
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      CASCADE SCORE FUNCTION                                │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// Multi-dimensional scoring: the HIDDEN EDGE
+// Each component normalized to 0-100, then weighted
+f_score(_wickR, _dispR, _volR, _fvgR) =>
+    _tw = i_wGrab + i_wDisp + i_wVol + i_wFVG
+    _tw := _tw > 0 ? _tw : 1.0
+    _sG = math.min(_wickR / 0.75 * 100, 100)   // 0.75 wick ratio = perfect grab
+    _sD = math.min(_dispR / 3.0  * 100, 100)   // 3× ATR displacement = perfect
+    _sV = math.min(_volR  / 3.0  * 100, 100)   // 3× avg volume = perfect
+    _sF = math.min(_fvgR  / 1.0  * 100, 100)   // 1× ATR FVG = perfect
+    (_sG * i_wGrab + _sD * i_wDisp + _sV * i_wVol + _sF * i_wFVG) / _tw
+
+f_scoreColor(_s) =>
+    _s >= 80 ? color.new(#00E676, 0) :
+     _s >= 60 ? color.new(#FFD600, 0) :
+     color.new(#FF6D00, 0)
+
+f_scoreLabel(_s) =>
+    _s >= 80 ? "PERFECT STORM" :
+     _s >= 60 ? "STRONG CASCADE" :
+     "CASCADE"
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      LIQUIDITY POOL DETECTION                              │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// Swing highs = Buyside Liquidity (BSL) — resting buy stops above
+// Swing lows  = Sellside Liquidity (SSL) — resting sell stops below
+
+ph = ta.pivothigh(high, i_swingLen, i_swingLen)
+pl = ta.pivotlow(low,   i_swingLen, i_swingLen)
+pivotBar = bar_index - i_swingLen
+
+// ── BSL Storage ──
+var float[] poolBSL     = array.new_float(0)
+var int[]   poolBSLBar  = array.new_int(0)
+var bool[]  poolBSLSwpt = array.new_bool(0)
+var line[]  poolBSLLn   = array.new_line(0)
+var bool[]  poolBSLEq   = array.new_bool(0)
+
+// ── SSL Storage ──
+var float[] poolSSL     = array.new_float(0)
+var int[]   poolSSLBar  = array.new_int(0)
+var bool[]  poolSSLSwpt = array.new_bool(0)
+var line[]  poolSSLLn   = array.new_line(0)
+var bool[]  poolSSLEq   = array.new_bool(0)
+
+// ── New Swing High → Buyside Liquidity Pool ──
+if not na(ph)
+    _isEq = false
+    if array.size(poolBSL) > 0
+        for _i = 0 to array.size(poolBSL) - 1
+            if not array.get(poolBSLSwpt, _i)
+                _existing = array.get(poolBSL, _i)
+                if math.abs(ph - _existing) / math.max(ph, 0.0001) * 100 < i_eqTol
+                    _isEq := true
+                    array.set(poolBSLEq, _i, true)
+                    _pln = array.get(poolBSLLn, _i)
+                    if not na(_pln)
+                        line.set_width(_pln, 2)
+                        line.set_color(_pln, i_cEQ)
+                    break
+
+    _lnCol = _isEq ? i_cEQ : (i_showPools ? i_cBSL : na)
+    _lnW   = _isEq ? 2 : 1
+    _newLn = line.new(pivotBar, ph, bar_index, ph, color=_lnCol,
+         style=line.style_dotted, width=_lnW)
+
+    array.push(poolBSL,     ph)
+    array.push(poolBSLBar,  pivotBar)
+    array.push(poolBSLSwpt, false)
+    array.push(poolBSLLn,   _newLn)
+    array.push(poolBSLEq,   _isEq)
+
+    if _isEq
+        label.new(pivotBar, ph, "EQH ◆", textcolor=i_cEQ,
+             style=label.style_none, size=size.tiny)
+
+    if array.size(poolBSL) > i_maxPools
+        array.shift(poolBSL)
+        array.shift(poolBSLBar)
+        array.shift(poolBSLSwpt)
+        line.delete(array.shift(poolBSLLn))
+        array.shift(poolBSLEq)
+
+// ── New Swing Low → Sellside Liquidity Pool ──
+if not na(pl)
+    _isEq = false
+    if array.size(poolSSL) > 0
+        for _i = 0 to array.size(poolSSL) - 1
+            if not array.get(poolSSLSwpt, _i)
+                _existing = array.get(poolSSL, _i)
+                if math.abs(pl - _existing) / math.max(pl, 0.0001) * 100 < i_eqTol
+                    _isEq := true
+                    array.set(poolSSLEq, _i, true)
+                    _pln = array.get(poolSSLLn, _i)
+                    if not na(_pln)
+                        line.set_width(_pln, 2)
+                        line.set_color(_pln, i_cEQ)
+                    break
+
+    _lnCol = _isEq ? i_cEQ : (i_showPools ? i_cSSL : na)
+    _lnW   = _isEq ? 2 : 1
+    _newLn = line.new(pivotBar, pl, bar_index, pl, color=_lnCol,
+         style=line.style_dotted, width=_lnW)
+
+    array.push(poolSSL,     pl)
+    array.push(poolSSLBar,  pivotBar)
+    array.push(poolSSLSwpt, false)
+    array.push(poolSSLLn,   _newLn)
+    array.push(poolSSLEq,   _isEq)
+
+    if _isEq
+        label.new(pivotBar, pl, "EQL ◆", textcolor=i_cEQ,
+             style=label.style_none, size=size.tiny)
+
+    if array.size(poolSSL) > i_maxPools
+        array.shift(poolSSL)
+        array.shift(poolSSLBar)
+        array.shift(poolSSLSwpt)
+        line.delete(array.shift(poolSSLLn))
+        array.shift(poolSSLEq)
+
+// ── Extend active pool lines to current bar ──
+if array.size(poolBSLLn) > 0
+    for _i = 0 to array.size(poolBSLLn) - 1
+        if not array.get(poolBSLSwpt, _i)
+            _ln = array.get(poolBSLLn, _i)
+            if not na(_ln)
+                line.set_x2(_ln, bar_index + 3)
+
+if array.size(poolSSLLn) > 0
+    for _i = 0 to array.size(poolSSLLn) - 1
+        if not array.get(poolSSLSwpt, _i)
+            _ln = array.get(poolSSLLn, _i)
+            if not na(_ln)
+                line.set_x2(_ln, bar_index + 3)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      LIQUIDITY GRAB DETECTION                              │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// A grab occurs when:
+//   • Price WICKS beyond a liquidity pool level
+//   • But the BODY (close) stays on the other side
+//   • The wick ratio exceeds the threshold → institutional signature
+//   • This "stop hunt" fills institutional orders at retail's expense
+
+var float grbLevel   = na
+var int   grbDir     = 0         // -1 = sellside grab (bullish), +1 = buyside grab (bearish)
+var int   grbBar     = 0
+var float grbWickR   = 0.0
+var float grbVolR    = 0.0
+var bool  grbIsEq    = false
+var int   grbCount   = 0
+
+_bslGrab  = false
+_sslGrab  = false
+_gLevel   = 0.0
+_gWick    = 0.0
+_gIsEq    = false
+
+// ── Check Buyside Liquidity Grab ──
+// Price wicks ABOVE a swing high but closes BELOW it
+if barRange > 0 and array.size(poolBSL) > 0
+    for _i = array.size(poolBSL) - 1 to 0
+        if array.get(poolBSLSwpt, _i)
+            continue
+        _lvl = array.get(poolBSL, _i)
+        if high > _lvl and close < _lvl
+            _wr = upperWick / barRange
+            if _wr >= i_minWick
+                _bslGrab := true
+                _gLevel  := _lvl
+                _gWick   := _wr
+                _gIsEq   := array.get(poolBSLEq, _i)
+                array.set(poolBSLSwpt, _i, true)
+                _ln = array.get(poolBSLLn, _i)
+                if not na(_ln)
+                    line.set_color(_ln, color.new(color.gray, 80))
+                    line.set_style(_ln, line.style_dashed)
+                break
+
+// ── Check Sellside Liquidity Grab ──
+// Price wicks BELOW a swing low but closes ABOVE it
+if barRange > 0 and array.size(poolSSL) > 0 and not _bslGrab
+    for _i = array.size(poolSSL) - 1 to 0
+        if array.get(poolSSLSwpt, _i)
+            continue
+        _lvl = array.get(poolSSL, _i)
+        if low < _lvl and close > _lvl
+            _wr = lowerWick / barRange
+            if _wr >= i_minWick
+                _sslGrab := true
+                _gLevel  := _lvl
+                _gWick   := _wr
+                _gIsEq   := array.get(poolSSLEq, _i)
+                array.set(poolSSLSwpt, _i, true)
+                _ln = array.get(poolSSLLn, _i)
+                if not na(_ln)
+                    line.set_color(_ln, color.new(color.gray, 80))
+                    line.set_style(_ln, line.style_dashed)
+                break
+
+// ── Record Grab State ──
+if _bslGrab
+    grbLevel  := _gLevel
+    grbDir    := 1
+    grbBar    := bar_index
+    grbWickR  := _gWick
+    grbVolR   := volRatio
+    grbIsEq   := _gIsEq
+    grbCount  += 1
+
+if _sslGrab
+    grbLevel  := _gLevel
+    grbDir    := -1
+    grbBar    := bar_index
+    grbWickR  := _gWick
+    grbVolR   := volRatio
+    grbIsEq   := _gIsEq
+    grbCount  += 1
+
+// ── Grab Visualization ──
+plotshape(_bslGrab and i_showGrabs, "BSL Grab ▼", shape.xcross,
+     location.abovebar, color=i_cBearGrab, size=size.small)
+plotshape(_sslGrab and i_showGrabs, "SSL Grab ▲", shape.xcross,
+     location.belowbar, color=i_cBullGrab, size=size.small)
+
+if _bslGrab and i_showGrabs
+    label.new(bar_index, high + atr14 * 0.6, "BSL GRAB\n" + str.tostring(math.round(grbWickR * 100)) + "% wick",
+         textcolor=i_cBearGrab, color=color.new(i_cBearGrab, 88),
+         style=label.style_label_down, size=size.tiny)
+
+if _sslGrab and i_showGrabs
+    label.new(bar_index, low - atr14 * 0.6, "SSL GRAB\n" + str.tostring(math.round(grbWickR * 100)) + "% wick",
+         textcolor=i_cBullGrab, color=color.new(i_cBullGrab, 88),
+         style=label.style_label_up, size=size.tiny)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      FAIR VALUE GAP DETECTION                              │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// FVG = Institutional footprint of aggressive displacement
+// Bullish FVG: low[0] > high[2] → gap UP on middle candle
+// Bearish FVG: high[0] < low[2] → gap DOWN on middle candle
+//
+// CASCADE FVG: An FVG that forms within the cascade window AFTER a grab
+// These are the HIGHEST probability zones — institutional voids
+
+var float[] fvgTop    = array.new_float(0)
+var float[] fvgBot    = array.new_float(0)
+var int[]   fvgSBar   = array.new_int(0)
+var int[]   fvgDirn   = array.new_int(0)     // +1 bull, -1 bear
+var bool[]  fvgMit    = array.new_bool(0)     // mitigated?
+var float[] fvgScr    = array.new_float(0)    // cascade score
+var bool[]  fvgIsCas  = array.new_bool(0)     // is cascade FVG?
+var box[]   fvgBx     = array.new_box(0)
+
+_bullFVG  = bar_index > 2 and low > high[2] and (low - high[2]) >= atr14 * i_minFVG
+_bearFVG  = bar_index > 2 and high < low[2] and (low[2] - high) >= atr14 * i_minFVG
+_inCascade = grbDir != 0 and (bar_index - grbBar) <= i_cascadeWin
+
+// Helper to add FVG and manage arrays
+f_addFVG(_top, _bot, _dir, _isCasc, _scr, _bxCol, _borderW) =>
+    _bx = i_showFVG ? box.new(bar_index - 1, _top, bar_index + i_fvgExt, _bot,
+         border_color=color.new(_bxCol, 40), bgcolor=color.new(_bxCol, 85),
+         border_width=_borderW, border_style=line.style_solid) : na
+
+    if _isCasc and _scr >= i_minScore and i_showFVG
+        label.new(bar_index, _dir == 1 ? _top : _bot,
+             "⚡" + str.tostring(math.round(_scr)),
+             textcolor=f_scoreColor(_scr), style=label.style_none, size=size.tiny)
+
+    array.push(fvgTop,   _top)
+    array.push(fvgBot,   _bot)
+    array.push(fvgSBar,  bar_index)
+    array.push(fvgDirn,  _dir)
+    array.push(fvgMit,   false)
+    array.push(fvgScr,   _scr)
+    array.push(fvgIsCas, _isCasc)
+    array.push(fvgBx,    _bx)
+
+    if array.size(fvgTop) > i_maxFVG
+        array.shift(fvgTop)
+        array.shift(fvgBot)
+        array.shift(fvgSBar)
+        array.shift(fvgDirn)
+        array.shift(fvgMit)
+        array.shift(fvgScr)
+        array.shift(fvgIsCas)
+        _old = array.shift(fvgBx)
+        if not na(_old)
+            box.delete(_old)
+    true
+
+// ── Bullish FVG ──
+if _bullFVG
+    _top   = low
+    _bot   = high[2]
+    _sz    = _top - _bot
+    _dispR = nz(math.abs(close - nz(grbLevel, close)) / atr14, 0)
+    _fvgR  = nz(_sz / atr14, 0)
+
+    _isCasc = _inCascade and grbDir == -1
+    _scr    = _isCasc ? f_score(grbWickR, _dispR, grbVolR, _fvgR) : _fvgR * 15
+    _bxCol  = _isCasc and _scr >= i_minScore ? i_cBullGrab : color.new(i_cBullGrab, 50)
+    _bw     = _isCasc and _scr >= i_minScore ? 2 : 1
+    f_addFVG(_top, _bot, 1, _isCasc, _scr, _bxCol, _bw)
+
+// ── Bearish FVG ──
+if _bearFVG
+    _top   = low[2]
+    _bot   = high
+    _sz    = _top - _bot
+    _dispR = nz(math.abs(close - nz(grbLevel, close)) / atr14, 0)
+    _fvgR  = nz(_sz / atr14, 0)
+
+    _isCasc = _inCascade and grbDir == 1
+    _scr    = _isCasc ? f_score(grbWickR, _dispR, grbVolR, _fvgR) : _fvgR * 15
+    _bxCol  = _isCasc and _scr >= i_minScore ? i_cBearGrab : color.new(i_cBearGrab, 50)
+    _bw     = _isCasc and _scr >= i_minScore ? 2 : 1
+    f_addFVG(_top, _bot, -1, _isCasc, _scr, _bxCol, _bw)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │              FVG MITIGATION & CASCADE ENTRY SIGNALS                        │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// THE KEY EDGE: Entry signals fire ONLY when price retests a CASCADE FVG
+// (one formed after an institutional grab with a high cascade score)
+// This is the "optimal trade entry" — buying at institutional discount
+// or selling at institutional premium.
+
+var int   lastSigBar    = 0
+var int   sigLongCount  = 0
+var int   sigShortCount = 0
+
+_longSig   = false
+_shortSig  = false
+_sigScore  = 0.0
+
+if array.size(fvgTop) > 0
+    for _i = array.size(fvgTop) - 1 to 0
+        if array.get(fvgMit, _i)
+            continue
+
+        _ft  = array.get(fvgTop, _i)
+        _fb  = array.get(fvgBot, _i)
+        _fd  = array.get(fvgDirn, _i)
+        _fs  = array.get(fvgScr, _i)
+        _fc  = array.get(fvgIsCas, _i)
+        _fsb = array.get(fvgSBar, _i)
+
+        if _fd == 1   // ── Bullish FVG Zone ──
+            // Full mitigation: price completely fills the gap
+            if low <= _fb
+                array.set(fvgMit, _i, true)
+                _bx = array.get(fvgBx, _i)
+                if not na(_bx)
+                    box.set_right(_bx, bar_index)
+                    if i_showMitFVG
+                        box.set_bgcolor(_bx, color.new(color.gray, 93))
+                        box.set_border_color(_bx, color.new(color.gray, 87))
+                    else
+                        box.delete(_bx)
+            // Entry signal: price retests FVG but doesn't fully fill
+            else if low <= _ft and low > _fb
+                if _fc and _fs >= i_minScore and bar_index - lastSigBar > 3 and bar_index - _fsb >= 2
+                    _longSig   := true
+                    _sigScore  := _fs
+                    lastSigBar := bar_index
+                    sigLongCount += 1
+
+        else   // ── Bearish FVG Zone ──
+            // Full mitigation
+            if high >= _ft
+                array.set(fvgMit, _i, true)
+                _bx = array.get(fvgBx, _i)
+                if not na(_bx)
+                    box.set_right(_bx, bar_index)
+                    if i_showMitFVG
+                        box.set_bgcolor(_bx, color.new(color.gray, 93))
+                        box.set_border_color(_bx, color.new(color.gray, 87))
+                    else
+                        box.delete(_bx)
+            // Entry signal: price retests FVG
+            else if high >= _fb and high < _ft
+                if _fc and _fs >= i_minScore and bar_index - lastSigBar > 3 and bar_index - _fsb >= 2
+                    _shortSig  := true
+                    _sigScore  := _fs
+                    lastSigBar := bar_index
+                    sigShortCount += 1
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      SIGNAL VISUALIZATION                                  │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// ── Entry signal markers ──
+plotshape(_longSig and i_showSigs, "▲ LONG CASCADE", shape.diamond,
+     location.belowbar, color=i_cBullGrab, size=size.normal)
+plotshape(_shortSig and i_showSigs, "▼ SHORT CASCADE", shape.diamond,
+     location.abovebar, color=i_cBearGrab, size=size.normal)
+
+// ── Entry labels with cascade score ──
+if _longSig and i_showSigs
+    _col = f_scoreColor(_sigScore)
+    _lbl = f_scoreLabel(_sigScore)
+    label.new(bar_index, low - atr14 * 0.8,
+         "▲ " + _lbl + "\nScore: " + str.tostring(math.round(_sigScore)),
+         textcolor=_col, color=color.new(i_cBullGrab, 82),
+         style=label.style_label_up, size=size.small)
+
+if _shortSig and i_showSigs
+    _col = f_scoreColor(_sigScore)
+    _lbl = f_scoreLabel(_sigScore)
+    label.new(bar_index, high + atr14 * 0.8,
+         "▼ " + _lbl + "\nScore: " + str.tostring(math.round(_sigScore)),
+         textcolor=_col, color=color.new(i_cBearGrab, 82),
+         style=label.style_label_down, size=size.small)
+
+// ── Bar coloring ──
+barcolor(_longSig ? color.new(i_cBullGrab, 20) :
+     _shortSig ? color.new(i_cBearGrab, 20) :
+     _bslGrab ? color.new(i_cBearGrab, 60) :
+     _sslGrab ? color.new(i_cBullGrab, 60) : na)
+
+// ── Cascade active background (very subtle) ──
+cascadeActive = grbDir != 0 and (bar_index - grbBar) <= i_cascadeWin
+bgcolor(cascadeActive ? color.new(i_cEQ, 96) : na, title="Cascade Active Zone")
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                           DASHBOARD                                        │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+var table dash = table.new(position.top_right, 2, 10,
+     bgcolor=color.new(#0D1117, 5),
+     border_width=1,
+     border_color=color.new(#30363D, 0),
+     frame_width=2,
+     frame_color=color.new(#58A6FF, 50))
+
+if barstate.islast and i_showDash
+    _hdr  = color.new(#161B22, 0)
+    _txtH = color.new(#F0F6FC, 0)
+    _txtN = color.new(#8B949E, 0)
+    _txtV = color.new(#C9D1D9, 0)
+
+    // Title
+    table.cell(dash, 0, 0, " STEALTH CASCADE", text_color=_txtH, bgcolor=_hdr,
+         text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 0, "ENGINE ⚡",        text_color=color.new(#58A6FF, 0), bgcolor=_hdr,
+         text_size=size.small, text_halign=text.align_right)
+
+    // Cascade state
+    _cascState = grbDir == 0 ? "IDLE" :
+         (bar_index - grbBar) <= i_cascadeWin ? "★ ACTIVE" : "EXPIRED"
+    _cascCol   = grbDir == 0 ? _txtN :
+         (bar_index - grbBar) <= i_cascadeWin ? color.new(#FFD600, 0) : _txtN
+    table.cell(dash, 0, 1, "Cascade State",  text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 1, _cascState,       text_color=_cascCol, text_size=size.tiny)
+
+    // Last grab type
+    _grabStr = grbDir == 1 ? "BSL ▼" : grbDir == -1 ? "SSL ▲" : "—"
+    _grabCol = grbDir == 1 ? i_cBearGrab : grbDir == -1 ? i_cBullGrab : _txtN
+    table.cell(dash, 0, 2, "Last Grab",      text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 2, _grabStr,         text_color=_grabCol, text_size=size.tiny)
+
+    // Grab quality
+    _gqStr = grbDir != 0 ? str.tostring(math.round(grbWickR * 100)) + "%" : "—"
+    table.cell(dash, 0, 3, "Grab Quality",   text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 3, _gqStr,           text_color=_txtV, text_size=size.tiny)
+
+    // Volume status
+    _volStr = str.tostring(math.round(volRatio, 1)) + "×"
+    _volCol = isVolSpike ? color.new(#FFD600, 0) : _txtV
+    table.cell(dash, 0, 4, "Volume",         text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 4, _volStr,          text_color=_volCol, text_size=size.tiny)
+
+    // Active voids
+    _actFVG = 0
+    _casFVG = 0
+    if array.size(fvgMit) > 0
+        for _i = 0 to array.size(fvgMit) - 1
+            if not array.get(fvgMit, _i)
+                _actFVG += 1
+                if array.get(fvgIsCas, _i)
+                    _casFVG += 1
+    table.cell(dash, 0, 5, "Active Voids",   text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 5, str.tostring(_actFVG) + " (" + str.tostring(_casFVG) + " cascade)",
+         text_color=_txtV, text_size=size.tiny)
+
+    // Total grabs
+    table.cell(dash, 0, 6, "Total Grabs",    text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 6, str.tostring(grbCount),
+         text_color=_txtV, text_size=size.tiny)
+
+    // Signals
+    table.cell(dash, 0, 7, "Long Signals",   text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 7, str.tostring(sigLongCount),
+         text_color=i_cBullGrab, text_size=size.tiny)
+
+    table.cell(dash, 0, 8, "Short Signals",  text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 8, str.tostring(sigShortCount),
+         text_color=i_cBearGrab, text_size=size.tiny)
+
+    // ATR
+    table.cell(dash, 0, 9, "ATR (14)",       text_color=_txtN, text_size=size.tiny)
+    table.cell(dash, 1, 9, str.tostring(atr14, format.mintick),
+         text_color=_txtV, text_size=size.tiny)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                             ALERTS                                         │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+alertcondition(_bslGrab, "⚠ Buyside Liquidity Grab",
+     "BSL GRAB — Buyside liquidity swept. Potential bearish cascade forming.")
+alertcondition(_sslGrab, "⚠ Sellside Liquidity Grab",
+     "SSL GRAB — Sellside liquidity swept. Potential bullish cascade forming.")
+alertcondition(_longSig, "▲ Bullish Cascade Entry",
+     "BULLISH CASCADE ENTRY — Price retesting institutional FVG after sellside grab.")
+alertcondition(_shortSig, "▼ Bearish Cascade Entry",
+     "BEARISH CASCADE ENTRY — Price retesting institutional FVG after buyside grab.")
+alertcondition(_longSig or _shortSig, "⚡ Any Cascade Entry",
+     "CASCADE ENTRY SIGNAL — Institutional-grade setup detected.")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// END OF STEALTH LIQUIDITY CASCADE ENGINE
+// ═══════════════════════════════════════════════════════════════════════════════

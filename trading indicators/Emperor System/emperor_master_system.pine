@@ -1,0 +1,674 @@
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║         EMPEROR BTC MASTER SYSTEM  [All-In-One]                     ║
+// ║         Pine Script v5  |  Inspired by EmperorBTC Curriculum        ║
+// ║                                                                      ║
+// ║  Modules:                                                            ║
+// ║  1. Volume Profile  (POC / VAH / VAL)                                ║
+// ║  2. VWAP + Bands                                                     ║
+// ║  3. Market Structure  (Swing H/L, BOS, CHoCH, MTF)                  ║
+// ║  4. Swing Failure Pattern  (SFP)                                     ║
+// ║  5. CVD + Order Flow Divergence                                      ║
+// ║  6. Fibonacci S/R  (0.236 → 1.618)                                  ║
+// ║  7. RSI Divergence  (Regular Bull/Bear)                              ║
+// ║  8. Scoring Engine  (0–8 per side)                                   ║
+// ║  9. Buy/Sell Signal Arrows                                           ║
+// ║  10. Dashboard Panel                                                 ║
+// ║  11. Alert Conditions  (10 alerts)                                   ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+//@version=5
+indicator("Emperor BTC Master System [All-In-One]",
+     shorttitle = "EMPEROR",
+     overlay    = true,
+     max_lines_count   = 500,
+     max_boxes_count   = 100,
+     max_labels_count  = 400)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 1 — INPUTS
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── Global ──────────────────────────────────────────────────────────────
+var string GG = "⚙  Global"
+i_mtf       = input.bool(true,        "Multi-Timeframe Mode",           group=GG)
+i_htfRes    = input.timeframe("240",  "HTF Resolution  (default 4H)",   group=GG)
+
+// ── Volume Profile + VWAP ────────────────────────────────────────────────
+var string GV = "📊  Volume Profile + VWAP"
+i_showVP    = input.bool(true,    "Show Volume Profile (POC/VAH/VAL)",  group=GV)
+i_vpLB      = input.int(100,      "VP Lookback Bars",   minval=20, maxval=500, group=GV)
+i_vpBkts    = input.int(24,       "Price Buckets",      minval=8,  maxval=48,  group=GV)
+i_vpVA      = input.float(0.70,   "Value Area %",       minval=0.50, maxval=0.95, step=0.05, group=GV)
+i_showVWAP  = input.bool(true,    "Show VWAP",                                 group=GV)
+i_showBands = input.bool(true,    "Show VWAP Bands",                           group=GV)
+i_bandMult  = input.float(2.0,    "VWAP Band Multiplier", minval=0.5, maxval=4.0, step=0.5, group=GV)
+
+// ── Market Structure + SFP ───────────────────────────────────────────────
+var string GM = "🏗  Market Structure + SFP"
+i_showMS    = input.bool(true,    "Show Market Structure",     group=GM)
+i_swLen     = input.int(10,       "Swing Length",  minval=3, maxval=30, group=GM)
+i_showBOS   = input.bool(true,    "Show BOS / CHoCH Labels",  group=GM)
+i_showSFP   = input.bool(true,    "Show Swing Failure Pattern", group=GM)
+i_sfpWick   = input.float(0.50,   "SFP Min Wick Ratio",  minval=0.2, maxval=0.9, step=0.1, group=GM)
+
+// ── CVD ──────────────────────────────────────────────────────────────────
+var string GC = "💹  CVD + Order Flow"
+i_showCVD   = input.bool(true,    "Show CVD Divergence Signals", group=GC)
+i_cvdLen    = input.int(20,       "CVD EMA Length",  minval=5, maxval=100, group=GC)
+
+// ── Fibonacci ────────────────────────────────────────────────────────────
+var string GF = "🌀  Fibonacci S/R"
+i_showFib   = input.bool(true,    "Show Fibonacci Levels",         group=GF)
+i_fibLen    = input.int(50,       "Fib Swing Lookback",  minval=20, maxval=300, group=GF)
+i_showExt   = input.bool(false,   "Show Extension Levels (1.272 / 1.618)", group=GF)
+i_fibProx   = input.float(0.50,   "Fib Proximity % (for score)", minval=0.1, maxval=2.0, step=0.1, group=GF)
+
+// ── RSI Divergence ───────────────────────────────────────────────────────
+var string GR = "📉  RSI Divergence"
+i_showRSI   = input.bool(true,    "Show RSI Divergence",          group=GR)
+i_rsiLen    = input.int(14,       "RSI Length",  minval=5, maxval=30, group=GR)
+i_pivLen    = input.int(5,        "Divergence Pivot Length", minval=2, maxval=15, group=GR)
+
+// ── Signals ──────────────────────────────────────────────────────────────
+var string GS = "🎯  Signals"
+i_showSig   = input.bool(true,    "Show Buy / Sell Signal Arrows",  group=GS)
+i_minScore  = input.int(3,        "Min Score to Trigger (max 8)",   minval=1, maxval=8, group=GS)
+i_htfFilter = input.bool(true,    "Require HTF Bias Alignment",     group=GS)
+
+// ── Dashboard ────────────────────────────────────────────────────────────
+var string GD = "🖥  Dashboard"
+i_showDash  = input.bool(true,    "Show Dashboard",    group=GD)
+i_dashPos   = input.string("Top Right", "Position",
+     options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=GD)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 2 — COLORS & STYLE
+// ═══════════════════════════════════════════════════════════════════════
+C_BULL    = color.new(#00C4FF, 0)
+C_BEAR    = color.new(#FF3D71, 0)
+C_NEUT    = color.new(#9EA3AE, 0)
+C_POC     = color.new(#FFD700, 0)
+C_VAH     = color.new(#26A69A, 0)
+C_VAL     = color.new(#EF5350, 0)
+C_VWAP    = color.new(#FF9800, 0)
+C_FIB     = color.new(#7B61FF, 0)
+C_GOLD    = color.new(#FFD700, 0)
+C_DKBG    = color.new(#0D0E1C, 85)
+C_HDRBG   = color.new(#1E2040, 0)
+C_ROWBG   = color.new(#12131E, 80)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 3 — VWAP  (session-anchored, daily reset)
+// ═══════════════════════════════════════════════════════════════════════
+var float _cumVol  = 0.0
+var float _cumTPV  = 0.0
+var float _cumVar  = 0.0
+
+bool  _newDay  = timeframe.change("D")
+float _tp      = (high + low + close) / 3.0
+
+_cumVol := _newDay ? volume            : _cumVol + volume
+_cumTPV := _newDay ? _tp * volume      : _cumTPV + _tp * volume
+
+float vwapVal = _cumTPV / _cumVol
+
+_cumVar := _newDay ? math.pow(_tp - vwapVal, 2) * volume
+         :           _cumVar + math.pow(_tp - vwapVal, 2) * volume
+
+float _vwapSD  = math.sqrt(_cumVar / _cumVol)
+float vwapUp   = vwapVal + i_bandMult * _vwapSD
+float vwapDn   = vwapVal - i_bandMult * _vwapSD
+
+// Plots (stored for fill)
+pVWAP = plot(i_showVWAP             ? vwapVal : na, "VWAP",    C_VWAP, 2)
+pVWUP = plot(i_showVWAP and i_showBands ? vwapUp  : na, "VWAP+", color.new(C_VWAP, 55), 1, plot.style_linebr)
+pVWDN = plot(i_showVWAP and i_showBands ? vwapDn  : na, "VWAP-", color.new(C_VWAP, 55), 1, plot.style_linebr)
+fill(pVWUP, pVWDN, color.new(C_VWAP, 90))
+
+bool aboveVWAP = close > vwapVal
+bool belowVWAP = close < vwapVal
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 4 — VOLUME PROFILE  (POC / VAH / VAL)
+//   Runs only on the last bar to avoid execution-time limits.
+//   Uses close-price bucket assignment (O(N) vs O(N*B) for range method).
+// ═══════════════════════════════════════════════════════════════════════
+var float vpPOC = na
+var float vpVAH = na
+var float vpVAL = na
+
+if i_showVP and barstate.islast and bar_index >= i_vpLB
+    float  _rH  = ta.highest(high,  i_vpLB)
+    float  _rL  = ta.lowest(low,    i_vpLB)
+    float  _bSz = (_rH - _rL) / i_vpBkts
+
+    if _bSz > 0
+        float[] _bv = array.new_float(i_vpBkts, 0.0)
+
+        // Distribute volume into price buckets (by close price)
+        for i = 0 to i_vpLB - 1
+            int b = math.min(math.max(int((close[i] - _rL) / _bSz), 0), i_vpBkts - 1)
+            array.set(_bv, b, array.get(_bv, b) + volume[i])
+
+        // ── POC ──────────────────────────────────────────
+        float _mxV = array.max(_bv)
+        int   _poc = array.indexof(_bv, _mxV)
+        vpPOC     := _rL + (_poc + 0.5) * _bSz
+
+        // ── Value Area (70% of total volume outward from POC) ──
+        float _tot = array.sum(_bv)
+        float _tgt = _tot * i_vpVA
+        float _acc = _mxV
+        int   _up  = _poc
+        int   _dn  = _poc
+
+        while _acc < _tgt
+            float _uN = _up + 1 < i_vpBkts ? array.get(_bv, _up + 1) : 0.0
+            float _dN = _dn - 1 >= 0        ? array.get(_bv, _dn - 1) : 0.0
+            if _uN >= _dN and _up + 1 < i_vpBkts
+                _up  += 1
+                _acc += _uN
+            else if _dn - 1 >= 0
+                _dn  -= 1
+                _acc += _dN
+            else
+                break
+
+        vpVAH := _rL + (_up + 1) * _bSz
+        vpVAL := _rL +  _dn      * _bSz
+
+        // ── Draw lines (extend right so they stay visible) ──
+        int _sb = bar_index - i_vpLB
+
+        line.new(_sb, vpPOC, bar_index, vpPOC,
+             color=C_POC, width=2, style=line.style_dashed, extend=extend.right)
+        line.new(_sb, vpVAH, bar_index, vpVAH,
+             color=color.new(C_VAH, 30), width=1, style=line.style_dotted, extend=extend.right)
+        line.new(_sb, vpVAL, bar_index, vpVAL,
+             color=color.new(C_VAL, 30), width=1, style=line.style_dotted, extend=extend.right)
+
+        // ── Labels ──
+        label.new(bar_index + 2, vpPOC, "◆ POC",
+             color=C_POC, textcolor=color.black, style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 2, vpVAH, "▲ VAH",
+             color=color.new(C_VAH, 20), textcolor=color.white, style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 2, vpVAL, "▼ VAL",
+             color=color.new(C_VAL, 20), textcolor=color.white, style=label.style_label_left, size=size.tiny)
+
+// VP scoring helpers (readable on every bar)
+bool abovePOC = not na(vpPOC) and close > vpPOC
+bool inVA     = not na(vpVAH) and not na(vpVAL) and close >= vpVAL and close <= vpVAH
+bool atVAL    = not na(vpVAL) and math.abs(close - vpVAL) / vpVAL * 100 <= 0.30
+bool atVAH    = not na(vpVAH) and math.abs(close - vpVAH) / vpVAH * 100 <= 0.30
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 5 — MARKET STRUCTURE  (Swing H/L, BOS, CHoCH)
+// ═══════════════════════════════════════════════════════════════════════
+float swHigh = ta.pivothigh(high, i_swLen, i_swLen)
+float swLow  = ta.pivotlow(low,  i_swLen, i_swLen)
+
+// Track last two swing highs and lows
+var float _SH1 = na   // most recent swing high
+var float _SH2 = na   // previous swing high
+var float _SL1 = na
+var float _SL2 = na
+
+if not na(swHigh)
+    _SH2 := _SH1
+    _SH1 := swHigh
+
+if not na(swLow)
+    _SL2 := _SL1
+    _SL1 := swLow
+
+// ── Trend context (Higher Highs + Higher Lows = uptrend) ──
+var int _trend = 0
+if not na(_SH1) and not na(_SH2)
+    _trend := _SH1 > _SH2 ? 1 : _SH1 < _SH2 ? -1 : _trend
+
+// ── BOS: close breaks the most recent swing level ──
+bool bullBOS = i_showMS and not na(_SH1) and ta.crossover(close, _SH1)
+bool bearBOS = i_showMS and not na(_SL1) and ta.crossunder(close, _SL1)
+
+// ── CHoCH: structure flip against the prevailing trend ──
+bool bullChoCH = i_showMS and _trend == -1 and bullBOS
+bool bearChoCH = i_showMS and _trend ==  1 and bearBOS
+
+// ── HTF structure (via security) ──
+[htfSH, htfSL, htfClose] = request.security(syminfo.tickerid, i_htfRes,
+     [ta.pivothigh(high, i_swLen, i_swLen),
+      ta.pivotlow(low,   i_swLen, i_swLen),
+      close],
+     lookahead=barmerge.lookahead_off)
+
+var float _htfSH = na
+var float _htfSL = na
+
+if not na(htfSH)
+    _htfSH := htfSH
+if not na(htfSL)
+    _htfSL := htfSL
+
+bool htfBull = i_mtf and not na(_htfSH) and not na(_htfSL) and htfClose > _htfSL
+bool htfBear = i_mtf and not na(_htfSH) and not na(_htfSL) and htfClose < _htfSH
+
+// ── Plots ──
+plotshape(i_showMS and not na(swHigh),
+     "Swing High", shape.triangledown, location.abovebar,
+     color.new(C_BEAR, 40), offset=-i_swLen, size=size.tiny)
+plotshape(i_showMS and not na(swLow),
+     "Swing Low",  shape.triangleup,   location.belowbar,
+     color.new(C_BULL, 40), offset=-i_swLen, size=size.tiny)
+
+if i_showBOS
+    if bullBOS and not bullChoCH
+        label.new(bar_index, low,  "BOS ↑",
+             color=color.new(C_BULL, 15), textcolor=color.black,
+             style=label.style_label_up, size=size.tiny)
+    if bearBOS and not bearChoCH
+        label.new(bar_index, high, "BOS ↓",
+             color=color.new(C_BEAR, 15), textcolor=color.white,
+             style=label.style_label_down, size=size.tiny)
+    if bullChoCH
+        label.new(bar_index, low,  "CHoCH ↑",
+             color=C_BULL, textcolor=color.black,
+             style=label.style_label_up, size=size.small)
+    if bearChoCH
+        label.new(bar_index, high, "CHoCH ↓",
+             color=C_BEAR, textcolor=color.white,
+             style=label.style_label_down, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 6 — SWING FAILURE PATTERN (SFP)
+//   Bullish SFP : wick pierces below _SL1, candle closes back above it
+//   Bearish SFP : wick pierces above _SH1, candle closes back below it
+//   Wick ratio  : wick beyond level / total candle range >= i_sfpWick
+// ═══════════════════════════════════════════════════════════════════════
+float _range = high - low
+
+bool bullSFP = false
+bool bearSFP = false
+
+if i_showSFP and not na(_SL1) and not na(_SH1) and _range > 0
+    // Bullish SFP
+    if low < _SL1 and close > _SL1
+        float _wick = _SL1 - low
+        bullSFP := (_wick / _range) >= i_sfpWick
+
+    // Bearish SFP
+    if high > _SH1 and close < _SH1
+        float _wick = high - _SH1
+        bearSFP := (_wick / _range) >= i_sfpWick
+
+plotshape(bullSFP, "SFP Bull", shape.diamond, location.belowbar,
+     C_BULL, size=size.small, text="SFP↑")
+plotshape(bearSFP, "SFP Bear", shape.diamond, location.abovebar,
+     color.new(C_BEAR, 10), size=size.small, text="SFP↓")
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 7 — CVD + ORDER FLOW DIVERGENCE
+//   Delta   : bullish bar → +volume, bearish bar → -volume
+//   CVD     : running cumulative sum of delta
+//   CVD EMA : smoothed trend direction
+//   Divergence:
+//     Bull  → price at N-bar low, CVD rising (absorption)
+//     Bear  → price at N-bar high, CVD falling (distribution)
+// ═══════════════════════════════════════════════════════════════════════
+float _delta  = close >= open ? volume : -volume
+float cvd     = ta.cum(_delta)
+float cvdEMA  = ta.ema(cvd, i_cvdLen)
+
+bool cvdBull  = cvd > cvdEMA           // CVD above its average = buy pressure
+bool cvdBear  = cvd < cvdEMA
+
+// Divergence (hidden absorption / distribution)
+bool cvdBullDiv = i_showCVD and low  <= ta.lowest(low,  i_cvdLen) * 1.002 and cvd > cvd[i_cvdLen]
+bool cvdBearDiv = i_showCVD and high >= ta.highest(high, i_cvdLen) * 0.998 and cvd < cvd[i_cvdLen]
+
+plotshape(cvdBullDiv, "CVD Bull Div",
+     shape.circle, location.belowbar, color.new(C_BULL, 55), size=size.tiny, text="Δ↑")
+plotshape(cvdBearDiv, "CVD Bear Div",
+     shape.circle, location.abovebar, color.new(C_BEAR, 55), size=size.tiny, text="Δ↓")
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 8 — FIBONACCI S/R
+//   Auto-drawn between highest high and lowest low over i_fibLen bars.
+//   Golden Zone (0.618–0.786) highlighted with fill.
+//   Proximity check feeds into scoring engine.
+// ═══════════════════════════════════════════════════════════════════════
+float _fH  = ta.highest(high, i_fibLen)
+float _fL  = ta.lowest(low,   i_fibLen)
+float _fR  = _fH - _fL
+
+float fib236 = _fL + _fR * 0.236
+float fib382 = _fL + _fR * 0.382
+float fib500 = _fL + _fR * 0.500
+float fib618 = _fL + _fR * 0.618
+float fib786 = _fL + _fR * 0.786
+float fib1   = _fH
+float fib127 = i_showExt ? _fL + _fR * 1.272 : na
+float fib162 = i_showExt ? _fL + _fR * 1.618 : na
+
+// Proximity helper
+_nearFib(p, lvl) => not na(lvl) and math.abs(p - lvl) / lvl * 100 <= i_fibProx
+
+bool atFib = i_showFib and (
+     _nearFib(close, fib236) or _nearFib(close, fib382) or
+     _nearFib(close, fib500) or _nearFib(close, fib618) or
+     _nearFib(close, fib786))
+
+// Plots (golden zone fill needs stored references)
+pFib382 = plot(i_showFib ? fib382 : na, "Fib 0.382", color.new(C_FIB, 50), 1)
+pFib618 = plot(i_showFib ? fib618 : na, "Fib 0.618", color.new(C_FIB, 20), 2)
+plot(i_showFib ? fib236 : na, "Fib 0.236", color.new(C_FIB, 65), 1)
+plot(i_showFib ? fib500 : na, "Fib 0.500", color.new(C_FIB, 40), 1, plot.style_circles)
+plot(i_showFib ? fib786 : na, "Fib 0.786", color.new(C_FIB, 50), 1)
+plot(i_showFib ? fib1   : na, "Fib 1.000", color.new(C_FIB, 70), 1)
+plot(i_showFib and i_showExt ? fib127 : na, "Fib 1.272", color.new(C_BEAR, 55), 1, plot.style_linebr)
+plot(i_showFib and i_showExt ? fib162 : na, "Fib 1.618", color.new(C_BEAR, 35), 1, plot.style_linebr)
+fill(pFib382, pFib618, color.new(C_FIB, 90))  // Golden zone highlight
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 9 — RSI DIVERGENCE  (Regular Bullish & Bearish)
+//
+//   Method: track price pivot highs/lows with their RSI values.
+//   Use rsiVal[i_pivLen] = RSI value at the bar where the price pivot
+//   occurred (i_pivLen bars ago), so price and RSI are time-aligned.
+//
+//   Bull divergence : price LL, RSI HL  (buyers stepping in)
+//   Bear divergence : price HH, RSI LH  (momentum fading)
+// ═══════════════════════════════════════════════════════════════════════
+float rsiVal = ta.rsi(close, i_rsiLen)
+
+float pricePivH = ta.pivothigh(high, i_pivLen, i_pivLen)
+float pricePivL = ta.pivotlow(low,   i_pivLen, i_pivLen)
+
+// Last two price pivot highs + RSI values at those bars
+var float _pH1 = na
+var float _pH2 = na
+var float _rH1 = na
+var float _rH2 = na
+
+// Last two price pivot lows + RSI values
+var float _pL1 = na
+var float _pL2 = na
+var float _rL1 = na
+var float _rL2 = na
+
+if not na(pricePivH)
+    _pH2 := _pH1
+    _rH2 := _rH1
+    _pH1 := pricePivH
+    _rH1 := rsiVal[i_pivLen]   // RSI at the pivot bar (i_pivLen bars ago)
+
+if not na(pricePivL)
+    _pL2 := _pL1
+    _rL2 := _rL1
+    _pL1 := pricePivL
+    _rL1 := rsiVal[i_pivLen]
+
+// Detect divergence on the bar the second pivot is confirmed
+bool rsiBullDiv = i_showRSI and
+     not na(_pL1) and not na(_pL2) and not na(_rL1) and not na(_rL2) and
+     _pL1 < _pL2 and _rL1 > _rL2   // price LL, RSI HL
+
+bool rsiBearDiv = i_showRSI and
+     not na(_pH1) and not na(_pH2) and not na(_rH1) and not na(_rH2) and
+     _pH1 > _pH2 and _rH1 < _rH2   // price HH, RSI LH
+
+plotshape(rsiBullDiv, "RSI Bull Div",
+     shape.labelup,   location.belowbar, color.new(C_BULL, 20),
+     size=size.small, text="RSI↑", offset=-i_pivLen)
+plotshape(rsiBearDiv, "RSI Bear Div",
+     shape.labeldown, location.abovebar, color.new(C_BEAR, 20),
+     size=size.small, text="RSI↓", offset=-i_pivLen)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 10 — SCORING ENGINE  (0–8 bull / 0–8 bear)
+//
+//   Each module contributes 1 point (SFP = 2, as it's the highest-
+//   conviction pattern).  HTF bias is a mandatory filter, not a score.
+// ═══════════════════════════════════════════════════════════════════════
+int bullScore = 0
+int bearScore = 0
+
+// Vol Profile (2 pts max)
+bullScore += atVAL   ? 2 : 0   // price at value area low = strong bull zone
+bearScore += atVAH   ? 2 : 0   // price at value area high = strong bear zone
+bullScore += abovePOC ? 1 : 0
+bearScore += abovePOC ? 0 : 1  // below POC = bear context
+
+// VWAP (1 pt)
+bullScore += aboveVWAP ? 1 : 0
+bearScore += belowVWAP ? 1 : 0
+
+// SFP (2 pts — highest conviction single-bar pattern)
+bullScore += bullSFP ? 2 : 0
+bearScore += bearSFP ? 2 : 0
+
+// CVD (1 pt)
+bullScore += cvdBull     ? 1 : 0
+bearScore += cvdBear     ? 1 : 0
+bullScore += cvdBullDiv  ? 1 : 0
+bearScore += cvdBearDiv  ? 1 : 0
+
+// Fibonacci (1 pt)
+bullScore += (atFib and close <= fib618) ? 1 : 0
+bearScore += (atFib and close >= fib618) ? 1 : 0
+
+// RSI Divergence (1 pt)
+bullScore += rsiBullDiv ? 1 : 0
+bearScore += rsiBearDiv ? 1 : 0
+
+// Market Structure (1 pt)
+bullScore += bullBOS or bullChoCH ? 1 : 0
+bearScore += bearBOS or bearChoCH ? 1 : 0
+
+// Cap at 8
+bullScore := math.min(bullScore, 8)
+bearScore := math.min(bearScore, 8)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 11 — SIGNAL GENERATION
+//   Fires when score >= threshold AND (optionally) HTF bias aligns.
+//   State-machine prevents consecutive same-direction signals.
+// ═══════════════════════════════════════════════════════════════════════
+bool _htfOkBull = not i_htfFilter or htfBull
+bool _htfOkBear = not i_htfFilter or htfBear
+
+var bool _inLong  = false
+var bool _inShort = false
+
+bool longRaw  = i_showSig and bullScore >= i_minScore and _htfOkBull
+bool shortRaw = i_showSig and bearScore >= i_minScore and _htfOkBear
+
+bool longSig  = longRaw  and not _inLong
+bool shortSig = shortRaw and not _inShort
+
+if longSig
+    _inLong  := true
+    _inShort := false
+
+if shortSig
+    _inShort := true
+    _inLong  := false
+
+// Reset state when opposing raw signal appears
+if not longRaw  and not shortRaw
+    _inLong  := false
+    _inShort := false
+
+plotshape(longSig,  "LONG  ▲", shape.labelup,
+     location.belowbar, C_BULL, size=size.normal, text="▲\nBUY")
+plotshape(shortSig, "SHORT ▼", shape.labeldown,
+     location.abovebar, C_BEAR, size=size.normal, text="SELL\n▼")
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 12 — DASHBOARD PANEL
+// ═══════════════════════════════════════════════════════════════════════
+_tblPos(_s) =>
+    _s == "Top Right"    ? position.top_right    :
+     _s == "Top Left"     ? position.top_left     :
+     _s == "Bottom Right" ? position.bottom_right :
+                            position.bottom_left
+
+// Score bar helper  ████░░░░
+_bar(score, maxS) =>
+    int filled = int(score / maxS * 8)
+    str.repeat("█", filled) + str.repeat("░", 8 - filled)
+
+// HTF display
+_htfLabel = i_mtf ? (htfBull and not htfBear ? "▲ BULL" :
+                     htfBear and not htfBull ? "▼ BEAR" : "◆ NEUT") : "OFF"
+_htfColor = i_mtf ? (htfBull and not htfBear ? C_BULL :
+                     htfBear and not htfBull ? C_BEAR : C_NEUT) : C_NEUT
+
+// Signal row text / color
+_sigText  = longSig  ? "▲  BUY" : shortSig ? "▼  SELL" : "─  WAIT"
+_sigColor = longSig  ? C_BULL   : shortSig  ? C_BEAR    : C_NEUT
+
+// CVD
+_cvdText  = cvdBull ? "▲ BUY PRESSURE" : "▼ SELL PRESSURE"
+_cvdColor = cvdBull ? C_BULL : C_BEAR
+
+// VWAP status
+_vwapText  = aboveVWAP ? "▲ ABOVE" : "▼ BELOW"
+_vwapColor = aboveVWAP ? C_BULL    : C_BEAR
+
+// VP status
+_vpText  = not na(vpPOC) ? (abovePOC ? "▲ ABOVE POC" : "▼ BELOW POC") : "COMPUTING…"
+_vpColor = not na(vpPOC) ? (abovePOC ? C_BULL : C_BEAR) : C_NEUT
+
+// RSI label
+_rsiTxt = rsiVal > 70 ? "OB " + str.tostring(math.round(rsiVal, 1)) :
+          rsiVal < 30 ? "OS " + str.tostring(math.round(rsiVal, 1)) :
+                        str.tostring(math.round(rsiVal, 1))
+_rsiCol = rsiVal > 70 ? C_BEAR : rsiVal < 30 ? C_BULL : C_NEUT
+
+// SFP label
+_sfpText  = bullSFP ? "▲ BULL SFP" : bearSFP ? "▼ BEAR SFP" : "─"
+_sfpColor = bullSFP ? C_BULL       : bearSFP  ? C_BEAR       : C_NEUT
+
+// Fib label
+_fibText  = atFib ? "⚡ AT FIB ZONE" : "─"
+_fibColor = atFib ? C_GOLD         : C_NEUT
+
+var table dash = na
+
+if i_showDash
+    if na(dash)
+        dash := table.new(_tblPos(i_dashPos), 2, 13,
+             bgcolor       = C_DKBG,
+             border_color  = color.new(#FFFFFF, 75),
+             border_width  = 1,
+             frame_color   = color.new(#7B61FF, 40),
+             frame_width   = 1)
+
+    // ─ Header ─────────────────────────────────────────────
+    table.cell(dash, 0, 0, "EMPEROR SYSTEM",
+         text_color=color.white, bgcolor=C_HDRBG,
+         text_size=size.small,   text_halign=text.align_center)
+    table.cell(dash, 1, 0, "v2.0",
+         text_color=C_NEUT, bgcolor=C_HDRBG,
+         text_size=size.tiny,   text_halign=text.align_center)
+
+    // ─ Row helper (label | value) ──────────────────────────
+    _row(r, lbl, val, vc) =>
+        table.cell(dash, 0, r, lbl,
+             text_color=C_NEUT, bgcolor=C_ROWBG,
+             text_size=size.tiny, text_halign=text.align_right)
+        table.cell(dash, 1, r, val,
+             text_color=vc, bgcolor=C_ROWBG,
+             text_size=size.tiny, text_halign=text.align_left)
+
+    _row(1,  "HTF Bias",    _htfLabel,                   _htfColor)
+    _row(2,  "Vol Profile", _vpText,                     _vpColor)
+    _row(3,  "VWAP",        _vwapText,                   _vwapColor)
+    _row(4,  "CVD",         _cvdText,                    _cvdColor)
+    _row(5,  "RSI",         _rsiTxt,                     _rsiCol)
+    _row(6,  "SFP",         _sfpText,                    _sfpColor)
+    _row(7,  "Fib Zone",    _fibText,                    _fibColor)
+
+    // ─ Score bars ─────────────────────────────────────────
+    table.cell(dash, 0, 8, "BULL  " + str.tostring(bullScore) + "/8",
+         text_color=C_BULL, bgcolor=C_ROWBG,
+         text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 1, 8, _bar(bullScore, 8),
+         text_color=C_BULL, bgcolor=C_ROWBG,
+         text_size=size.tiny, text_halign=text.align_left)
+
+    table.cell(dash, 0, 9, "BEAR  " + str.tostring(bearScore) + "/8",
+         text_color=C_BEAR, bgcolor=C_ROWBG,
+         text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 1, 9, _bar(bearScore, 8),
+         text_color=C_BEAR, bgcolor=C_ROWBG,
+         text_size=size.tiny, text_halign=text.align_left)
+
+    // ─ Signal row ─────────────────────────────────────────
+    table.cell(dash, 0, 10, "SIGNAL",
+         text_color=C_NEUT, bgcolor=color.new(_sigColor, 80),
+         text_size=size.small, text_halign=text.align_right)
+    table.cell(dash, 1, 10, _sigText,
+         text_color=_sigColor, bgcolor=color.new(_sigColor, 80),
+         text_size=size.small, text_halign=text.align_left)
+
+    // ─ BOS/CHoCH status ───────────────────────────────────
+    _bosT = bullChoCH ? "▲ CHoCH ↑" : bearChoCH ? "▼ CHoCH ↓" :
+             bullBOS   ? "▲ BOS ↑"   : bearBOS   ? "▼ BOS ↓"   : "─"
+    _bosC = bullChoCH or bullBOS ? C_BULL : bearChoCH or bearBOS ? C_BEAR : C_NEUT
+    _row(11, "Structure", _bosT, _bosC)
+
+    // ─ Ticker + TF ────────────────────────────────────────
+    table.cell(dash, 0, 12, syminfo.ticker,
+         text_color=color.new(C_NEUT, 30), bgcolor=C_HDRBG,
+         text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 1, 12, timeframe.period,
+         text_color=color.new(C_NEUT, 30), bgcolor=C_HDRBG,
+         text_size=size.tiny, text_halign=text.align_left)
+
+// ═══════════════════════════════════════════════════════════════════════
+// ► SECTION 13 — ALERT CONDITIONS  (10 alerts)
+// ═══════════════════════════════════════════════════════════════════════
+alertcondition(longSig,
+     "🟢 EMPEROR — LONG Signal",
+     "Emperor System: LONG triggered | Bull Score = {{plot_0}} | {{ticker}} {{interval}}")
+
+alertcondition(shortSig,
+     "🔴 EMPEROR — SHORT Signal",
+     "Emperor System: SHORT triggered | Bear Score = {{plot_1}} | {{ticker}} {{interval}}")
+
+alertcondition(bullSFP,
+     "🔄 EMPEROR — Bullish SFP",
+     "Emperor System: Bullish Swing Failure Pattern | {{ticker}} {{interval}}")
+
+alertcondition(bearSFP,
+     "🔄 EMPEROR — Bearish SFP",
+     "Emperor System: Bearish Swing Failure Pattern | {{ticker}} {{interval}}")
+
+alertcondition(bullBOS,
+     "📈 EMPEROR — Bullish BOS",
+     "Emperor System: Bullish Break of Structure | {{ticker}} {{interval}}")
+
+alertcondition(bearBOS,
+     "📉 EMPEROR — Bearish BOS",
+     "Emperor System: Bearish Break of Structure | {{ticker}} {{interval}}")
+
+alertcondition(bullChoCH,
+     "🔃 EMPEROR — Bullish CHoCH",
+     "Emperor System: Bullish Change of Character (trend flip) | {{ticker}} {{interval}}")
+
+alertcondition(bearChoCH,
+     "🔃 EMPEROR — Bearish CHoCH",
+     "Emperor System: Bearish Change of Character (trend flip) | {{ticker}} {{interval}}")
+
+alertcondition(rsiBullDiv,
+     "📊 EMPEROR — RSI Bullish Divergence",
+     "Emperor System: RSI Regular Bullish Divergence detected | {{ticker}} {{interval}}")
+
+alertcondition(rsiBearDiv,
+     "📊 EMPEROR — RSI Bearish Divergence",
+     "Emperor System: RSI Regular Bearish Divergence detected | {{ticker}} {{interval}}")
+
+// ═══════════════════════════════════════════════════════════════════════
+// END OF EMPEROR BTC MASTER SYSTEM
+// ═══════════════════════════════════════════════════════════════════════

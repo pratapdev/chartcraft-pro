@@ -1,0 +1,169 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © LuxAlgo
+
+//@version=6
+indicator("ICT Power of 3 (AMD) - Educational Masterclass", "ICT AMD Masterclass", overlay = true, max_labels_count = 500, max_lines_count = 500, max_boxes_count = 500)
+
+// --- Constants & Inputs ---
+color BLUE_ACC   = color.new(#5b9cf6, 85)
+color RED_MANIP  = color.new(#f23645, 80)
+color GREEN_DIST = color.new(#089981, 80)
+
+grp_sessions = "Sessions (EST/New York)"
+asianSession  = input.session("2000-0000", "Asian Session (Accumulation)", group = grp_sessions, tooltip = "Time range for the accumulation phase")
+londonSession = input.session("0200-0500", "London Killzone (Manipulation)", group = grp_sessions, tooltip = "Time range for the manipulation phase/Judas swing")
+nySession     = input.session("0830-1100", "NY Killzone (Distribution)", group = grp_sessions, tooltip = "Time range for the distribution/expansion phase")
+
+grp_style = "Style Settings"
+showTable     = input.bool(true, "Show Info Table", group = grp_style)
+showChecklist = input.bool(true, "Show Checklist", group = grp_style)
+showTimeline  = input.bool(true, "Show Session Timeline", group = grp_style)
+
+// --- Helper Functions ---
+f_set_row(t, r, k, v) =>
+    table.cell(t, 0, r, k, text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+    table.cell(t, 1, r, v, text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+
+is_session(sess) => 
+    not na(time(timeframe.period, sess, "America/New_York"))
+
+// --- Session Logic ---
+isAsian  = is_session(asianSession)
+isLondon = is_session(londonSession)
+isNY     = is_session(nySession)
+
+// --- Data Tracking ---
+var float asianHigh  = na
+var float asianLow   = na
+var int   asianStart = na
+var int   asianEnd   = na
+
+var float londonHigh  = na
+var float londonLow   = na
+var int   londonStart = na
+var int   londonEnd   = na
+
+var float nyHigh  = na
+var float nyLow   = na
+var int   nyStart = na
+var int   nyEnd   = na
+
+// Reset & Update Session Values
+if isAsian and not isAsian[1]
+    asianHigh  := high
+    asianLow   := low
+    asianStart := bar_index
+if isAsian
+    asianHigh  := math.max(high, asianHigh)
+    asianLow   := math.min(low, asianLow)
+    asianEnd   := bar_index
+
+if isLondon and not isLondon[1]
+    londonHigh  := high
+    londonLow   := low
+    londonStart := bar_index
+if isLondon
+    londonHigh  := math.max(high, londonHigh)
+    londonLow   := math.min(low, londonLow)
+    londonEnd   := bar_index
+
+if isNY and not isNY[1]
+    nyHigh  := high
+    nyLow   := low
+    nyStart := bar_index
+if isNY
+    nyHigh  := math.max(high, nyHigh)
+    nyLow   := math.min(low, nyLow)
+    nyEnd   := bar_index
+
+// --- Drawing Logic (Only for the most recent day) ---
+if barstate.islast
+    // 1. Accumulation Box
+    box.new(asianStart, asianHigh, asianEnd, asianLow, 
+         bgcolor = BLUE_ACC, border_color = #5b9cf6, border_style = line.style_solid,
+         text = "ACCUMULATION\nSmart Money Building Positions", text_color = #5b9cf6, text_size = size.small, text_halign = text.align_center, text_valign = text.align_top)
+    
+    // Annotations for Accumulation
+    label.new(math.round(math.avg(asianStart, asianEnd)), asianHigh, "BSL", color = #00000000, textcolor = #5b9cf6, style = label.style_label_down, size = size.tiny)
+    label.new(math.round(math.avg(asianStart, asianEnd)), asianLow, "SSL", color = #00000000, textcolor = #5b9cf6, style = label.style_label_up, size = size.tiny)
+
+    // 2. Manipulation Box
+    box.new(londonStart, londonHigh, londonEnd, londonLow, 
+         bgcolor = RED_MANIP, border_color = #f23645, border_style = line.style_solid,
+         text = "MANIPULATION\nJudas Swing / Stop Hunt", text_color = #f23645, text_size = size.small, text_halign = text.align_center, text_valign = text.align_top)
+    
+    // Logic for Bullish/Bearish setup visualization
+    bool isBullishAMD = londonLow < asianLow
+    if isBullishAMD
+        label.new(londonStart + 2, londonLow, "X", color = #00000000, textcolor = #f23645, style = label.style_label_center, size = size.small, tooltip = "Liquidity Sweep")
+        label.new(londonStart + 2, londonLow, "Fake Move - Liquidity Grab", color = #00000000, textcolor = #f23645, style = label.style_label_up, size = size.tiny)
+
+    // 3. Distribution Box
+    box.new(nyStart, nyHigh, nyEnd, nyLow, 
+         bgcolor = GREEN_DIST, border_color = #089981, border_style = line.style_solid,
+         text = "DISTRIBUTION\nTrue Directional Move", text_color = #089981, text_size = size.small, text_halign = text.align_center, text_valign = text.align_top)
+
+    // 4. Trade Execution Markers (Example based on current structure)
+    float entryPrice = isBullishAMD ? math.avg(londonLow, asianLow) : na
+    if not na(entryPrice)
+        // Entry
+        label.new(londonEnd, entryPrice, "ENTRY (OTE)", color = #089981, textcolor = color.white, style = label.style_label_left, size = size.small)
+        line.new(londonEnd, entryPrice, nyEnd, entryPrice, color = #089981, style = line.style_dashed)
+        
+        // Stop Loss
+        float slPrice = londonLow - (10 * syminfo.mintick)
+        label.new(londonEnd, slPrice, "SL", color = #f23645, textcolor = color.white, style = label.style_label_left, size = size.small)
+        line.new(londonEnd, slPrice, nyEnd, slPrice, color = #f23645, style = line.style_dashed)
+
+        // Take Profits
+        float tp1 = asianHigh
+        float tp2 = asianHigh + (asianHigh - asianLow)
+        line.new(londonEnd, tp1, nyEnd, tp1, color = #089981, style = line.style_dotted)
+        label.new(nyEnd, tp1, "TP1 (1:1)", color = #00000000, textcolor = #089981, style = label.style_label_left, size = size.tiny)
+        line.new(londonEnd, tp2, nyEnd, tp2, color = #089981, style = line.style_dotted)
+        label.new(nyEnd, tp2, "TP2 (1:2)", color = #00000000, textcolor = #089981, style = label.style_label_left, size = size.tiny)
+
+// --- Tables ---
+var table refTable   = table.new(position.top_right, 2, 11, bgcolor = color.new(color.black, 30), border_color = chart.fg_color, border_width = 1)
+var table checkTable = table.new(position.bottom_left, 1, 9, bgcolor = color.new(color.black, 30), border_color = chart.fg_color, border_width = 1)
+var table sidePanel  = table.new(position.bottom_right, 1, 3, bgcolor = color.new(color.black, 30), border_color = chart.fg_color)
+
+if barstate.islast
+    // Reference Table
+    if showTable
+        table.cell(refTable, 0, 0, "ICT POWER OF 3 (AMD) REFERENCE", bgcolor = #5b9cf6, text_color = color.white, text_size = size.small)
+        table.merge_cells(refTable, 0, 0, 1, 0)
+        
+        f_set_row(refTable, 1, "Concept", "Accumulation -> Manipulation -> Distribution")
+        f_set_row(refTable, 2, "Also Known As", "Judas Swing, Power of 3, AMD")
+        f_set_row(refTable, 3, "Best Sessions", "London Open, NY Open")
+        f_set_row(refTable, 4, "Accumulation", "Asian Range (20:00-00:00 EST)")
+        f_set_row(refTable, 5, "Manipulation", "London Open (02:00-05:00 EST)")
+        f_set_row(refTable, 6, "Distribution", "NY Open (09:30-12:00 EST)")
+        f_set_row(refTable, 7, "Entry Trigger", "Displacement + FVG after sweep")
+        f_set_row(refTable, 8, "Stop Loss", "Beyond manipulation sweep wick")
+        f_set_row(refTable, 9, "Take Profit", "TP1: Range H/L, TP2: Next Liquidity")
+        f_set_row(refTable, 10, "Risk Per Trade", "1-2% of total account")
+
+    // Checklist Table
+    if showChecklist
+        table.cell(checkTable, 0, 0, "STEP-BY-STEP CHECKLIST", bgcolor = #089981, text_color = color.white, text_size = size.small)
+        table.cell(checkTable, 0, 1, "[] Step 1: Identify HTF Bias", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 2, "[] Step 2: Mark Asian Range", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 3, "[] Step 3: Wait for Manipulation Sweep", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 4, "[] Step 4: Look for Displacement + FVG", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 5, "[] Step 5: Enter at OTE / FVG", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 6, "[] Step 6: SL below sweep wick", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 7, "[] Step 7: TP1 at Range High/Low", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+        table.cell(checkTable, 0, 8, "[] Step 8: Partial @ TP1, SL to BE", text_color = color.white, text_halign = text.align_left, text_size = size.tiny)
+
+    // Side Panel
+    table.cell(sidePanel, 0, 0, "SMART MONEY vs RETAIL", bgcolor = #f23645, text_color = color.white, text_size = size.small)
+    table.cell(sidePanel, 0, 1, "Retail: Buys Breakout -> Stopped in Manip", text_color = color.white, text_size = size.tiny)
+    table.cell(sidePanel, 0, 2, "SM: Grabs Liquidity -> Distributes True Move", text_color = color.white, text_size = size.tiny)
+
+// --- Timeline Bar (Bottom) ---
+bgcolor(showTimeline ? (isAsian ? BLUE_ACC : isLondon ? RED_MANIP : isNY ? GREEN_DIST : na) : na, offset = 0, title = "Session Timeline")
+
+// Plotting price to keep indicator valid
+plot(close, color = #00000000, display = display.none)

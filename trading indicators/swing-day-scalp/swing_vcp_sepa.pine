@@ -1,0 +1,192 @@
+// ============================================================
+// VCP + SEPA TREND TEMPLATE — Swing Trading Indicator
+// Based on Mark Minervini's methodology
+// Timeframe : Daily
+// Markets   : Stocks (works on any liquid equity)
+// Version   : Pine Script v5
+// ============================================================
+// HOW TO USE
+// 1. Add to TradingView on DAILY chart
+// 2. Green background = all 8 Trend Template criteria pass
+// 3. Gold triangle = VCP breakout entry signal
+// 4. Red line = auto-calculated stop loss (7% below entry)
+// 5. Blue line = first profit target (20% above entry)
+// 6. Never enter unless background is green
+// ============================================================
+
+//@version=5
+indicator("VCP + SEPA Trend Template [Minervini]", shorttitle="VCP·SEPA", overlay=true, max_bars_back=300)
+
+// ── INPUTS ──────────────────────────────────────────────────
+grp1 = "Trend Template MAs"
+ma50_len   = input.int(50,  "50 MA",  group=grp1)
+ma150_len  = input.int(150, "150 MA", group=grp1)
+ma200_len  = input.int(200, "200 MA", group=grp1)
+
+grp2 = "VCP Detection"
+vol_lookback = input.int(20,  "Volume Avg Lookback (bars)",  group=grp2, minval=5)
+min_contractions = input.int(2, "Min Contractions Required", group=grp2, minval=1, maxval=4)
+squeeze_bars = input.int(5, "Final Squeeze: Min Quiet Bars", group=grp2, minval=3)
+
+grp3 = "Risk Management"
+stop_pct   = input.float(7.0, "Stop Loss %",      group=grp3, minval=1, maxval=15, step=0.5)
+target1_pct= input.float(20.0,"Target 1 %",       group=grp3, minval=5, maxval=50, step=1.0)
+target2_pct= input.float(40.0,"Target 2 %",       group=grp3, minval=10, maxval=100,step=1.0)
+rs_min     = input.int(70,   "Min RS Rank (0-99)",group=grp3, minval=0,  maxval=99)
+
+grp4 = "Display"
+show_tt_bg   = input.bool(true, "Show Trend Template Background", group=grp4)
+show_signals = input.bool(true, "Show Entry Signals",             group=grp4)
+show_levels  = input.bool(true, "Show Stop/Target Lines",         group=grp4)
+show_ma      = input.bool(true, "Show Moving Averages",           group=grp4)
+
+// ── MOVING AVERAGES ──────────────────────────────────────────
+ma50  = ta.sma(close, ma50_len)
+ma150 = ta.sma(close, ma150_len)
+ma200 = ta.sma(close, ma200_len)
+
+plot(show_ma ? ma50  : na, "50 MA",  color=#ce93d8, linewidth=1)
+plot(show_ma ? ma150 : na, "150 MA", color=#4dd0e1, linewidth=1)
+plot(show_ma ? ma200 : na, "200 MA", color=#ffcc02, linewidth=1)
+
+// ── TREND TEMPLATE — ALL 8 CRITERIA ────────────────────────
+// C1: Price above 50, 150, 200 MA
+c1 = close > ma50 and close > ma150 and close > ma200
+// C2: 50 MA above 150 and 200 MA
+c2 = ma50 > ma150 and ma50 > ma200
+// C3: 150 MA above 200 MA
+c3 = ma150 > ma200
+// C4: 200 MA trending up (today's 200 MA > 22 bars ago)
+c4 = ma200 > ta.valuewhen(bar_index == bar_index[22], ma200, 0)
+// C5: Price at least 30% above 52-week low
+lo52 = ta.lowest(low, 252)
+c5 = close >= lo52 * 1.30
+// C6: Price within 25% of 52-week high
+hi52 = ta.highest(high, 252)
+c6 = close >= hi52 * 0.75
+// C7: RS proxy — stock outperforming (52wk % change vs SPY proxy via close momentum)
+//     True RS requires external data; we approximate with 6-month price strength
+mom6m = (close - close[126]) / close[126] * 100
+c7 = mom6m > 10  // > 10% in 6 months = rough RS > 70 proxy
+// C8: 50 MA trending up
+c8 = ma50 > ma50[10]
+
+trend_template_pass = c1 and c2 and c3 and c4 and c5 and c6 and c7 and c8
+
+// ── BACKGROUND — GREEN ONLY WHEN ALL 8 PASS ─────────────────
+bgcolor(show_tt_bg and trend_template_pass ? color.new(color.green, 94) : na, title="Trend Template OK")
+
+// ── VCP DETECTION ───────────────────────────────────────────
+// Measure true range as % of price — contractions = TR shrinking
+tr_pct = (high - low) / close * 100
+vol_avg = ta.sma(volume, vol_lookback)
+
+// Rolling window: identify swing highs to find the base high (pivot)
+is_swing_high = high == ta.highest(high, 10)
+pivot_high = ta.valuewhen(is_swing_high, high, 0)
+
+// Detect range contracting over last N bars
+// Compare avg TR of last 5 bars vs 5 bars before that (2 contraction windows)
+tr_recent = ta.sma(tr_pct, 5)
+tr_prior  = ta.sma(tr_pct[5], 5)
+tr_prior2 = ta.sma(tr_pct[10], 5)
+
+contraction1 = tr_recent  < tr_prior   // last 5 tighter than prior 5
+contraction2 = tr_prior   < tr_prior2  // prior 5 tighter than one before
+
+// Volume drying up
+vol_recent = ta.sma(volume, 5)
+vol_prior  = ta.sma(volume[5], 5)
+vol_drying = vol_recent < vol_prior * 0.8
+
+// Price in right side of base (near pivot high, not at lows)
+near_pivot = close >= pivot_high * 0.92
+
+// Squeeze: ultra-tight bars (TR < 1% for N bars)
+quiet_bars = 0
+for i = 0 to squeeze_bars - 1
+    if tr_pct[i] < 1.2
+        quiet_bars += 1
+final_squeeze = quiet_bars >= squeeze_bars
+
+vcp_forming = contraction1 and contraction2 and vol_drying and near_pivot and trend_template_pass
+
+// ── BREAKOUT ENTRY SIGNAL ────────────────────────────────────
+// Breakout: close above 10-bar high (pivot resistance) on volume
+resistance = ta.highest(high, 10)[1]
+breakout_vol = volume > vol_avg * 1.5
+breakout_candle = close > resistance and breakout_vol
+entry_signal = breakout_candle and vcp_forming and trend_template_pass and final_squeeze
+
+// ── PLOT ENTRY SIGNAL ────────────────────────────────────────
+plotshape(show_signals and entry_signal, title="VCP Breakout Entry",
+     style=shape.triangleup, location=location.belowbar,
+     color=color.new(#00e676, 0), size=size.normal, text="VCP\nBUY")
+
+// ── STOP LOSS & TARGETS (shown on breakout bar only) ─────────
+var float entry_price = na
+var float stop_line   = na
+var float target1_line= na
+var float target2_line= na
+var bool  in_trade    = false
+
+if entry_signal and not in_trade
+    entry_price  := close
+    stop_line    := close * (1 - stop_pct / 100)
+    target1_line := close * (1 + target1_pct / 100)
+    target2_line := close * (1 + target2_pct / 100)
+    in_trade     := true
+
+// Reset when stop or target2 hit
+if in_trade
+    if low <= stop_line or high >= target2_line
+        in_trade      := false
+        entry_price   := na
+        stop_line     := na
+        target1_line  := na
+        target2_line  := na
+
+// Plots
+plot(show_levels and in_trade ? stop_line    : na, "Stop Loss",  color=color.new(#ff1744,0), linewidth=1, style=plot.style_linebr)
+plot(show_levels and in_trade ? target1_line : na, "Target 1",   color=color.new(#4fc3f7,0), linewidth=1, style=plot.style_linebr)
+plot(show_levels and in_trade ? target2_line : na, "Target 2",   color=color.new(#00e676,0), linewidth=1, style=plot.style_linebr)
+
+// Stop hit alert shape
+stop_hit = in_trade[1] and low <= stop_line[1]
+plotshape(show_signals and stop_hit, title="Stop Hit",
+     style=shape.xcross, location=location.abovebar,
+     color=color.new(#ff1744, 0), size=size.small, text="STOP")
+
+// Target 1 hit shape
+t1_hit = in_trade[1] and high >= target1_line[1]
+plotshape(show_signals and t1_hit, title="Target 1 Hit",
+     style=shape.circle, location=location.abovebar,
+     color=color.new(#4fc3f7, 0), size=size.small, text="T1")
+
+// ── TREND TEMPLATE STATUS TABLE ──────────────────────────────
+var table tt_table = table.new(position.top_right, 2, 10,
+     bgcolor=#0b0c16, border_color=#222338, border_width=1, frame_color=#222338, frame_width=1)
+
+if barstate.islast
+    table.cell(tt_table, 0, 0, "CRITERION",    text_color=#50527a, text_size=size.tiny, bgcolor=#0b0c16)
+    table.cell(tt_table, 1, 0, "PASS/FAIL",    text_color=#50527a, text_size=size.tiny, bgcolor=#0b0c16)
+    criteria = array.from(
+         "C1: Price > 50/150/200 MA",
+         "C2: 50 MA > 150 & 200 MA",
+         "C3: 150 MA > 200 MA",
+         "C4: 200 MA trending up",
+         "C5: Price 30%+ above 52wk Lo",
+         "C6: Price within 25% of 52wk Hi",
+         "C7: RS Strength (6mo >10%)",
+         "C8: 50 MA trending up")
+    results = array.from(c1, c2, c3, c4, c5, c6, c7, c8)
+    for i = 0 to 7
+        clr = array.get(results, i) ? color.new(#00e676, 0) : color.new(#ff1744, 0)
+        lbl = array.get(results, i) ? "✓" : "✗"
+        table.cell(tt_table, 0, i + 1, array.get(criteria, i), text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+        table.cell(tt_table, 1, i + 1, lbl, text_color=clr, text_size=size.small, bgcolor=#0e0f1d)
+
+// ── ALERTS ───────────────────────────────────────────────────
+alertcondition(entry_signal, "VCP Breakout Entry", "VCP setup triggered: {{ticker}} breaking out above pivot on volume. Check trend template.")
+alertcondition(stop_hit,     "Stop Loss Hit",      "STOP HIT: {{ticker}} breached stop loss level. Exit immediately.")
+alertcondition(t1_hit,       "Target 1 Hit",       "TARGET 1 reached: {{ticker}}. Take 1/3 profit, trail rest with 50 MA.")

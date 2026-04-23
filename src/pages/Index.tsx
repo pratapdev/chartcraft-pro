@@ -21,9 +21,10 @@ const Index: React.FC = () => {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <TopBar />
       <div className="flex flex-1 min-h-0">
-        {!multiTfMode && <LeftToolbar />}
+        {/* LeftToolbar now visible in both modes */}
+        <LeftToolbar />
         <ResizablePanelGroup direction="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={rightPanelOpen && !multiTfMode ? 80 : 100} minSize={40}>
+          <ResizablePanel defaultSize={rightPanelOpen ? 80 : 100} minSize={40}>
             <div className="flex flex-col h-full min-w-0">
               <div className="flex-1 min-h-0">
                 {multiTfMode ? <MultiTimeframeView /> : <ChartContainer />}
@@ -31,7 +32,8 @@ const Index: React.FC = () => {
               {!multiTfMode && <BottomPanel />}
             </div>
           </ResizablePanel>
-          {!multiTfMode && rightPanelOpen && (
+          {/* RightSidebar now visible in both modes */}
+          {rightPanelOpen && (
             <>
               <ResizableHandle />
               <ResizablePanel defaultSize={20} minSize={12} maxSize={40}>

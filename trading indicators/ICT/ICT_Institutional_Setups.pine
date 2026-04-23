@@ -1,0 +1,819 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// ICT INSTITUTIONAL SETUPS PRO v2.0
+// ─────────────────────────────────────────────────────────────────────────────
+// Covers: Order Blocks, Fair Value Gaps, Breaker Blocks, Liquidity Sweeps,
+//         Market Structure (BOS/CHoCH), Kill Zones, OTE Fibonacci,
+//         Silver Bullet, Asian Range, Power of 3
+// Best used on: Forex, Indices (NQ/ES/YM), Crypto, Commodities (Gold/Oil)
+// Ideal Timeframes: 1m–15m for entries, 1H–4H for bias, Daily for premium
+// ═══════════════════════════════════════════════════════════════════════════════
+
+//@version=5
+indicator("ICT Institutional Setups Pro 2.0", 
+     overlay        = true, 
+     max_boxes_count = 500, 
+     max_lines_count = 500, 
+     max_labels_count= 500,
+     shorttitle      = "ICT Pro")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ STRATEGY SELECTOR
+// ─────────────────────────────────────────────────────────────────────────────
+grp0 = "═══ 🎯 STRATEGY SELECTOR ═══"
+selected = input.string("All Strategies", "Active Strategy", options = ["1 · Order Blocks","2 · Fair Value Gaps","3 · Breaker Blocks","4 · Liquidity Sweeps","All Strategies","5 · Market Structure (BOS/CHoCH)","6 · Kill Zones","7 · OTE Fibonacci","8 · Silver Bullet","9 · Asian Range","10 · Power of 3 (PO3)"], group = grp0,tooltip = "Select one strategy to isolate its signals, or keep All Strategies to see everything.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ ORDER BLOCKS
+// ─────────────────────────────────────────────────────────────────────────────
+grp1 = "═══ 📦 Order Blocks ═══"
+ob_on       = input.bool(true,  "Enable Order Blocks",         group=grp1)
+ob_lb       = input.int (5,     "Impulse Lookback (bars)",     group=grp1, minval=2, maxval=30)
+ob_ext      = input.int (25,    "Box Extension (bars)",        group=grp1, minval=5, maxval=100)
+ob_bull_clr = input.color(color.new(#00c853, 80), "Bullish OB Color", group=grp1)
+ob_bear_clr = input.color(color.new(#ff1744, 80), "Bearish OB Color", group=grp1)
+ob_mid      = input.bool(true,  "Show OB Midline (50%)",       group=grp1)
+ob_labels   = input.bool(true,  "Show OB Labels",              group=grp1)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ FAIR VALUE GAPS
+// ─────────────────────────────────────────────────────────────────────────────
+grp2 = "═══ ⚡ Fair Value Gaps ═══"
+fvg_on      = input.bool(true,  "Enable Fair Value Gaps",      group=grp2)
+fvg_min_pct = input.float(0.05, "Min FVG Size (% of price)",   group=grp2, minval=0.01, step=0.01)
+fvg_ext     = input.int (40,    "FVG Extension (bars)",        group=grp2, minval=5, maxval=150)
+fvg_bull_clr= input.color(color.new(#00bcd4, 82), "Bullish FVG Color", group=grp2)
+fvg_bear_clr= input.color(color.new(#ff9800, 82), "Bearish FVG Color", group=grp2)
+fvg_labels  = input.bool(true,  "Show FVG Labels",             group=grp2)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ BREAKER BLOCKS
+// ─────────────────────────────────────────────────────────────────────────────
+grp3 = "═══ 🔄 Breaker Blocks ═══"
+bb_on       = input.bool(true,  "Enable Breaker Blocks",       group=grp3)
+bb_bull_clr = input.color(color.new(#76ff03, 75), "Bullish Breaker Color", group=grp3)
+bb_bear_clr = input.color(color.new(#b71c1c, 75), "Bearish Breaker Color", group=grp3)
+bb_lb       = input.int (20,    "Lookback for failed OB",      group=grp3, minval=5, maxval=50)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ LIQUIDITY SWEEPS
+// ─────────────────────────────────────────────────────────────────────────────
+grp4 = "═══ 💧 Liquidity Levels & Sweeps ═══"
+liq_on      = input.bool(true,  "Enable Liquidity Levels",     group=grp4)
+liq_lb      = input.int (20,    "Swing Lookback (bars)",       group=grp4, minval=5, maxval=100)
+liq_clr     = input.color(color.new(#ffd600, 55), "Liquidity Level Color", group=grp4)
+sweep_on    = input.bool(true,  "Highlight Sweeps (Grabs)",    group=grp4)
+sweep_clr   = input.color(color.new(#e040fb, 55), "Sweep Highlight Color", group=grp4)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ MARKET STRUCTURE
+// ─────────────────────────────────────────────────────────────────────────────
+grp5 = "═══ 📊 Market Structure ═══"
+ms_on       = input.bool(true,  "Enable Market Structure",     group=grp5)
+bos_on      = input.bool(true,  "Show BOS (Break of Structure)",group=grp5)
+choch_on    = input.bool(true,  "Show CHoCH (Change of Char)", group=grp5)
+ms_len      = input.int (5,     "Pivot Lookback",              group=grp5, minval=2, maxval=20)
+bos_clr     = input.color(#2196f3, "BOS Color",                group=grp5)
+choch_clr   = input.color(#ff9800, "CHoCH Color",              group=grp5)
+eq_on       = input.bool(true,  "Show Equal Highs/Lows (EQH/EQL)", group=grp5)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ KILL ZONES  (NOTE: Requires chart timeframe ≤ 1H for session detection)
+// ─────────────────────────────────────────────────────────────────────────────
+grp6 = "═══ 🕐 Kill Zones (≤1H TF recommended) ═══"
+kz_on       = input.bool(true,  "Enable Kill Zones",           group=grp6)
+kz_asia     = input.bool(true,  "Asian Kill Zone  18:00–00:00", group=grp6)
+kz_london   = input.bool(true,  "London Kill Zone  02:00–05:00",group=grp6)
+kz_ny       = input.bool(true,  "NY Kill Zone  07:00–10:00",   group=grp6)
+kz_london2  = input.bool(true,  "London Close  10:00–12:00",   group=grp6)
+kz_silver   = input.bool(true,  "Silver Bullet  10:00–11:00 & 14:00–15:00", group=grp6)
+asia_clr    = input.color(color.new(#7c4dff, 88), "Asia Color",    group=grp6)
+london_clr  = input.color(color.new(#0091ea, 88), "London Color",  group=grp6)
+ny_clr      = input.color(color.new(#00c853, 88), "NY Color",      group=grp6)
+lclose_clr  = input.color(color.new(#ff6d00, 90), "London Close",  group=grp6)
+silver_clr  = input.color(color.new(#ffd600, 86), "Silver Bullet Color", group=grp6)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ OTE FIBONACCI
+// ─────────────────────────────────────────────────────────────────────────────
+grp7 = "═══ 📐 OTE Fibonacci ═══"
+ote_on      = input.bool(true,  "Enable OTE Zones",            group=grp7)
+ote_lb      = input.int (50,    "Swing Detection Lookback",    group=grp7, minval=10, maxval=200)
+ote_clr     = input.color(color.new(#ffd600, 72), "OTE Zone Color", group=grp7)
+ote_show62  = input.bool(true,  "Show 0.62 Level",             group=grp7)
+ote_show705 = input.bool(true,  "Show 0.705 Level (Sweet Spot)",group=grp7)
+ote_show79  = input.bool(true,  "Show 0.79 Level",             group=grp7)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ ASIAN RANGE
+// ─────────────────────────────────────────────────────────────────────────────
+grp9 = "═══ 🌏 Asian Range ═══"
+ar_on       = input.bool(true,  "Enable Asian Range",          group=grp9)
+ar_h_clr    = input.color(color.new(#26c6da, 78), "Asian High Color", group=grp9)
+ar_l_clr    = input.color(color.new(#ef9a9a, 78), "Asian Low Color",  group=grp9)
+ar_ext      = input.int (80,    "Asian Range Extension (bars)",group=grp9, minval=20, maxval=300)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ POWER OF 3
+// ─────────────────────────────────────────────────────────────────────────────
+grp10 = "═══ 🔺 Power of 3 (PO3) ═══"
+po3_on      = input.bool(true,  "Enable PO3 Labels",           group=grp10)
+po3_clr     = input.color(color.new(#e91e63, 0), "PO3 Label Color", group=grp10)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ INFO TABLE
+// ─────────────────────────────────────────────────────────────────────────────
+grp_tbl = "═══ 📋 Info Dashboard ═══"
+tbl_on      = input.bool(true, "Show Dashboard Table",         group=grp_tbl)
+tbl_pos_str = input.string("Top Right", "Table Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp_tbl)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ HELPER: STRATEGY VISIBILITY
+// ─────────────────────────────────────────────────────────────────────────────
+show_all   = selected == "All Strategies"
+show_ob_s  = ob_on   and (show_all or selected == "1 · Order Blocks")
+show_fvg_s = fvg_on  and (show_all or selected == "2 · Fair Value Gaps")
+show_bb_s  = bb_on   and (show_all or selected == "3 · Breaker Blocks")
+show_liq_s = liq_on  and (show_all or selected == "4 · Liquidity Sweeps")
+show_ms_s  = ms_on   and (show_all or selected == "5 · Market Structure (BOS/CHoCH)")
+show_kz_s  = kz_on   and (show_all or selected == "6 · Kill Zones")
+show_ote_s = ote_on  and (show_all or selected == "7 · OTE Fibonacci")
+show_sv_s  = kz_on   and (show_all or selected == "8 · Silver Bullet")
+show_ar_s  = ar_on   and (show_all or selected == "9 · Asian Range")
+show_po3_s = po3_on  and (show_all or selected == "10 · Power of 3 (PO3)")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ■ CORE CALCULATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+atr14  = ta.atr(14)
+
+// Session helper
+inSess(s) => not na(time(timeframe.period, s, "America/New_York"))
+
+// Momentum: body size
+body    = math.abs(close - open)
+avgBody = ta.sma(body, 20)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 1. ORDER BLOCKS
+//    Definition: Last opposing candle before a displacement (impulsive move).
+//    Bullish OB = last bearish candle before price sweeps buy-side liq up.
+//    Bearish OB = last bullish candle before price sweeps sell-side liq down.
+// ═══════════════════════════════════════════════════════════════════════════════
+var box[]   ob_b_boxes = array.new_box()
+var box[]   ob_s_boxes = array.new_box()
+var line[]  ob_b_mids  = array.new_line()
+var line[]  ob_s_mids  = array.new_line()
+
+// Displacement: close > high of previous N bars (bullish impulse)
+bull_displacement = close > ta.highest(high, ob_lb)[1]
+bear_displacement = close < ta.lowest(low,  ob_lb)[1]
+
+// Bullish OB: bearish candle just before bullish displacement
+if show_ob_s and bull_displacement and close[1] < open[1]
+    ob_h = open[1]  // OB top  = open of bearish candle (refined)
+    ob_l = close[1] // OB bot  = close of bearish candle
+    ob_mid_price = math.avg(ob_h, ob_l)
+    b = box.new(bar_index-1, ob_h, bar_index+ob_ext, ob_l,
+         bgcolor=ob_bull_clr, border_color=color.new(#00c853,30), border_width=1)
+    array.push(ob_b_boxes, b)
+    if ob_mid
+        ml = line.new(bar_index-1, ob_mid_price, bar_index+ob_ext, ob_mid_price,
+             color=color.new(#00c853,40), style=line.style_dashed, width=1)
+        array.push(ob_b_mids, ml)
+    if ob_labels
+        label.new(bar_index-1, ob_h, "🟢 BullOB\nEntry: " + str.tostring(ob_l,"#.####") +
+             "\nMid: " + str.tostring(ob_mid_price,"#.####"),
+             style=label.style_label_lower_right, color=color.new(#00c853,30),
+             textcolor=color.white, size=size.tiny)
+    if array.size(ob_b_boxes) > 8
+        box.delete(array.shift(ob_b_boxes))
+        if ob_mid
+            line.delete(array.shift(ob_b_mids))
+
+// Bearish OB: bullish candle just before bearish displacement
+if show_ob_s and bear_displacement and close[1] > open[1]
+    ob_h = close[1] // OB top  = close of bullish candle
+    ob_l = open[1]  // OB bot  = open of bullish candle
+    ob_mid_price = math.avg(ob_h, ob_l)
+    b = box.new(bar_index-1, ob_h, bar_index+ob_ext, ob_l,
+         bgcolor=ob_bear_clr, border_color=color.new(#ff1744,30), border_width=1)
+    array.push(ob_s_boxes, b)
+    if ob_mid
+        ml = line.new(bar_index-1, ob_mid_price, bar_index+ob_ext, ob_mid_price,
+             color=color.new(#ff1744,40), style=line.style_dashed, width=1)
+        array.push(ob_s_mids, ml)
+    if ob_labels
+        label.new(bar_index-1, ob_l, "🔴 BearOB\nEntry: " + str.tostring(ob_h,"#.####") +
+             "\nMid: " + str.tostring(ob_mid_price,"#.####"),
+             style=label.style_label_upper_right, color=color.new(#ff1744,30),
+             textcolor=color.white, size=size.tiny)
+    if array.size(ob_s_boxes) > 8
+        box.delete(array.shift(ob_s_boxes))
+        if ob_mid
+            line.delete(array.shift(ob_s_mids))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 2. FAIR VALUE GAPS (FVG / Imbalances)
+//    Bullish FVG: high[2] < low[0]  → gap = price moved too fast upward
+//    Bearish FVG: low[2]  > high[0] → gap = price moved too fast downward
+//    Institutional algo comes BACK to fill these. Trade the RETURN.
+// ═══════════════════════════════════════════════════════════════════════════════
+var box[] fvg_bull_arr = array.new_box()
+var box[] fvg_bear_arr = array.new_box()
+
+min_fvg_size = close * fvg_min_pct / 100
+
+bull_fvg_cond = high[2] < low[0] and (low[0] - high[2]) >= min_fvg_size
+bear_fvg_cond = low[2]  > high[0] and (low[2] - high[0]) >= min_fvg_size
+
+if show_fvg_s and bull_fvg_cond
+    fx = box.new(bar_index-2, low[0], bar_index+fvg_ext, high[2],
+         bgcolor=fvg_bull_clr, border_color=color.new(#00bcd4,20), border_width=1)
+    array.push(fvg_bull_arr, fx)
+    if fvg_labels
+        label.new(bar_index-1, math.avg(low[0],high[2]),
+             "⚡FVG+\n" + str.tostring(low[0],"#.####") + " – " + str.tostring(high[2],"#.####"),
+             style=label.style_label_center, color=color.new(#00bcd4,70),
+             textcolor=color.white, size=size.tiny)
+    if array.size(fvg_bull_arr) > 12
+        box.delete(array.shift(fvg_bull_arr))
+
+if show_fvg_s and bear_fvg_cond
+    fx = box.new(bar_index-2, low[2], bar_index+fvg_ext, high[0],
+         bgcolor=fvg_bear_clr, border_color=color.new(#ff9800,20), border_width=1)
+    array.push(fvg_bear_arr, fx)
+    if fvg_labels
+        label.new(bar_index-1, math.avg(low[2],high[0]),
+             "⚡FVG-\n" + str.tostring(high[0],"#.####") + " – " + str.tostring(low[2],"#.####"),
+             style=label.style_label_center, color=color.new(#ff9800,70),
+             textcolor=color.white, size=size.tiny)
+    if array.size(fvg_bear_arr) > 12
+        box.delete(array.shift(fvg_bear_arr))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 3. BREAKER BLOCKS
+//    A FAILED Order Block that FLIPS polarity.
+//    Bullish Breaker: A bearish OB that was taken out (price swept above it),
+//                     then price returns → now acts as SUPPORT.
+//    Bearish Breaker: A bullish OB swept below, return = RESISTANCE.
+//    These are HIGH-PROBABILITY because institutions KNOW the stop clusters.
+// ═══════════════════════════════════════════════════════════════════════════════
+ph_bb = ta.pivothigh(high, bb_lb, bb_lb)
+pl_bb = ta.pivotlow(low, bb_lb, bb_lb)
+
+var float prev_ph = na
+var float prev_pl = na
+var int   prev_ph_bar = na
+var int   prev_pl_bar = na
+var box[] bb_bull_arr = array.new_box()
+var box[] bb_bear_arr = array.new_box()
+
+if not na(ph_bb)
+    prev_ph := ph_bb
+    prev_ph_bar := bar_index - bb_lb
+
+if not na(pl_bb)
+    prev_pl := pl_bb
+    prev_pl_bar := bar_index - bb_lb
+
+// Bullish Breaker: price sweeps above old high then reverses sharply down → 
+// on return to that zone from above = long
+bull_breaker_formed = not na(prev_ph) and high > prev_ph and close < prev_ph and body > avgBody * 1.2
+if show_bb_s and bull_breaker_formed
+    b = box.new(prev_ph_bar, prev_ph, bar_index + 30, prev_ph - atr14 * 1.0,
+         bgcolor=bb_bull_clr, border_color=color.new(#76ff03,20), border_width=1)
+    array.push(bb_bull_arr, b)
+    label.new(bar_index, prev_ph, "🔄 BULL\nBREAKER\nLong Zone",
+         style=label.style_label_lower_left, color=color.new(#76ff03,40),
+         textcolor=color.white, size=size.tiny)
+    if array.size(bb_bull_arr) > 5
+        box.delete(array.shift(bb_bull_arr))
+
+// Bearish Breaker: price sweeps below old low then reverses sharply up →
+// on return to that zone from below = short
+bear_breaker_formed = not na(prev_pl) and low < prev_pl and close > prev_pl and body > avgBody * 1.2
+if show_bb_s and bear_breaker_formed
+    b = box.new(prev_pl_bar, prev_pl + atr14 * 1.0, bar_index + 30, prev_pl,
+         bgcolor=bb_bear_clr, border_color=color.new(#b71c1c,20), border_width=1)
+    array.push(bb_bear_arr, b)
+    label.new(bar_index, prev_pl, "🔄 BEAR\nBREAKER\nShort Zone",
+         style=label.style_label_upper_left, color=color.new(#b71c1c,40),
+         textcolor=color.white, size=size.tiny)
+    if array.size(bb_bear_arr) > 5
+        box.delete(array.shift(bb_bear_arr))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 4. LIQUIDITY SWEEPS (Stop Hunts)
+//    BSL = Buy-Side Liquidity  (above swing highs where longs cluster stops)
+//    SSL = Sell-Side Liquidity (below swing lows where shorts cluster stops)
+//    Institutions sweep liquidity to fill their large orders, then reverse.
+//    SWEEP = price spikes through level but CLOSES back on opposite side.
+// ═══════════════════════════════════════════════════════════════════════════════
+ph_liq = ta.pivothigh(high, liq_lb, liq_lb)
+pl_liq = ta.pivotlow(low,  liq_lb, liq_lb)
+
+var float bsl_level = na  // Buy-side liquidity above
+var float ssl_level = na  // Sell-side liquidity below
+var int   bsl_bar   = na
+var int   ssl_bar   = na
+
+if not na(ph_liq) and show_liq_s
+    bsl_level := ph_liq
+    bsl_bar   := bar_index - liq_lb
+    line.new(bar_index-liq_lb, ph_liq, bar_index+40, ph_liq,
+         color=liq_clr, style=line.style_dashed, width=1)
+    label.new(bar_index-liq_lb, ph_liq + atr14*0.3, "BSL",
+         style=label.style_label_right, color=color.new(#ffd600,60),
+         textcolor=color.black, size=size.tiny)
+
+if not na(pl_liq) and show_liq_s
+    ssl_level := pl_liq
+    ssl_bar   := bar_index - liq_lb
+    line.new(bar_index-liq_lb, pl_liq, bar_index+40, pl_liq,
+         color=liq_clr, style=line.style_dashed, width=1)
+    label.new(bar_index-liq_lb, pl_liq - atr14*0.3, "SSL",
+         style=label.style_label_right, color=color.new(#ffd600,60),
+         textcolor=color.black, size=size.tiny)
+
+// Sweep signals
+bsl_swept = not na(bsl_level) and high > bsl_level and close < bsl_level  // Fake breakout above
+ssl_swept = not na(ssl_level) and low  < ssl_level and close > ssl_level  // Fake breakdown below
+
+if show_liq_s and sweep_on and bsl_swept
+    label.new(bar_index, high + atr14*0.5,
+         "⚡ BSL SWEPT\n→ SHORT Setup\nSL: above wick",
+         style=label.style_label_down, color=sweep_clr,
+         textcolor=color.white, size=size.small)
+
+if show_liq_s and sweep_on and ssl_swept
+    label.new(bar_index, low - atr14*0.5,
+         "⚡ SSL SWEPT\n→ LONG Setup\nSL: below wick",
+         style=label.style_label_up, color=sweep_clr,
+         textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 5. MARKET STRUCTURE (BOS / CHoCH)
+//    BOS  = Break of Structure → trend continuation signal
+//    CHoCH = Change of Character → potential TREND REVERSAL signal
+//    Higher Highs + Higher Lows = Bullish Structure
+//    Lower Lows  + Lower Highs  = Bearish Structure
+// ═══════════════════════════════════════════════════════════════════════════════
+ms_ph = ta.pivothigh(high, ms_len, ms_len)
+ms_pl = ta.pivotlow( low,  ms_len, ms_len)
+
+var float ms_last_ph    = na
+var float ms_last_pl    = na
+var int   ms_last_ph_bar = na
+var int   ms_last_pl_bar = na
+var bool  ms_bullish    = true   // Market structure direction
+
+// Process pivot highs
+if not na(ms_ph) and show_ms_s
+    int ph_bar_idx = bar_index - ms_len
+    if not na(ms_last_ph) and not na(ms_last_ph_bar)
+        if ms_ph > ms_last_ph  // Higher high
+            if ms_bullish and bos_on
+                // BOS up (bullish continuation)
+                line.new(ms_last_ph_bar, ms_last_ph, ph_bar_idx, ms_last_ph,
+                     color=bos_clr, style=line.style_dotted, width=2)
+                label.new(math.round(math.avg(ms_last_ph_bar, ph_bar_idx)),
+                     ms_last_ph + atr14*0.6, "BOS ↑",
+                     style=label.style_label_center, color=bos_clr,
+                     textcolor=color.white, size=size.tiny)
+            else if not ms_bullish and choch_on
+                // CHoCH bullish (reversal signal)
+                line.new(ms_last_ph_bar, ms_last_ph, ph_bar_idx, ms_last_ph,
+                     color=choch_clr, style=line.style_dotted, width=2)
+                label.new(math.round(math.avg(ms_last_ph_bar, ph_bar_idx)),
+                     ms_last_ph + atr14*0.6, "CHoCH ↑",
+                     style=label.style_label_center, color=choch_clr,
+                     textcolor=color.white, size=size.small)
+                ms_bullish := true
+    ms_last_ph     := ms_ph
+    ms_last_ph_bar := bar_index - ms_len
+
+// Process pivot lows
+if not na(ms_pl) and show_ms_s
+    int pl_bar_idx = bar_index - ms_len
+    if not na(ms_last_pl) and not na(ms_last_pl_bar)
+        if ms_pl < ms_last_pl  // Lower low
+            if not ms_bullish and bos_on
+                // BOS down (bearish continuation)
+                line.new(ms_last_pl_bar, ms_last_pl, pl_bar_idx, ms_last_pl,
+                     color=bos_clr, style=line.style_dotted, width=2)
+                label.new(math.round(math.avg(ms_last_pl_bar, pl_bar_idx)),
+                     ms_last_pl - atr14*0.6, "BOS ↓",
+                     style=label.style_label_center, color=bos_clr,
+                     textcolor=color.white, size=size.tiny)
+            else if ms_bullish and choch_on
+                // CHoCH bearish (reversal signal)
+                line.new(ms_last_pl_bar, ms_last_pl, pl_bar_idx, ms_last_pl,
+                     color=choch_clr, style=line.style_dotted, width=2)
+                label.new(math.round(math.avg(ms_last_pl_bar, pl_bar_idx)),
+                     ms_last_pl - atr14*0.6, "CHoCH ↓",
+                     style=label.style_label_center, color=choch_clr,
+                     textcolor=color.white, size=size.small)
+                ms_bullish := false
+    ms_last_pl     := ms_pl
+    ms_last_pl_bar := bar_index - ms_len
+
+// Equal Highs / Equal Lows (EQH/EQL) — liquidity magnets
+eqh_threshold = atr14 * 0.3
+eql_threshold = atr14 * 0.3
+eqh = not na(ms_ph) and not na(ms_last_ph) and math.abs(ms_ph - ms_last_ph) < eqh_threshold
+eql = not na(ms_pl) and not na(ms_last_pl) and math.abs(ms_pl - ms_last_pl) < eql_threshold
+
+if eq_on and show_ms_s and eqh
+    label.new(bar_index - ms_len, ms_ph + atr14*0.5, "⚖ EQH",
+         style=label.style_label_down, color=color.new(#ff5722,50),
+         textcolor=color.white, size=size.tiny)
+
+if eq_on and show_ms_s and eql
+    label.new(bar_index - ms_len, ms_pl - atr14*0.5, "⚖ EQL",
+         style=label.style_label_up, color=color.new(#ff5722,50),
+         textcolor=color.white, size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 6. KILL ZONES  (High-probability trading windows)
+//    ALL major institutional moves happen inside these windows.
+//    Outside these windows → DO NOT trade. Wait patiently.
+// ═══════════════════════════════════════════════════════════════════════════════
+in_asia    = kz_asia   and inSess("1800-0000") and show_kz_s
+in_london  = kz_london and inSess("0200-0500") and show_kz_s
+in_ny_kz   = kz_ny     and inSess("0700-1000") and show_kz_s
+in_l_close = kz_london2 and inSess("1000-1200") and show_kz_s
+in_silver_am = kz_silver and inSess("1000-1100") and (show_kz_s or show_sv_s)
+in_silver_pm = kz_silver and inSess("1400-1500") and (show_kz_s or show_sv_s)
+
+bgcolor(in_asia    ? asia_clr   : na, title="Asia Session BG")
+bgcolor(in_london  ? london_clr : na, title="London Session BG")
+bgcolor(in_ny_kz   ? ny_clr     : na, title="NY Kill Zone BG")
+bgcolor(in_l_close ? lclose_clr : na, title="London Close BG")
+bgcolor(in_silver_am or in_silver_pm ? silver_clr : na, title="Silver Bullet BG")
+
+// Session Start Labels
+var bool as_lbl = false
+var bool lo_lbl = false
+var bool ny_lbl = false
+var bool lc_lbl = false
+var bool sv_lbl = false
+
+if in_asia    and not in_asia[1]
+    as_lbl := false
+if in_london  and not in_london[1]
+    lo_lbl := false
+if in_ny_kz   and not in_ny_kz[1]
+    ny_lbl := false
+if in_l_close and not in_l_close[1]
+    lc_lbl := false
+if (in_silver_am or in_silver_pm) and not (in_silver_am[1] or in_silver_pm[1])
+    sv_lbl := false
+
+if in_asia    and not as_lbl and show_kz_s
+    label.new(bar_index, high + atr14*1.5, "🌏 ASIA KZ", style=label.style_label_down,
+         color=color.new(#7c4dff,40), textcolor=color.white, size=size.small)
+    as_lbl := true
+
+if in_london  and not lo_lbl and show_kz_s
+    label.new(bar_index, high + atr14*1.5, "🇬🇧 LONDON KZ", style=label.style_label_down,
+         color=color.new(#0091ea,40), textcolor=color.white, size=size.small)
+    lo_lbl := true
+
+if in_ny_kz   and not ny_lbl and show_kz_s
+    label.new(bar_index, high + atr14*1.5, "🗽 NY KZ", style=label.style_label_down,
+         color=color.new(#00c853,40), textcolor=color.white, size=size.small)
+    ny_lbl := true
+
+if in_l_close and not lc_lbl and show_kz_s
+    label.new(bar_index, high + atr14*1.5, "🔔 LDN CLOSE", style=label.style_label_down,
+         color=color.new(#ff6d00,40), textcolor=color.white, size=size.small)
+    lc_lbl := true
+
+if (in_silver_am or in_silver_pm) and not sv_lbl and (show_kz_s or show_sv_s)
+    label.new(bar_index, high + atr14*2.0, "🥈 SILVER BULLET\nFVG Entry Window",
+         style=label.style_label_down, color=color.new(#ffd600,40),
+         textcolor=color.black, size=size.small)
+    sv_lbl := true
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 7. OTE FIBONACCI (Optimal Trade Entry 62%–79%)
+//    ICT's own Fibonacci tool: 62%, 70.5% (sweet spot), 79% retracement
+//    After displacement, price retraces into OTE → enter with trend.
+//    SL: below the swing low (for longs) / above swing high (for shorts)
+//    TP: Previous high/low or 2–3R
+// ═══════════════════════════════════════════════════════════════════════════════
+ote_ph = ta.pivothigh(high, ote_lb, ote_lb)
+ote_pl = ta.pivotlow(low,   ote_lb, ote_lb)
+
+var float ote_sh = na  // swing high for OTE
+var float ote_sl_val = na  // swing low for OTE
+var int   ote_sh_bar = na
+var int   ote_sl_bar = na
+
+if not na(ote_ph)
+    ote_sh    := ote_ph
+    ote_sh_bar := bar_index - ote_lb
+
+if not na(ote_pl)
+    ote_sl_val := ote_pl
+    ote_sl_bar := bar_index - ote_lb
+
+// Bullish OTE: after swing low, rally, retrace into 62–79%
+if show_ote_s and not na(ote_sh) and not na(ote_sl_val) and ote_sl_bar > ote_sh_bar
+    // Bullish swing: low then high
+    rng = ote_sh - ote_sl_val
+    lvl_62  = ote_sh - rng * 0.62
+    lvl_705 = ote_sh - rng * 0.705
+    lvl_79  = ote_sh - rng * 0.79
+    
+    in_ote = close <= lvl_62 and close >= lvl_79
+    
+    if in_ote
+        if ote_show62
+            line.new(bar_index, lvl_62, bar_index+10, lvl_62,
+                 color=color.new(#ffd600,40), width=1, style=line.style_dashed)
+            label.new(bar_index, lvl_62, "0.62", style=label.style_label_left,
+                 color=color.new(#ffd600,60), textcolor=color.white, size=size.tiny)
+        if ote_show705
+            line.new(bar_index, lvl_705, bar_index+10, lvl_705,
+                 color=color.new(#ff9800,20), width=2, style=line.style_solid)
+            label.new(bar_index, lvl_705, "🎯 0.705 OTE SWEET SPOT",
+                 style=label.style_label_left, color=color.new(#ff9800,20),
+                 textcolor=color.black, size=size.small)
+        if ote_show79
+            line.new(bar_index, lvl_79, bar_index+10, lvl_79,
+                 color=color.new(#ffd600,40), width=1, style=line.style_dashed)
+            label.new(bar_index, lvl_79, "0.79", style=label.style_label_left,
+                 color=color.new(#ffd600,60), textcolor=color.white, size=size.tiny)
+        box.new(bar_index, lvl_62, bar_index+10, lvl_79,
+             bgcolor=ote_clr, border_color=color.new(#ffd600,30), border_width=1)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 9. ASIAN RANGE HIGH / LOW
+//    Asia session creates a consolidation range (accumulation).
+//    London/NY sessions then EXPAND price — often sweeping the Asian range first
+//    before the real move. Trade the SWEEP and reversal or the BREAKOUT.
+// ═══════════════════════════════════════════════════════════════════════════════
+in_asian_sess = inSess("1800-0000")
+
+var float ar_high = na
+var float ar_low  = na
+var bool  ar_active = false
+var line  ar_h_line = na
+var line  ar_l_line = na
+var box   ar_box    = na
+
+if in_asian_sess and not in_asian_sess[1]
+    ar_high  := high
+    ar_low   := low
+    ar_active := true
+
+if in_asian_sess and ar_active
+    if high > ar_high
+        ar_high := high
+    if low  < ar_low
+        ar_low  := low
+
+if not in_asian_sess and in_asian_sess[1] and show_ar_s and not na(ar_high)
+    if not na(ar_h_line) then line.delete(ar_h_line)
+    if not na(ar_l_line) then line.delete(ar_l_line)
+    if not na(ar_box)    then box.delete(ar_box)
+    ar_h_line := line.new(bar_index, ar_high, bar_index+ar_ext, ar_high,
+         color=ar_h_clr, style=line.style_solid, width=2)
+    ar_l_line := line.new(bar_index, ar_low, bar_index+ar_ext, ar_low,
+         color=ar_l_clr, style=line.style_solid, width=2)
+    ar_box := box.new(bar_index, ar_high, bar_index+ar_ext, ar_low,
+         bgcolor=color.new(#26c6da,94), border_color=color.new(#26c6da,70))
+    label.new(bar_index, ar_high, "🌏 Asian High → BSL Target",
+         style=label.style_label_left, color=color.new(#26c6da,50),
+         textcolor=color.white, size=size.tiny)
+    label.new(bar_index, ar_low, "🌏 Asian Low  → SSL Target",
+         style=label.style_label_left, color=color.new(#ef9a9a,50),
+         textcolor=color.white, size=size.tiny)
+    ar_active := false
+
+// Asian Range Sweep alerts
+ar_high_sweep = show_ar_s and not na(ar_high) and high > ar_high and close < ar_high
+ar_low_sweep  = show_ar_s and not na(ar_low)  and low  < ar_low  and close > ar_low
+
+if ar_high_sweep
+    label.new(bar_index, high + atr14*0.6, "⚡ ASIAN HIGH SWEPT\n→ SHORT Opportunity",
+         style=label.style_label_down, color=color.new(#ff1744,40),
+         textcolor=color.white, size=size.small)
+
+if ar_low_sweep
+    label.new(bar_index, low - atr14*0.6, "⚡ ASIAN LOW SWEPT\n→ LONG Opportunity",
+         style=label.style_label_up, color=color.new(#00c853,40),
+         textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ 10. POWER OF 3 (PO3) — Accumulation → Manipulation → Distribution
+//     Daily: First 1–2 hrs = Accumulation (Asia consolidation)
+//     Manipulation: London open sweeps one side (Judas Swing)
+//     Distribution: NY session moves in OPPOSITE direction to the fake move
+//     This explains WHY price always fakes out before the real move!
+// ═══════════════════════════════════════════════════════════════════════════════
+// PO3 Phase indicators based on session
+po3_accum  = in_asian_sess and show_po3_s
+po3_manip  = in_london and show_po3_s
+po3_distrib = in_ny_kz and show_po3_s
+
+var bool po3_a_lbl = false
+var bool po3_m_lbl = false
+var bool po3_d_lbl = false
+
+if po3_accum  and not po3_accum[1]
+    po3_a_lbl := false
+if po3_manip  and not po3_manip[1]
+    po3_m_lbl := false
+if po3_distrib and not po3_distrib[1]
+    po3_d_lbl := false
+
+if po3_accum  and not po3_a_lbl
+    label.new(bar_index, low - atr14*2, "PO3①\nACCUM",
+         style=label.style_label_up, color=color.new(#9c27b0,30),
+         textcolor=color.white, size=size.tiny)
+    po3_a_lbl := true
+
+if po3_manip  and not po3_m_lbl
+    label.new(bar_index, low - atr14*2, "PO3②\nMANIP\n(Judas)",
+         style=label.style_label_up, color=color.new(#ff5722,30),
+         textcolor=color.white, size=size.tiny)
+    po3_m_lbl := true
+
+if po3_distrib and not po3_d_lbl
+    label.new(bar_index, low - atr14*2, "PO3③\nDISTRIB",
+         style=label.style_label_up, color=color.new(#4caf50,30),
+         textcolor=color.white, size=size.tiny)
+    po3_d_lbl := true
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ COMBINED SIGNAL QUALITY SCORE
+//    Score = # of confluent signals. Higher = higher probability trade.
+// ═══════════════════════════════════════════════════════════════════════════════
+conf_score = 0
+conf_score := conf_score + (bull_fvg_cond          ? 1 : 0)
+conf_score := conf_score + (ssl_swept               ? 1 : 0)
+conf_score := conf_score + (ms_bullish              ? 1 : 0)
+conf_score := conf_score + (in_london or in_ny_kz   ? 1 : 0)
+conf_score := conf_score + (bull_displacement        ? 1 : 0)
+
+bear_conf = 0
+bear_conf := bear_conf + (bear_fvg_cond             ? 1 : 0)
+bear_conf := bear_conf + (bsl_swept                 ? 1 : 0)
+bear_conf := bear_conf + (not ms_bullish             ? 1 : 0)
+bear_conf := bear_conf + (in_london or in_ny_kz     ? 1 : 0)
+bear_conf := bear_conf + (bear_displacement          ? 1 : 0)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ DASHBOARD TABLE
+// ═══════════════════════════════════════════════════════════════════════════════
+var table dash = na
+
+if tbl_on and barstate.islast
+    pos = switch tbl_pos_str
+        "Top Right"    => position.top_right
+        "Top Left"     => position.top_left
+        "Bottom Right" => position.bottom_right
+        "Bottom Left"  => position.bottom_left
+        => position.top_right
+
+    dash := table.new(pos, 4, 18, bgcolor=color.new(#0a0e1a,10),
+         border_color=color.new(#1e3a5f,0), border_width=1,
+         frame_color=color.new(#00bcd4,30), frame_width=2)
+
+    // ── Header ──
+    table.cell(dash, 0, 0, "⚡ ICT INSTITUTIONAL SETUPS PRO", 
+         bgcolor=color.new(#0d2137,20), text_color=#00e5ff,
+         text_size=size.small, text_halign=text.align_center)
+    table.merge_cells(dash, 0, 0, 3, 0)
+
+    // ── Column Headers ──
+    hdr_bg = color.new(#1a2744, 30)
+    table.cell(dash, 0, 1, "SETUP",    bgcolor=hdr_bg, text_color=#90caf9, text_size=size.tiny)
+    table.cell(dash, 1, 1, "STATUS",   bgcolor=hdr_bg, text_color=#90caf9, text_size=size.tiny)
+    table.cell(dash, 2, 1, "SIGNAL",   bgcolor=hdr_bg, text_color=#90caf9, text_size=size.tiny)
+    table.cell(dash, 3, 1, "ACTION",   bgcolor=hdr_bg, text_color=#90caf9, text_size=size.tiny)
+
+    // ── Row Helper ──
+    row_bg = color.new(#0a0e1a, 40)
+
+    // Row 2: Trend Bias
+    table.cell(dash, 0, 2, "Market Structure", bgcolor=row_bg, text_color=#eceff1, text_size=size.tiny)
+    table.cell(dash, 1, 2, ms_bullish ? "📈 BULL" : "📉 BEAR",
+         bgcolor=row_bg, text_color=ms_bullish ? #69f0ae : #ff5252, text_size=size.tiny)
+    table.cell(dash, 2, 2, ms_bullish ? "Bullish BOS" : "Bearish BOS",
+         bgcolor=row_bg, text_color=#b0bec5, text_size=size.tiny)
+    table.cell(dash, 3, 2, ms_bullish ? "Seek Longs" : "Seek Shorts",
+         bgcolor=row_bg, text_color=ms_bullish ? #69f0ae : #ff5252, text_size=size.tiny)
+
+    // Row 3: Fair Value Gap
+    fvg_status = bull_fvg_cond ? "🟢 BULL FVG" : bear_fvg_cond ? "🔴 BEAR FVG" : "⚪ None"
+    fvg_act    = bull_fvg_cond ? "Buy the fill" : bear_fvg_cond ? "Sell the fill" : "Wait"
+    table.cell(dash, 0, 3, "Fair Value Gap", bgcolor=row_bg, text_color=#eceff1, text_size=size.tiny)
+    table.cell(dash, 1, 3, fvg_status, bgcolor=row_bg,
+         text_color=bull_fvg_cond ? #69f0ae : bear_fvg_cond ? #ff5252 : #607d8b, text_size=size.tiny)
+    table.cell(dash, 2, 3, bull_fvg_cond ? "Gap open ↑" : bear_fvg_cond ? "Gap open ↓" : "—",
+         bgcolor=row_bg, text_color=#b0bec5, text_size=size.tiny)
+    table.cell(dash, 3, 3, fvg_act, bgcolor=row_bg,
+         text_color=bull_fvg_cond ? #69f0ae : bear_fvg_cond ? #ff5252 : #607d8b, text_size=size.tiny)
+
+    // Row 4: Liquidity Sweep
+    liq_status = bsl_swept ? "🔴 BSL SWEPT" : ssl_swept ? "🟢 SSL SWEPT" : "⚪ None"
+    liq_act    = bsl_swept ? "SHORT Setup" : ssl_swept ? "LONG Setup" : "Wait"
+    table.cell(dash, 0, 4, "Liquidity Sweep", bgcolor=row_bg, text_color=#eceff1, text_size=size.tiny)
+    table.cell(dash, 1, 4, liq_status, bgcolor=row_bg,
+         text_color=bsl_swept ? #ff5252 : ssl_swept ? #69f0ae : #607d8b, text_size=size.tiny)
+    table.cell(dash, 2, 4, bsl_swept ? "BSL hunted" : ssl_swept ? "SSL hunted" : "—",
+         bgcolor=row_bg, text_color=#b0bec5, text_size=size.tiny)
+    table.cell(dash, 3, 4, liq_act, bgcolor=row_bg,
+         text_color=bsl_swept ? #ff5252 : ssl_swept ? #69f0ae : #607d8b, text_size=size.tiny)
+
+    // Row 5: Order Block
+    ob_bull_now = bull_displacement and close[1] < open[1]
+    ob_bear_now = bear_displacement and close[1] > open[1]
+    ob_status   = ob_bull_now ? "🟢 BULL OB" : ob_bear_now ? "🔴 BEAR OB" : "⚪ None"
+    table.cell(dash, 0, 5, "Order Block", bgcolor=row_bg, text_color=#eceff1, text_size=size.tiny)
+    table.cell(dash, 1, 5, ob_status, bgcolor=row_bg,
+         text_color=ob_bull_now ? #69f0ae : ob_bear_now ? #ff5252 : #607d8b, text_size=size.tiny)
+    table.cell(dash, 2, 5, ob_bull_now ? "Imbalance ↑" : ob_bear_now ? "Imbalance ↓" : "—",
+         bgcolor=row_bg, text_color=#b0bec5, text_size=size.tiny)
+    table.cell(dash, 3, 5, ob_bull_now ? "BUY at OB" : ob_bear_now ? "SELL at OB" : "Wait",
+         bgcolor=row_bg, text_color=ob_bull_now ? #69f0ae : ob_bear_now ? #ff5252 : #607d8b, text_size=size.tiny)
+
+    // Row 6: Session
+    sess_str = in_silver_am or in_silver_pm ? "🥈 SILVER BULLET" :
+               in_ny_kz   ? "🗽 NY Kill Zone" :
+               in_l_close ? "🔔 London Close" :
+               in_london  ? "🇬🇧 London KZ"   :
+               in_asia    ? "🌏 Asia KZ"       : "⚫ Off Hours"
+    sess_prob = (in_silver_am or in_silver_pm or in_ny_kz or in_london) ? "HIGH PROB 🔥" : "Low Prob"
+    sess_clr  = (in_silver_am or in_silver_pm or in_ny_kz or in_london) ? #69f0ae : #607d8b
+    table.cell(dash, 0, 6, "Session", bgcolor=row_bg, text_color=#eceff1, text_size=size.tiny)
+    table.cell(dash, 1, 6, sess_str, bgcolor=row_bg, text_color=#ffd600, text_size=size.tiny)
+    table.cell(dash, 2, 6, sess_prob, bgcolor=row_bg, text_color=sess_clr, text_size=size.tiny)
+    table.cell(dash, 3, 6, in_silver_am or in_silver_pm ? "FVG Entry!" : "Follow Setup", bgcolor=row_bg, text_color=sess_clr, text_size=size.tiny)
+
+    // Row 7: Asian Range
+    ar_status = ar_high_sweep ? "🔴 High Swept" : ar_low_sweep ? "🟢 Low Swept" : "Intact"
+    table.cell(dash, 0, 7, "Asian Range", bgcolor=row_bg, text_color=#eceff1, text_size=size.tiny)
+    table.cell(dash, 1, 7, not na(ar_high) ? "H: " + str.tostring(ar_high,"#.####") : "—",
+         bgcolor=row_bg, text_color=#26c6da, text_size=size.tiny)
+    table.cell(dash, 2, 7, not na(ar_low) ? "L: " + str.tostring(ar_low,"#.####") : "—",
+         bgcolor=row_bg, text_color=#ef9a9a, text_size=size.tiny)
+    table.cell(dash, 3, 7, ar_status, bgcolor=row_bg,
+         text_color=ar_high_sweep ? #ff5252 : ar_low_sweep ? #69f0ae : #607d8b, text_size=size.tiny)
+
+    // Row 8: CONFLUENCE SCORE
+    bull_score_str = str.tostring(conf_score) + "/5"
+    bear_score_str = str.tostring(bear_conf) + "/5"
+    bull_score_clr = conf_score >= 4 ? #69f0ae : conf_score >= 2 ? #ffd600 : #607d8b
+    bear_score_clr = bear_conf  >= 4 ? #ff5252 : bear_conf  >= 2 ? #ffd600 : #607d8b
+
+    table.cell(dash, 0, 8, "⭐ Confluence Score", bgcolor=color.new(#1a2744,40),
+         text_color=#90caf9, text_size=size.tiny)
+    table.cell(dash, 1, 8, "LONG: " + bull_score_str, bgcolor=color.new(#1a2744,40),
+         text_color=bull_score_clr, text_size=size.tiny)
+    table.cell(dash, 2, 8, "SHORT: " + bear_score_str, bgcolor=color.new(#1a2744,40),
+         text_color=bear_score_clr, text_size=size.tiny)
+    table.cell(dash, 3, 8, conf_score >= 4 ? "EXECUTE!" : bear_conf >= 4 ? "EXECUTE!" : conf_score >= 3 or bear_conf >= 3 ? "Consider" : "Wait",
+         bgcolor=color.new(#1a2744,40),
+         text_color=conf_score >= 4 or bear_conf >= 4 ? #ffd600 : #607d8b, text_size=size.small)
+
+    // ── LEGEND SEPARATOR ──
+    table.cell(dash, 0, 9, "──── GLOSSARY ────", bgcolor=color.new(#0d2137,40),
+         text_color=#546e7a, text_size=size.tiny)
+    table.merge_cells(dash, 0, 9, 3, 9)
+
+    glossary = array.from(
+         "OB  = Order Block (last opposing candle before impulse)",
+         "FVG = Fair Value Gap (3-candle imbalance / inefficiency)",
+         "BSL = Buy-Side Liquidity (stops above highs)",
+         "SSL = Sell-Side Liquidity (stops below lows)",
+         "BOS = Break of Structure (trend continuation)",
+         "CHoCH = Change of Character (trend reversal)",
+         "OTE = Optimal Trade Entry (62–79% Fibonacci)",
+         "PO3 = Power of 3 (Accum → Manip → Distrib)")
+
+    for i = 0 to array.size(glossary) - 1
+        table.cell(dash, 0, 10 + i, array.get(glossary, i),
+             bgcolor=color.new(#0a0e1a,40), text_color=#607d8b, text_size=size.tiny)
+        table.merge_cells(dash, 0, 10+i, 3, 10+i)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ■ ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+alertcondition(bsl_swept,                    "⚡ BSL Swept – SHORT",    "Buy-Side Liq swept → Short opportunity")
+alertcondition(ssl_swept,                    "⚡ SSL Swept – LONG",     "Sell-Side Liq swept → Long opportunity")
+alertcondition(bull_fvg_cond,               "⚡ Bullish FVG Formed",   "Bullish Fair Value Gap – watch for fill")
+alertcondition(bear_fvg_cond,               "⚡ Bearish FVG Formed",   "Bearish Fair Value Gap – watch for fill")
+alertcondition(bull_breaker_formed,         "🔄 Bullish Breaker Block", "Bullish Breaker Block formed")
+alertcondition(bear_breaker_formed,         "🔄 Bearish Breaker Block", "Bearish Breaker Block formed")
+alertcondition(in_london  and not in_london[1],   "🇬🇧 London KZ Open", "London Kill Zone started")
+alertcondition(in_ny_kz   and not in_ny_kz[1],   "🗽 NY KZ Open",      "NY Kill Zone started")
+alertcondition(in_silver_am and not in_silver_am[1], "🥈 Silver Bullet AM", "Silver Bullet AM window open!")
+alertcondition(in_silver_pm and not in_silver_pm[1], "🥈 Silver Bullet PM", "Silver Bullet PM window open!")
+alertcondition(ar_high_sweep,               "🌏 Asian High Swept",     "Asian High swept – short potential")
+alertcondition(ar_low_sweep,                "🌏 Asian Low Swept",      "Asian Low swept – long potential")
+alertcondition(conf_score >= 4,             "🔥 HIGH CONFLUENCE LONG", "4+ bullish confluences aligned!")
+alertcondition(bear_conf  >= 4,             "🔥 HIGH CONFLUENCE SHORT","4+ bearish confluences aligned!")

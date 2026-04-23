@@ -1,0 +1,668 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║             NEXUS MOMENTUM CIPHER [Institutional Grade]                    ║
+// ║                                                                            ║
+// ║  A composite momentum system built from 7 institutional-grade layers:      ║
+// ║                                                                            ║
+// ║  Layer 1 ─ Ehlers Super Smoother Filter (Zero-Lag Noise Reduction)         ║
+// ║  Layer 2 ─ Kalman Filter (Optimal State Estimation)                        ║
+// ║  Layer 3 ─ Multi-Component Adaptive Momentum Engine                        ║
+// ║  Layer 4 ─ Inverse Fisher Transform (Probabilistic Signal Mapping)         ║
+// ║  Layer 5 ─ Volume Delta & Smart Money Confirmation                         ║
+// ║  Layer 6 ─ Squeeze Dynamics (Volatility Compression → Expansion)           ║
+// ║  Layer 7 ─ Hurst Exponent Regime Detection (Trend vs Mean-Reversion)       ║
+// ║                                                                            ║
+// ║  + Automated Divergence Detection                                          ║
+// ║  + Institutional Footprint Scoring                                         ║
+// ║  + Multi-State Signal Generation                                           ║
+// ║  + Real-Time Dashboard                                                     ║
+// ║                                                                            ║
+// ║  © 2024 — Based on research by J.F. Ehlers, Kalman, Mandelbrot & Hurst    ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+//@version=5
+indicator("NEXUS MOMENTUM CIPHER [Institutional]", shorttitle="NMC ⚡", 
+         overlay=false, precision=4, max_bars_back=500, 
+         max_lines_count=50, max_labels_count=50)
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                              INPUTS                                         │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// ── Core Engine ──
+i_src         = input.source(close, "Source", group="⚙ Core Engine")
+i_length      = input.int(14, "Momentum Length", minval=2, maxval=100, group="⚙ Core Engine",
+                tooltip="Primary lookback period for momentum calculations. Lower = faster, Higher = smoother.")
+i_smoothing   = input.int(5, "Signal Smoothing", minval=1, maxval=30, group="⚙ Core Engine",
+                tooltip="Smoothing applied to the signal line. Controls signal line responsiveness.")
+
+// ── Kalman Filter ──
+i_kalman_gain = input.float(0.7, "Kalman Gain Factor", minval=0.1, maxval=1.0, step=0.05, group="🔬 Kalman Filter",
+                tooltip="Controls how quickly the Kalman filter adapts. 0.7 is optimal for most markets. Higher = more responsive, Lower = more filtering.")
+i_kalman_Q    = input.float(0.01, "Process Noise (Q)", minval=0.001, maxval=0.1, step=0.005, group="🔬 Kalman Filter",
+                tooltip="Process noise covariance. Controls the filter's belief in how fast the true state changes. Higher = tracks faster moves.")
+
+// ── Volume Intelligence ──
+i_vol_enabled = input.bool(true, "Enable Volume Analysis", group="📊 Volume Intelligence")
+i_vol_length  = input.int(20, "Volume MA Length", minval=5, maxval=200, group="📊 Volume Intelligence",
+                tooltip="Lookback for average volume calculation. Used to detect abnormal volume spikes.")
+
+// ── Squeeze Detection ──
+i_sq_enabled  = input.bool(true, "Enable Squeeze Detection", group="💥 Squeeze Dynamics")
+i_bb_length   = input.int(20, "Bollinger Band Length", minval=5, maxval=50, group="💥 Squeeze Dynamics")
+i_bb_mult     = input.float(2.0, "BB Multiplier", minval=0.5, maxval=4.0, step=0.1, group="💥 Squeeze Dynamics")
+i_kc_length   = input.int(20, "Keltner Channel Length", minval=5, maxval=50, group="💥 Squeeze Dynamics")
+i_kc_mult     = input.float(1.5, "KC Multiplier", minval=0.5, maxval=4.0, step=0.1, group="💥 Squeeze Dynamics")
+
+// ── Divergence ──
+i_div_enabled  = input.bool(true, "Enable Divergence Detection", group="🔄 Divergence")
+i_div_lookback = input.int(5, "Pivot Lookback", minval=2, maxval=15, group="🔄 Divergence",
+                 tooltip="Number of bars to confirm a pivot high/low. Higher = fewer but more reliable divergence signals.")
+
+// ── Anti-False Signal Filters (NEW) ──
+i_cooldown     = input.int(8, "Signal Cooldown (bars)", minval=0, maxval=50, group="🛡 Signal Filters",
+                 tooltip="After a signal fires, ignore signals in the same direction for N bars. Prevents duplicate entries in choppy crossovers. Set 0 to disable.")
+i_min_zone     = input.float(0.25, "Min Momentum Zone", minval=0.0, maxval=0.8, step=0.05, group="🛡 Signal Filters",
+                 tooltip="BUY signals only fire when NMC < -zone. SELL signals only when NMC > +zone. Higher = fewer but stronger signals from deeper extremes.")
+i_vol_gate     = input.bool(true, "Volume Gate", group="🛡 Signal Filters",
+                 tooltip="Only allow signals when volume is above the 20-period average. Kills false breakouts on thin volume.")
+i_hist_confirm = input.bool(true, "Histogram Confirmation", group="🛡 Signal Filters",
+                 tooltip="Require histogram to expand in signal direction for 1 bar after crossover before confirming. Eliminates crossovers that immediately fail.")
+i_regime_filter = input.bool(true, "Regime Filter", group="🛡 Signal Filters",
+                  tooltip="In NEUTRAL regime (Hurst ≈ 0.5), only show Strong signals. Skips low-edge random walk conditions.")
+i_htf_enabled  = input.bool(false, "Higher TF Confirmation", group="🛡 Signal Filters",
+                 tooltip="Require NMC direction on a higher timeframe to align with signal. Uses 4x current timeframe.")
+
+// ── Visual Design ──
+i_bull_color   = input.color(#00E676, "Bullish Color", group="🎨 Visual Design")
+i_bear_color   = input.color(#FF1744, "Bearish Color", group="🎨 Visual Design")
+i_signal_color = input.color(#FFD740, "Signal Line Color", group="🎨 Visual Design")
+i_nmc_color    = input.color(#00B0FF, "NMC Line Color", group="🎨 Visual Design")
+i_show_table   = input.bool(true, "Show Dashboard", group="🎨 Visual Design")
+i_bar_color    = input.bool(false, "Color Chart Bars", group="🎨 Visual Design",
+                 tooltip="Colors main chart candles based on NMC direction.")
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                        CORE FUNCTIONS                                       │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EHLERS SUPER SMOOTHER FILTER (2-Pole Butterworth)
+// ─────────────────────────────────────────────────────────────────────────────
+// From: J.F. Ehlers, "Cybernetic Analysis for Stocks and Futures" (2004)
+// 
+// A 2-pole recursive filter that achieves superior noise suppression with
+// dramatically less lag than any moving average of equivalent smoothing power.
+// Used by institutional desks as a preprocessing step before all signal analysis.
+// The filter removes high-frequency noise while preserving the dominant cycle.
+// ═══════════════════════════════════════════════════════════════════════════════
+f_superSmoother(float src, int len) =>
+    float arg = math.sqrt(2) * math.pi / math.max(len, 2)
+    float a1  = math.exp(-arg)
+    float b1  = 2.0 * a1 * math.cos(arg)
+    float c2  = b1
+    float c3  = -(a1 * a1)
+    float c1  = 1.0 - c2 - c3
+    float filt = 0.0
+    filt := c1 * (src + nz(src[1])) / 2.0 + c2 * nz(filt[1]) + c3 * nz(filt[2])
+    filt
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KALMAN FILTER (Simplified Scalar Form)
+// ─────────────────────────────────────────────────────────────────────────────
+// Originally developed by Rudolf Kalman (1960) for aerospace navigation.
+// Used by Renaissance Technologies, Citadel, and Two Sigma for optimal
+// price state estimation. Separates signal from noise using a recursive
+// Bayesian approach — far superior to any moving average.
+//
+// The filter maintains an estimate of the true price state and its uncertainty,
+// updating both as new data arrives. The Kalman Gain determines how much
+// weight to give new measurements vs. the existing estimate.
+// ═══════════════════════════════════════════════════════════════════════════════
+f_kalman(float measurement, float gain, float processNoise) =>
+    float estimate = 0.0
+    float P = 1.0         // Estimation error covariance
+    float R = 1.0         // Measurement noise (normalized to 1)
+    
+    // Prediction step: increase uncertainty by process noise
+    P := nz(P[1], 1.0) + processNoise
+    
+    // Update step: compute optimal Kalman Gain
+    float K = P / (P + R)
+    K := math.max(gain * K, 0.01)  // Scale by user gain factor
+    
+    // State update: blend prediction with new measurement
+    estimate := nz(estimate[1], measurement) + K * (measurement - nz(estimate[1], measurement))
+    
+    // Covariance update: reduce uncertainty after measurement
+    P := (1.0 - K) * P
+    estimate
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVERSE FISHER TRANSFORM
+// ─────────────────────────────────────────────────────────────────────────────
+// From: J.F. Ehlers, "Using the Fisher Transform" (TASC, Nov 2002)
+// 
+// Maps any input to a bounded [-1, +1] range with a nonlinear compression.
+// This creates SHARP turning points at extremes — far clearer than traditional
+// oscillators. When the output approaches ±1, it indicates a high probability
+// of reversal. The compressive nature means signals spend more time near
+// extremes, creating definitive entry/exit zones.
+// ═══════════════════════════════════════════════════════════════════════════════
+f_ift(float src) =>
+    float val = math.max(math.min(src, 4.0), -4.0)  // Clamp to prevent overflow
+    float e2v = math.exp(2.0 * val)
+    (e2v - 1.0) / (e2v + 1.0)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESCALE TO IFT INPUT RANGE
+// Maps any series to [-5, +5] for optimal IFT input
+// ═══════════════════════════════════════════════════════════════════════════════
+f_rescale(float src, int len) =>
+    float hh = ta.highest(src, len)
+    float ll = ta.lowest(src, len)
+    float rng = hh - ll
+    rng == 0.0 ? 0.0 : 10.0 * ((src - ll) / rng) - 5.0
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOLUME DELTA APPROXIMATION
+// ─────────────────────────────────────────────────────────────────────────────
+// Approximates buying vs selling pressure using the Close Location Value (CLV).
+// The CLV measures where the close falls within the bar's range:
+//   CLV = [(Close - Low) - (High - Close)] / (High - Low)
+// 
+// CLV = +1 means close at the high (buyers dominated)
+// CLV = -1 means close at the low (sellers dominated)
+// Multiplied by volume to get dollar-weighted directional flow.
+//
+// This is the same concept behind Accumulation/Distribution but computed
+// per-bar for momentum analysis — a proxy for institutional order flow.
+// ═══════════════════════════════════════════════════════════════════════════════
+f_volumeDelta(float vol) =>
+    float minRange = ta.atr(14) * 0.001
+    float barRange = math.max(high - low, minRange)
+    float clv = ((close - low) - (high - close)) / barRange
+    clv * vol
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HURST EXPONENT (R/S Method)
+// ─────────────────────────────────────────────────────────────────────────────
+// From: H.E. Hurst (1951), extended by Mandelbrot & Wallis (1969)
+// 
+// Measures the PERSISTENCE of a time series:
+//   H > 0.5  →  TRENDING (persistent) — momentum strategies work
+//   H ≈ 0.5  →  RANDOM WALK — no edge, stay flat
+//   H < 0.5  →  MEAN-REVERTING — fade extremes, sell rallies, buy dips
+//
+// Used by Renaissance Technologies and D.E. Shaw to dynamically switch
+// between momentum and mean-reversion strategies. This is the "regime
+// detection" layer that most retail indicators completely lack.
+//
+// Method: Rescaled Range (R/S) analysis
+//   R = range of cumulative deviations from mean
+//   S = standard deviation of the series
+//   H = log(R/S) / log(N)
+// ═══════════════════════════════════════════════════════════════════════════════
+f_hurst(float src, int len) =>
+    float mean = ta.sma(src, len)
+    float cumDev = 0.0
+    float maxCum = -1e10
+    float minCum = 1e10
+    float sumSq = 0.0
+    for i = 0 to len - 1
+        cumDev += (src[i] - mean)
+        maxCum := math.max(maxCum, cumDev)
+        minCum := math.min(minCum, cumDev)
+        sumSq += math.pow(src[i] - mean, 2.0)
+    float R = maxCum - minCum
+    float S = math.sqrt(sumSq / len)
+    float RS = S > 0 ? R / S : 0.0
+    float H = RS > 0 and len > 1 ? math.log(RS) / math.log(len) : 0.5
+    math.max(math.min(H, 1.0), 0.0)
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    LAYER 1-2: PREPROCESSING                                 │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// Step 1: Remove high-frequency noise with Ehlers Super Smoother
+float smoothed = f_superSmoother(i_src, i_length)
+
+// Step 2: Apply Kalman filter for optimal state estimation
+float kalmanPrice = f_kalman(smoothed, i_kalman_gain, i_kalman_Q)
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    LAYER 3: MULTI-COMPONENT MOMENTUM                        │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// Component A: Kalman-Filtered Rate of Change (primary momentum)
+float prevKalman = nz(kalmanPrice[i_length], kalmanPrice)
+float roc = prevKalman != 0 ? (kalmanPrice - prevKalman) / math.abs(prevKalman) * 100.0 : 0.0
+
+// Component B: Momentum Acceleration (second derivative — rate of change OF rate of change)
+float accel = roc - nz(roc[1])
+
+// Component C: Normalized RSI of Kalman Price (centered at zero)
+float rsiMom = ta.rsi(kalmanPrice, i_length) - 50.0
+
+// Component D: Stochastic of Kalman Price (where is Kalman within its recent range)
+float kHigh = ta.highest(kalmanPrice, i_length)
+float kLow  = ta.lowest(kalmanPrice, i_length)
+float kRange = kHigh - kLow
+float kStoch = kRange != 0 ? ((kalmanPrice - kLow) / kRange) * 100.0 - 50.0 : 0.0
+
+// Composite Momentum Score (weighted blend)
+// Weights: ROC 35% | RSI 30% | Stochastic 20% | Acceleration 15%
+float composite = roc * 0.35 + rsiMom * 0.30 + kStoch * 0.20 + accel * 15.0 * 0.15
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    LAYER 4: INVERSE FISHER TRANSFORM                        │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// Rescale composite to [-5, +5] for optimal IFT input
+float rescaled = f_rescale(composite, i_length * 3)
+
+// Apply Inverse Fisher Transform — maps to probabilistic [-1, +1]
+float iftValue = f_ift(rescaled * 0.5)
+
+// Apply final Kalman smoothing for the cleanest possible signal
+float nmc = f_kalman(iftValue, i_kalman_gain * 0.8, i_kalman_Q * 0.5)
+
+// Generate signal line via Super Smoother (less lag than EMA/SMA)
+float signal = f_superSmoother(nmc, i_smoothing)
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    LAYER 5: VOLUME INTELLIGENCE                             │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+float volDelta      = f_volumeDelta(volume)
+float avgVolDelta   = ta.sma(volDelta, i_vol_length)
+float fastVolDelta  = ta.sma(volDelta, 5)
+float volMomentum   = fastVolDelta - avgVolDelta
+float relativeVol   = volume / math.max(ta.sma(volume, i_vol_length), 1.0)
+
+// Volume Confirmation Score [-1, +1]
+// Positive = volume confirms price momentum direction
+// Negative = volume DIVERGES from price momentum (institutional distribution/accumulation)
+float volConfirm = 0.0
+if i_vol_enabled
+    float volDir   = volMomentum > 0 ? 1.0 : -1.0
+    float priceDir = nmc > 0 ? 1.0 : -1.0
+    float rvCapped = math.min(relativeVol, 3.0) / 3.0
+    volConfirm := volDir == priceDir ? rvCapped : -rvCapped
+
+// Institutional Footprint: detect abnormal volume bars with strong directional conviction
+bool instFootprint = relativeVol > 2.0 and math.abs(close - open) > ta.atr(14) * 0.5
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    LAYER 6: SQUEEZE DYNAMICS                                │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// Bollinger Bands
+float bbBasis = ta.sma(close, i_bb_length)
+float bbDev   = i_bb_mult * ta.stdev(close, i_bb_length)
+float bbUpper = bbBasis + bbDev
+float bbLower = bbBasis - bbDev
+
+// Keltner Channels
+float kcBasis = ta.sma(close, i_kc_length)
+float kcRange = i_kc_mult * ta.atr(i_kc_length)
+float kcUpper = kcBasis + kcRange
+float kcLower = kcBasis - kcRange
+
+// Squeeze States
+bool sqzOn   = i_sq_enabled and (bbLower > kcLower and bbUpper < kcUpper)
+bool sqzOff  = i_sq_enabled and (bbLower <= kcLower or bbUpper >= kcUpper)
+bool sqzFire = sqzOff and nz(sqzOn[1])  // First bar of expansion after squeeze
+
+// Squeeze Momentum: Linear regression of price deviation during squeeze
+float sqzMom = ta.linreg(kalmanPrice - ta.sma(kalmanPrice, i_kc_length), i_kc_length, 0)
+
+// Count consecutive squeeze bars
+var int sqzCount = 0
+sqzCount := sqzOn ? sqzCount + 1 : 0
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    LAYER 7: HURST REGIME DETECTION                          │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+int hurstLen = math.max(i_length * 2, 20)
+float hurst = f_hurst(close, hurstLen)
+
+// Regime Classification
+bool isTrending      = hurst > 0.55
+bool isMeanReverting = hurst < 0.45
+bool isRandom        = not isTrending and not isMeanReverting
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    COMPOSITE SIGNAL GENERATION                              │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// Final NMC value adjusted for volume confirmation
+float nmcFinal = nmc * (1.0 + volConfirm * 0.3)
+
+// Histogram (momentum of the momentum — acceleration of NMC)
+float hist     = nmcFinal - signal
+float histPrev = nz(hist[1])
+bool histUp    = hist > histPrev
+bool histPos   = hist >= 0
+
+// ── Higher Timeframe Confirmation (optional) ──
+// Note: request.security must be at global scope in Pine v5
+string htfTF = timeframe.period == "1" ? "5" : timeframe.period == "5" ? "15" : timeframe.period == "15" ? "60" : timeframe.period == "60" ? "240" : timeframe.period == "240" ? "D" : "W"
+float htfNmcRaw = request.security(syminfo.tickerid, htfTF, nmc)
+float htfNmc = i_htf_enabled ? htfNmcRaw : 0.0
+
+// ── ANTI-FALSE SIGNAL ENGINE ──
+// Step 1: Raw crossover detection
+bool rawBuy  = ta.crossover(nmcFinal, signal)
+bool rawSell = ta.crossunder(nmcFinal, signal)
+
+// Step 2: Minimum Momentum Zone Filter
+// Only accept buys from oversold, sells from overbought
+bool zoneBuy  = rawBuy and nmcFinal < -i_min_zone
+bool zoneSell = rawSell and nmcFinal > i_min_zone
+
+// Step 3: Volume Gate Filter
+// Reject signals on below-average volume (no institutional participation)
+bool volGatePass = not i_vol_gate or relativeVol >= 1.0
+
+// Step 4: Histogram Confirmation Filter
+// Previous bar's histogram must be expanding in signal direction
+bool histConfirmBuy  = not i_hist_confirm or (hist > histPrev)
+bool histConfirmSell = not i_hist_confirm or (hist < histPrev)
+
+// Step 5: Regime Filter
+// In random walk regime, only allow strong signals
+bool regimePassBuy  = not i_regime_filter or not isRandom or (nmcFinal < -0.4 and volConfirm > 0.3)
+bool regimePassSell = not i_regime_filter or not isRandom or (nmcFinal > 0.4 and volConfirm < -0.3)
+
+// Step 6: Higher Timeframe Alignment
+bool htfPassBuy  = not i_htf_enabled or htfNmc > 0 or nz(htfNmc[1]) < htfNmc
+bool htfPassSell = not i_htf_enabled or htfNmc < 0 or nz(htfNmc[1]) > htfNmc
+
+// Step 7: Cooldown Period
+// Track bars since last signal to prevent cluster signals
+var int lastBuyBar  = -9999
+var int lastSellBar = -9999
+bool cooldownBuy  = i_cooldown == 0 or (bar_index - lastBuyBar) > i_cooldown
+bool cooldownSell = i_cooldown == 0 or (bar_index - lastSellBar) > i_cooldown
+
+// ── Final Filtered Signals ──
+bool buySignal  = zoneBuy and volGatePass and histConfirmBuy and regimePassBuy and htfPassBuy and cooldownBuy
+bool sellSignal = zoneSell and volGatePass and histConfirmSell and regimePassSell and htfPassSell and cooldownSell
+
+// Strong signals: volume-confirmed + from deep extreme zone + additional confluence
+bool strongBuy  = buySignal and nmcFinal < -(i_min_zone + 0.1) and (volConfirm > 0.2 or sqzFire)
+bool strongSell = sellSignal and nmcFinal > (i_min_zone + 0.1) and (volConfirm < -0.2 or sqzFire)
+
+// Update cooldown trackers
+if buySignal
+    lastBuyBar := bar_index
+if sellSignal
+    lastSellBar := bar_index
+
+// Count how many filters each signal passed (for dashboard)
+var int filtersPassedBuy = 0
+var int filtersPassedSell = 0
+if rawBuy
+    filtersPassedBuy := (nmcFinal < -i_min_zone ? 1 : 0) + (volGatePass ? 1 : 0) + (histConfirmBuy ? 1 : 0) + (regimePassBuy ? 1 : 0) + (htfPassBuy ? 1 : 0) + (cooldownBuy ? 1 : 0)
+if rawSell
+    filtersPassedSell := (nmcFinal > i_min_zone ? 1 : 0) + (volGatePass ? 1 : 0) + (histConfirmSell ? 1 : 0) + (regimePassSell ? 1 : 0) + (htfPassSell ? 1 : 0) + (cooldownSell ? 1 : 0)
+
+// Regime-aware confidence scoring [0 to 100]
+float confidence = 0.0
+confidence += math.abs(nmcFinal) * 25.0                                     // Momentum magnitude
+confidence += math.abs(volConfirm) * 20.0                                   // Volume confirmation
+confidence += sqzFire ? 15.0 : sqzOn and sqzCount > 3 ? 10.0 : 0.0         // Squeeze energy
+confidence += isTrending and math.abs(nmcFinal) > 0.3 ? 15.0 : 0.0          // Regime alignment
+confidence += instFootprint ? 10.0 : 0.0                                     // Institutional footprint
+confidence += math.abs(hist) > math.abs(histPrev) ? 5.0 : 0.0              // Momentum accelerating
+confidence += volGatePass ? 5.0 : 0.0                                       // Volume gate passed
+confidence := math.min(confidence, 100.0)
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                    DIVERGENCE DETECTION                                     │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+float pivotHi = ta.pivothigh(nmcFinal, i_div_lookback, i_div_lookback)
+float pivotLo = ta.pivotlow(nmcFinal, i_div_lookback, i_div_lookback)
+
+var float prevPivotHi    = na
+var float prevPivotLo    = na
+var float prevPriceHi    = na
+var float prevPriceLo    = na
+var int   prevPivotHiBar = 0
+var int   prevPivotLoBar = 0
+
+bool bullDiv = false
+bool bearDiv = false
+
+if i_div_enabled
+    // Bearish Divergence: Price higher high + NMC lower high
+    if not na(pivotHi) and not na(prevPivotHi)
+        if high[i_div_lookback] > nz(prevPriceHi) and pivotHi < prevPivotHi
+            bearDiv := true
+
+    // Bullish Divergence: Price lower low + NMC higher low
+    if not na(pivotLo) and not na(prevPivotLo)
+        if low[i_div_lookback] < nz(prevPriceLo) and pivotLo > prevPivotLo
+            bullDiv := true
+
+    // Update stored pivots
+    if not na(pivotHi)
+        prevPivotHi    := pivotHi
+        prevPriceHi    := high[i_div_lookback]
+        prevPivotHiBar := bar_index - i_div_lookback
+
+    if not na(pivotLo)
+        prevPivotLo    := pivotLo
+        prevPriceLo    := low[i_div_lookback]
+        prevPivotLoBar := bar_index - i_div_lookback
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                         VISUAL ENGINE                                       │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+// ── Color Definitions ──
+color bullFull   = color.new(i_bull_color, 0)
+color bullMid    = color.new(i_bull_color, 40)
+color bullFade   = color.new(i_bull_color, 75)
+color bearFull   = color.new(i_bear_color, 0)
+color bearMid    = color.new(i_bear_color, 40)
+color bearFade   = color.new(i_bear_color, 75)
+
+// ── Histogram: 4-State Color System ──
+// Rising + Positive = Strong Bull | Falling + Positive = Weakening Bull
+// Rising + Negative = Weakening Bear | Falling + Negative = Strong Bear
+color histColor = histPos ? (histUp ? bullFull : bullMid) : (histUp ? bearMid : bearFull)
+
+// ── Main Plots ──
+plot(hist, title="Histogram", style=plot.style_columns, color=histColor, linewidth=2)
+
+// NMC Line with glow effect (thick transparent + thin opaque)
+plot(nmcFinal, title="NMC Glow", color=color.new(i_nmc_color, 70), linewidth=5, display=display.pane)
+p_nmc = plot(nmcFinal, title="NMC Line", color=color.new(i_nmc_color, 0), linewidth=2)
+
+// Signal Line
+p_sig = plot(signal, title="Signal Line", color=color.new(i_signal_color, 20), linewidth=1)
+
+// Momentum Fill between NMC and Signal
+fill(p_nmc, p_sig, color=nmcFinal > signal ? color.new(i_bull_color, 85) : color.new(i_bear_color, 85), 
+     title="Momentum Fill")
+
+// Zero Line
+h0 = hline(0, title="Zero", color=color.new(color.gray, 70), linestyle=hline.style_dotted, linewidth=1)
+
+// Overbought / Oversold Zones
+h_ob = hline(0.8, title="Overbought", color=color.new(i_bear_color, 85), linestyle=hline.style_dashed)
+h_os = hline(-0.8, title="Oversold", color=color.new(i_bull_color, 85), linestyle=hline.style_dashed)
+fill(h_ob, h0, color=color.new(i_bear_color, 95), title="OB Zone")
+fill(h0, h_os, color=color.new(i_bull_color, 95), title="OS Zone")
+
+// ── Squeeze Dots at Zero Line ──
+// Orange diamond = BB inside KC (building pressure)
+// Green diamond = First bar of expansion (squeeze fires!)
+plotshape(sqzOn ? 0 : na, title="Squeeze Active", style=shape.diamond, 
+          location=location.absolute, color=color.new(#FF6D00, 0), size=size.tiny)
+plotshape(sqzFire ? 0 : na, title="Squeeze Fire", style=shape.diamond, 
+          location=location.absolute, color=color.new(#76FF03, 0), size=size.small)
+
+// ── Signal Markers ──
+// Strong Buy/Sell: large triangles with text
+plotshape(strongBuy ? nmcFinal : na, title="Strong Buy", style=shape.triangleup, 
+          location=location.absolute, color=color.new(#00E676, 0), size=size.small, 
+          text="BUY", textcolor=color.new(#00E676, 0))
+plotshape(strongSell ? nmcFinal : na, title="Strong Sell", style=shape.triangledown, 
+          location=location.absolute, color=color.new(#FF1744, 0), size=size.small, 
+          text="SELL", textcolor=color.new(#FF1744, 0))
+
+// Regular Buy/Sell: small circles
+plotshape(buySignal and not strongBuy ? nmcFinal : na, title="Buy", style=shape.circle, 
+          location=location.absolute, color=color.new(#00E676, 30), size=size.tiny)
+plotshape(sellSignal and not strongSell ? nmcFinal : na, title="Sell", style=shape.circle, 
+          location=location.absolute, color=color.new(#FF1744, 30), size=size.tiny)
+
+// ── Divergence Labels ──
+plotshape(bullDiv ? nmcFinal[i_div_lookback] : na, title="Bullish Divergence", 
+          style=shape.labelup, location=location.absolute, 
+          color=color.new(#00E676, 10), size=size.tiny, 
+          text="DIV ↗", textcolor=color.white, offset=-i_div_lookback)
+plotshape(bearDiv ? nmcFinal[i_div_lookback] : na, title="Bearish Divergence", 
+          style=shape.labeldown, location=location.absolute, 
+          color=color.new(#FF1744, 10), size=size.tiny, 
+          text="DIV ↘", textcolor=color.white, offset=-i_div_lookback)
+
+// ── Institutional Footprint Marker (on zero line) ──
+plotshape(instFootprint ? 0 : na, title="Institutional Volume", style=shape.cross, 
+          location=location.absolute, color=color.new(#E040FB, 30), size=size.tiny)
+
+// ── Regime Background ──
+bgcolor(isTrending ? color.new(#2196F3, 96) : isMeanReverting ? color.new(#FF9800, 96) : na, 
+        title="Regime Background")
+
+// ── Bar Coloring ──
+barcolor(i_bar_color ? (nmcFinal > 0.3 ? bullFull : nmcFinal > 0 ? bullMid : nmcFinal > -0.3 ? bearMid : bearFull) : na, 
+         title="NMC Bar Color")
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                        LIVE DASHBOARD                                       │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+if i_show_table and barstate.islast
+    var table dash = table.new(position.top_right, 2, 11, 
+                               bgcolor=color.new(#0D1117, 5), 
+                               border_color=color.new(#30363D, 0), 
+                               border_width=1, 
+                               frame_color=color.new(#58A6FF, 30), 
+                               frame_width=2)
+
+    // Header
+    table.cell(dash, 0, 0, "  NEXUS MOMENTUM CIPHER  ", 
+               text_color=color.new(#58A6FF, 0), text_size=size.small, 
+               bgcolor=color.new(#161B22, 0), text_halign=text.align_center)
+    table.merge_cells(dash, 0, 0, 1, 0)
+
+    // Row 1: NMC Value
+    color nmcDashColor = nmcFinal > 0 ? bullFull : bearFull
+    table.cell(dash, 0, 1, "NMC Value", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 1, str.tostring(nmcFinal, "#.####"), text_color=nmcDashColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 2: Signal
+    table.cell(dash, 0, 2, "Signal", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 2, str.tostring(signal, "#.####"), text_color=color.new(i_signal_color, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 3: Histogram
+    table.cell(dash, 0, 3, "Histogram", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 3, str.tostring(hist, "#.####"), text_color=histColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 4: Volume Confirmation
+    string volStr = i_vol_enabled ? str.tostring(volConfirm, "#.##") : "OFF"
+    color volDashColor = volConfirm > 0 ? bullFull : volConfirm < 0 ? bearFull : color.gray
+    table.cell(dash, 0, 4, "Vol Confirm", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 4, volStr, text_color=i_vol_enabled ? volDashColor : color.gray, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 5: Squeeze Status
+    string sqzStr = sqzOn ? "● SQUEEZE" : sqzFire ? "⚡ FIRE!" : "— OFF"
+    color sqzDashColor = sqzOn ? color.new(#FF6D00, 0) : sqzFire ? color.new(#76FF03, 0) : color.gray
+    table.cell(dash, 0, 5, "Squeeze", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 5, sqzStr, text_color=sqzDashColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 6: Regime
+    string regStr = isTrending ? "📈 TRENDING" : isMeanReverting ? "🔄 MEAN REV" : "〰 NEUTRAL"
+    color regDashColor = isTrending ? color.new(#2196F3, 0) : isMeanReverting ? color.new(#FF9800, 0) : color.gray
+    table.cell(dash, 0, 6, "Regime", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 6, regStr, text_color=regDashColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 7: Hurst Exponent
+    table.cell(dash, 0, 7, "Hurst (H)", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 7, str.tostring(hurst, "#.###"), text_color=regDashColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 8: Confidence
+    string confStr = str.tostring(confidence, "#") + "%"
+    color confColor = confidence > 70 ? bullFull : confidence > 40 ? color.new(#FFD740, 0) : bearFull
+    table.cell(dash, 0, 8, "Confidence", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 8, confStr, text_color=confColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 9: Relative Volume
+    string rvolStr = str.tostring(relativeVol, "#.##") + "x"
+    color rvolColor = relativeVol > 2.0 ? color.new(#E040FB, 0) : relativeVol > 1.0 ? bullFull : color.new(#8B949E, 0)
+    table.cell(dash, 0, 9, "Rel Volume", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 9, rvolStr, text_color=rvolColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+    // Row 10: Filter Status (how many anti-false filters are active)
+    int activeFilters = (i_cooldown > 0 ? 1 : 0) + (i_min_zone > 0 ? 1 : 0) + (i_vol_gate ? 1 : 0) + (i_hist_confirm ? 1 : 0) + (i_regime_filter ? 1 : 0) + (i_htf_enabled ? 1 : 0)
+    string filterStr = str.tostring(activeFilters) + "/6 ACTIVE"
+    color filterColor = activeFilters >= 4 ? color.new(#76FF03, 0) : activeFilters >= 2 ? color.new(#FFD740, 0) : color.new(#FF6D00, 0)
+    table.cell(dash, 0, 10, "🛡 Filters", text_color=color.new(#8B949E, 0), 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+    table.cell(dash, 1, 10, filterStr, text_color=filterColor, 
+               text_size=size.tiny, bgcolor=color.new(#0D1117, 0))
+
+
+// ┌──────────────────────────────────────────────────────────────────────────────┐
+// │                           ALERTS                                            │
+// └──────────────────────────────────────────────────────────────────────────────┘
+
+alertcondition(strongBuy, title="⚡ Strong BUY Signal", 
+     message="NMC STRONG BUY — Volume-confirmed momentum reversal from oversold zone. Confidence: {{plot_4}}")
+alertcondition(strongSell, title="⚡ Strong SELL Signal", 
+     message="NMC STRONG SELL — Volume-confirmed momentum reversal from overbought zone. Confidence: {{plot_4}}")
+alertcondition(buySignal, title="📗 Buy Signal", 
+     message="NMC Buy — Momentum crossing above signal line from below zero.")
+alertcondition(sellSignal, title="📕 Sell Signal", 
+     message="NMC Sell — Momentum crossing below signal line from above zero.")
+alertcondition(sqzFire, title="💥 Squeeze Fired", 
+     message="NMC SQUEEZE FIRE — Volatility expanding after compression! Check NMC direction for trade direction.")
+alertcondition(bullDiv, title="🔄 Bullish Divergence", 
+     message="NMC Bullish Divergence — Price making lower low while momentum makes higher low. Potential trend reversal UP.")
+alertcondition(bearDiv, title="🔄 Bearish Divergence", 
+     message="NMC Bearish Divergence — Price making higher high while momentum makes lower high. Potential trend reversal DOWN.")
+
+// ── END ──

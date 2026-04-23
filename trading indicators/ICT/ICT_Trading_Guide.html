@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICT Institutional Setups — Prop Firm Playbook</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #050a12;
+    --bg2:      #0a1220;
+    --bg3:      #0f1c2e;
+    --panel:    #0d1829;
+    --border:   #1a3050;
+    --accent:   #00e5ff;
+    --accent2:  #ffd600;
+    --green:    #00e676;
+    --red:      #ff5252;
+    --purple:   #ce93d8;
+    --orange:   #ffb300;
+    --text:     #cdd9e5;
+    --muted:    #5a7a9a;
+    --white:    #eaf0f8;
+    --font-mono: 'Space Mono', monospace;
+    --font-head: 'Syne', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── GRID NOISE TEXTURE ── */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,229,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position:relative; z-index:1;
+    padding: 60px 24px 40px;
+    text-align:center;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-badge {
+    display:inline-block;
+    background: rgba(0,229,255,.08);
+    border: 1px solid rgba(0,229,255,.3);
+    color: var(--accent);
+    font-size:.7rem; letter-spacing:.15em;
+    padding:4px 16px; border-radius:2px;
+    margin-bottom:20px;
+    text-transform:uppercase;
+  }
+  .hero h1 {
+    font-family: var(--font-head);
+    font-size: clamp(2rem,5vw,3.8rem);
+    font-weight:800;
+    line-height:1.1;
+    color: var(--white);
+    margin-bottom:12px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p {
+    max-width:640px; margin:0 auto 32px;
+    color: var(--muted);
+    font-size:.82rem; line-height:1.8;
+  }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    display:flex; flex-wrap:wrap; gap:12px; justify-content:center;
+    margin-bottom:32px;
+  }
+  .stat {
+    background: rgba(0,229,255,.05);
+    border:1px solid rgba(0,229,255,.15);
+    border-radius:4px; padding:10px 20px;
+    text-align:center;
+  }
+  .stat-val {
+    font-family:var(--font-head); font-size:1.6rem; font-weight:800;
+    color:var(--accent2);
+  }
+  .stat-lbl { font-size:.65rem; color:var(--muted); letter-spacing:.1em; margin-top:2px; }
+
+  /* ── MAIN LAYOUT ── */
+  .container { max-width:1400px; margin:0 auto; padding:32px 20px; position:relative; z-index:1; }
+
+  /* ── TABS ── */
+  .tabs {
+    display:flex; flex-wrap:wrap; gap:6px; margin-bottom:28px;
+    border-bottom:1px solid var(--border); padding-bottom:12px;
+  }
+  .tab {
+    background: var(--bg3);
+    border:1px solid var(--border);
+    color:var(--muted);
+    font-family:var(--font-mono);
+    font-size:.7rem; letter-spacing:.05em;
+    padding:7px 14px; border-radius:3px;
+    cursor:pointer;
+    transition: all .2s;
+  }
+  .tab:hover { border-color:var(--accent); color:var(--accent); }
+  .tab.active {
+    background: rgba(0,229,255,.1);
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+
+  /* ── STRATEGY CARDS GRID ── */
+  .strategies-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px,1fr));
+    gap:20px;
+  }
+
+  .strategy-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius:6px;
+    overflow:hidden;
+    cursor:pointer;
+    transition: all .25s;
+    position:relative;
+  }
+  .strategy-card::before {
+    content:'';
+    position:absolute; top:0; left:0; right:0; height:2px;
+    background: var(--card-accent, var(--accent));
+    transform:scaleX(0); transform-origin:left;
+    transition: transform .3s;
+  }
+  .strategy-card:hover { border-color:var(--card-accent, var(--accent)); transform:translateY(-2px); }
+  .strategy-card:hover::before { transform:scaleX(1); }
+  .strategy-card.expanded { border-color:var(--card-accent, var(--accent)); }
+  .strategy-card.expanded::before { transform:scaleX(1); }
+
+  .card-header {
+    display:flex; align-items:center; gap:14px;
+    padding:18px 20px;
+  }
+  .card-icon {
+    width:44px; height:44px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.4rem;
+    background: var(--icon-bg, rgba(0,229,255,.1));
+    flex-shrink:0;
+  }
+  .card-meta { flex:1; }
+  .card-num {
+    font-size:.6rem; color:var(--muted); letter-spacing:.1em; margin-bottom:3px;
+  }
+  .card-title {
+    font-family:var(--font-head); font-weight:700;
+    color:var(--white); font-size:1rem;
+  }
+  .card-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+  .tag {
+    font-size:.58rem; padding:2px 7px; border-radius:2px;
+    background: rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.1);
+    color:var(--muted);
+    letter-spacing:.05em;
+  }
+  .tag.hot { background:rgba(255,82,82,.1); border-color:rgba(255,82,82,.3); color:var(--red); }
+  .tag.green { background:rgba(0,230,118,.1); border-color:rgba(0,230,118,.3); color:var(--green); }
+  .tag.yellow { background:rgba(255,214,0,.1); border-color:rgba(255,214,0,.3); color:var(--accent2); }
+
+  .winrate-badge {
+    text-align:right;
+  }
+  .wr-val {
+    font-family:var(--font-head); font-size:1.3rem; font-weight:800;
+    color:var(--green);
+  }
+  .wr-lbl { font-size:.55rem; color:var(--muted); }
+
+  .card-body {
+    display:none;
+    border-top:1px solid var(--border);
+  }
+  .card-body.open { display:block; }
+
+  .card-section {
+    padding:16px 20px;
+    border-bottom:1px solid rgba(255,255,255,.05);
+  }
+  .card-section:last-child { border-bottom:none; }
+  .section-title {
+    font-size:.65rem; color:var(--accent); letter-spacing:.12em;
+    text-transform:uppercase; margin-bottom:10px;
+  }
+  .card-section p {
+    font-size:.75rem; color:var(--text); line-height:1.8;
+  }
+
+  /* ── STEP FLOW ── */
+  .steps { display:flex; flex-direction:column; gap:8px; }
+  .step {
+    display:flex; align-items:flex-start; gap:12px;
+    background:rgba(255,255,255,.02); border-radius:4px; padding:10px 12px;
+    border-left:2px solid var(--step-clr, var(--accent));
+  }
+  .step-num {
+    width:22px; height:22px; border-radius:50%;
+    background:var(--step-clr, var(--accent));
+    color:#000; font-size:.65rem; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .step p { font-size:.72rem; line-height:1.7; color:var(--text); }
+  .step strong { color:var(--white); }
+
+  /* ── ENTRY/EXIT TABLE ── */
+  .ee-grid {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:12px; margin-top:4px;
+  }
+  .ee-box {
+    background:rgba(255,255,255,.03); border-radius:4px; padding:12px;
+  }
+  .ee-box.long { border-left:3px solid var(--green); }
+  .ee-box.short { border-left:3px solid var(--red); }
+  .ee-box h4 {
+    font-family:var(--font-head); font-size:.8rem; margin-bottom:8px;
+  }
+  .ee-box.long h4 { color:var(--green); }
+  .ee-box.short h4 { color:var(--red); }
+  .ee-row { display:flex; justify-content:space-between; margin-bottom:5px; }
+  .ee-label { font-size:.65rem; color:var(--muted); }
+  .ee-val { font-size:.65rem; color:var(--white); text-align:right; }
+
+  /* ── TIMEFRAME METER ── */
+  .tf-table { width:100%; border-collapse:collapse; }
+  .tf-table th {
+    font-size:.6rem; color:var(--muted); letter-spacing:.1em;
+    padding:4px 8px; text-align:left; border-bottom:1px solid var(--border);
+  }
+  .tf-table td { padding:5px 8px; font-size:.67rem; border-bottom:1px solid rgba(255,255,255,.03); }
+  .tf-table td:first-child { color:var(--accent2); font-weight:700; }
+  .bar-cell { width:120px; }
+  .bar-wrap { height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+  .bar-fill  { height:100%; border-radius:3px; background:var(--fill-clr,var(--accent)); }
+
+  /* ── CONFLUENCE BADGES ── */
+  .conf-list { display:flex; flex-direction:column; gap:6px; }
+  .conf-item {
+    display:flex; align-items:center; gap:8px;
+    font-size:.7rem; color:var(--text);
+  }
+  .conf-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+  /* ── RIGHT SIDEBAR PANEL ── */
+  .layout { display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start; }
+  @media(max-width:900px){ .layout { grid-template-columns:1fr; } }
+
+  .sidebar { position:sticky; top:20px; }
+
+  /* ── QUICK REF PANEL ── */
+  .panel {
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:6px; overflow:hidden; margin-bottom:16px;
+  }
+  .panel-hdr {
+    padding:12px 16px;
+    background: rgba(0,229,255,.05);
+    border-bottom:1px solid var(--border);
+    font-size:.7rem; color:var(--accent); letter-spacing:.1em; text-transform:uppercase;
+  }
+  .panel-body { padding:14px 16px; }
+
+  /* ── KILL ZONE TIMELINE ── */
+  .kz-timeline { position:relative; padding-left:12px; }
+  .kz-row {
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:10px; padding:8px 12px;
+    background:rgba(255,255,255,.02); border-radius:4px;
+  }
+  .kz-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .kz-info { flex:1; }
+  .kz-name { font-size:.7rem; color:var(--white); font-weight:700; }
+  .kz-time { font-size:.6rem; color:var(--muted); margin-top:2px; }
+  .kz-prob {
+    font-size:.6rem; padding:2px 8px; border-radius:2px;
+    font-weight:700;
+  }
+  .kz-prob.high { background:rgba(0,230,118,.15); color:var(--green); }
+  .kz-prob.med  { background:rgba(255,214,0,.15);  color:var(--accent2); }
+  .kz-prob.low  { background:rgba(90,120,154,.15);  color:var(--muted); }
+
+  /* ── PO3 VISUAL ── */
+  .po3-visual {
+    display:flex; height:80px; border-radius:6px; overflow:hidden; margin-top:8px;
+    border:1px solid var(--border);
+  }
+  .po3-phase {
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    font-size:.6rem; text-align:center; padding:4px;
+    transition: flex .3s;
+  }
+  .po3-phase.accum  { background:rgba(124,77,255,.15); color:#b39ddb; }
+  .po3-phase.manip  { background:rgba(255,87,34,.15);  color:#ffab91; }
+  .po3-phase.distrib{ background:rgba(76,175,80,.15);  color:#a5d6a7; }
+  .po3-num { font-size:1rem; margin-bottom:2px; }
+
+  /* ── CONFLUENCE SCORE WIDGET ── */
+  .score-display {
+    text-align:center; padding:20px;
+  }
+  .score-ring {
+    width:80px; height:80px; border-radius:50%;
+    border:4px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 12px;
+    position:relative;
+    font-family:var(--font-head); font-size:1.6rem; font-weight:800;
+  }
+  .score-ring.s0 { border-color:#3d5a7a; color:#3d5a7a; }
+  .score-ring.s1 { border-color:#607d8b; color:#607d8b; }
+  .score-ring.s2 { border-color:var(--orange); color:var(--orange); }
+  .score-ring.s3 { border-color:var(--accent2); color:var(--accent2); }
+  .score-ring.s4 { border-color:var(--green); color:var(--green); box-shadow:0 0 20px rgba(0,230,118,.3); }
+  .score-ring.s5 { border-color:var(--accent); color:var(--accent); box-shadow:0 0 25px rgba(0,229,255,.4); }
+
+  /* ── INTERACTIVE FILTERS ── */
+  .filter-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+  .filter-btn {
+    background:var(--bg3); border:1px solid var(--border);
+    color:var(--muted); font-family:var(--font-mono); font-size:.65rem;
+    padding:5px 12px; border-radius:3px; cursor:pointer; transition:all .2s;
+  }
+  .filter-btn:hover { border-color:var(--accent2); color:var(--accent2); }
+  .filter-btn.active { background:rgba(255,214,0,.1); border-color:var(--accent2); color:var(--accent2); }
+
+  /* ── RISK BOX ── */
+  .risk-section {
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:6px; padding:20px; margin-top:24px;
+  }
+  .risk-section h3 {
+    font-family:var(--font-head); color:var(--red);
+    margin-bottom:14px; font-size:.95rem;
+  }
+  .risk-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr));
+    gap:12px;
+  }
+  .risk-item {
+    background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:4px; padding:12px;
+  }
+  .risk-item h4 { color:var(--accent2); font-size:.72rem; margin-bottom:6px; }
+  .risk-item p  { color:var(--text); font-size:.68rem; line-height:1.7; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align:center; padding:30px 20px;
+    border-top:1px solid var(--border);
+    color:var(--muted); font-size:.65rem;
+    position:relative; z-index:1;
+  }
+  .footer strong { color:var(--accent); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  .strategy-card { animation: fadeIn .3s ease both; }
+
+  /* ── GLOW PULSE ── */
+  @keyframes pulse-glow {
+    0%,100% { box-shadow: 0 0 10px rgba(0,229,255,.2); }
+    50%      { box-shadow: 0 0 25px rgba(0,229,255,.4); }
+  }
+  .highlight { animation: pulse-glow 2s ease-in-out infinite; }
+
+  /* scroll smooth */
+  html { scroll-behavior: smooth; }
+
+  .verdict {
+    display:inline-block;
+    font-size:.6rem; padding:2px 10px; border-radius:2px; font-weight:700;
+    letter-spacing:.07em; margin-left:auto;
+  }
+  .verdict.elite  { background:rgba(0,229,255,.15); color:var(--accent); }
+  .verdict.strong { background:rgba(0,230,118,.12); color:var(--green); }
+  .verdict.solid  { background:rgba(255,214,0,.12);  color:var(--accent2); }
+  .verdict.scalp  { background:rgba(206,147,216,.12); color:var(--purple); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HERO ═══════════════════ -->
+<div class="hero">
+  <div class="hero-badge">CONFIDENTIAL — PROP FIRM PLAYBOOK</div>
+  <h1>ICT <span>Institutional</span><br>Trading Setups</h1>
+  <p>The complete Inner Circle Trader methodology used by institutional prop firms, hedge funds, and smart-money operators. Every setup, every killzone, every confluence — mapped and explained.</p>
+
+  <div class="stats-row">
+    <div class="stat"><div class="stat-val">10</div><div class="stat-lbl">Setups</div></div>
+    <div class="stat"><div class="stat-val">68–82%</div><div class="stat-lbl">Avg Win Rate</div></div>
+    <div class="stat"><div class="stat-val">1:3+</div><div class="stat-lbl">Min Risk:Reward</div></div>
+    <div class="stat"><div class="stat-val">5</div><div class="stat-lbl">Markets</div></div>
+    <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Kill Zones</div></div>
+  </div>
+
+  <div class="filter-row" style="justify-content:center;">
+    <button class="filter-btn active" onclick="filterCards('all',this)">All Setups</button>
+    <button class="filter-btn" onclick="filterCards('swing',this)">Swing</button>
+    <button class="filter-btn" onclick="filterCards('intraday',this)">Intraday</button>
+    <button class="filter-btn" onclick="filterCards('scalp',this)">Scalp</button>
+    <button class="filter-btn" onclick="filterCards('reversal',this)">Reversal</button>
+    <button class="filter-btn" onclick="filterCards('continuation',this)">Continuation</button>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<div class="container">
+<div class="layout">
+
+<!-- LEFT: STRATEGY CARDS -->
+<div>
+<div class="strategies-grid" id="cardsGrid">
+
+<!-- ──────────────── 1. ORDER BLOCKS ──────────────── -->
+<div class="strategy-card" style="--card-accent:#00e676; --icon-bg:rgba(0,230,118,.12);"
+     data-tags="swing intraday continuation reversal" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">📦</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 01</div>
+      <div class="card-title">Order Blocks</div>
+      <div class="card-tags">
+        <span class="tag green">CORE SETUP</span>
+        <span class="tag">Swing</span>
+        <span class="tag">Intraday</span>
+        <span class="verdict elite">ELITE</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">74%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p>An <strong>Order Block (OB)</strong> is the last opposing candle before a significant impulsive move (displacement). It represents the price level where institutional orders were placed — and where algorithms will return to fill remaining orders. It's the institution's "fingerprint" on the chart.</p>
+      <br>
+      <p>🟢 <strong>Bullish OB</strong> = Last bearish candle before a strong upward move.<br>
+         🔴 <strong>Bearish OB</strong> = Last bullish candle before a strong downward move.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry Checklist (5 Rules)</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#00e676">
+          <div class="step-num">1</div>
+          <p>Identify the <strong>higher timeframe bias</strong> (Daily/4H). Only trade OBs in the direction of the premium/discount array.</p>
+        </div>
+        <div class="step" style="--step-clr:#00e676">
+          <div class="step-num">2</div>
+          <p>Wait for <strong>liquidity sweep</strong> before expecting OB to react. Institutions need fuel (stops) to reverse.</p>
+        </div>
+        <div class="step" style="--step-clr:#00e676">
+          <div class="step-num">3</div>
+          <p>Drop to <strong>lower timeframe</strong> (5m/15m) to see price return to the OB with precision entry.</p>
+        </div>
+        <div class="step" style="--step-clr:#00e676">
+          <div class="step-num">4</div>
+          <p>Enter when price returns to the <strong>50% midline or lower quarter</strong> of the OB. Aggressive = OB touch; Conservative = confirmation candle.</p>
+        </div>
+        <div class="step" style="--step-clr:#00e676">
+          <div class="step-num">5</div>
+          <p>SL below the <strong>full OB body</strong> (not wick). TP at previous high/low, opposing FVG, or 1:3R minimum.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry / Exit Parameters</div>
+      <div class="ee-grid">
+        <div class="ee-box long">
+          <h4>📈 LONG (Bullish OB)</h4>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">OB open – OB 50%</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Below OB low by 1 pip</span></div>
+          <div class="ee-row"><span class="ee-label">TP1</span><span class="ee-val">Previous swing high</span></div>
+          <div class="ee-row"><span class="ee-label">TP2</span><span class="ee-val">Opposing FVG / BSL</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--green)">1:3 – 1:8</span></div>
+        </div>
+        <div class="ee-box short">
+          <h4>📉 SHORT (Bearish OB)</h4>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">OB open – OB 50%</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Above OB high by 1 pip</span></div>
+          <div class="ee-row"><span class="ee-label">TP1</span><span class="ee-val">Previous swing low</span></div>
+          <div class="ee-row"><span class="ee-label">TP2</span><span class="ee-val">Opposing FVG / SSL</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--red)">1:3 – 1:8</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Best Timeframes</div>
+      <table class="tf-table">
+        <tr><th>TF</th><th>Role</th><th>Quality</th><th class="bar-cell">Reliability</th></tr>
+        <tr><td>Daily</td><td>HTF Bias OBs</td><td>Swing trades</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:95%;--fill-clr:#00e676"></div></div></td></tr>
+        <tr><td>4H</td><td>Mid-term OBs</td><td>2–5 day trades</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:88%;--fill-clr:#00e676"></div></div></td></tr>
+        <tr><td>1H</td><td>Intraday OBs</td><td>Same-day plays</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:78%;--fill-clr:#ffd600"></div></div></td></tr>
+        <tr><td>15m</td><td>Entry precision</td><td>Kill zone entries</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:68%;--fill-clr:#ffd600"></div></div></td></tr>
+      </table>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight (Hidden from Retail)</div>
+      <p>Institutions do NOT place orders at round numbers. They place them at the <strong>open of the last opposing candle before displacement</strong>. Retail traders draw support/resistance at wicks and highs/lows — completely missing where smart money actually is. The "50% of OB" (the midline) is the highest probability entry because it's where algorithms refill remaining inventory.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 2. FAIR VALUE GAPS ──────────────── -->
+<div class="strategy-card" style="--card-accent:#00bcd4; --icon-bg:rgba(0,188,212,.12);"
+     data-tags="intraday scalp continuation" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">⚡</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 02</div>
+      <div class="card-title">Fair Value Gaps (FVG)</div>
+      <div class="card-tags">
+        <span class="tag hot">HIGH FREQ</span>
+        <span class="tag">Scalp</span>
+        <span class="tag">Intraday</span>
+        <span class="verdict elite">ELITE</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">76%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p>A <strong>Fair Value Gap (FVG)</strong> — also called imbalance or inefficiency — forms when price moves so aggressively in 3 candles that the wicks don't overlap: <code>high[2] &lt; low[0]</code> (bullish) or <code>low[2] &gt; high[0]</code> (bearish). This creates a price void that algorithms are PROGRAMMED to return to and fill before continuing.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry Checklist</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#00bcd4">
+          <div class="step-num">1</div>
+          <p>Spot a <strong>3-candle gap</strong> after a displacement move. The gap = the space between candle 1 high and candle 3 low (bullish) or vice versa.</p>
+        </div>
+        <div class="step" style="--step-clr:#00bcd4">
+          <div class="step-num">2</div>
+          <p>Wait for price to <strong>retrace INTO the FVG</strong>. Aggressive entry = top of FVG; Safe entry = 50% of FVG (Equilibrium point).</p>
+        </div>
+        <div class="step" style="--step-clr:#00bcd4">
+          <div class="step-num">3</div>
+          <p>Best entries: FVG <strong>inside a Kill Zone</strong> + FVG aligned with higher-timeframe OB = institutional confluence stack.</p>
+        </div>
+        <div class="step" style="--step-clr:#00bcd4">
+          <div class="step-num">4</div>
+          <p>SL below/above the <strong>full FVG</strong>. TP: next draw on liquidity (opposite FVG, old high/low, or institutional level).</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry / Exit Parameters</div>
+      <div class="ee-grid">
+        <div class="ee-box long">
+          <h4>📈 LONG (Bullish FVG)</h4>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">Top of FVG to 50%</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Below bottom of FVG</span></div>
+          <div class="ee-row"><span class="ee-label">TP1</span><span class="ee-val">Displacement high</span></div>
+          <div class="ee-row"><span class="ee-label">TP2</span><span class="ee-val">Next BSL / bearish FVG</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--green)">1:2 – 1:5</span></div>
+        </div>
+        <div class="ee-box short">
+          <h4>📉 SHORT (Bearish FVG)</h4>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">Bottom of FVG to 50%</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Above top of FVG</span></div>
+          <div class="ee-row"><span class="ee-label">TP1</span><span class="ee-val">Displacement low</span></div>
+          <div class="ee-row"><span class="ee-label">TP2</span><span class="ee-val">Next SSL / bullish FVG</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--red)">1:2 – 1:5</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Best Timeframes</div>
+      <table class="tf-table">
+        <tr><th>TF</th><th>Role</th><th>Quality</th><th class="bar-cell">Reliability</th></tr>
+        <tr><td>1m</td><td>Scalp FVGs</td><td>Silver Bullet specific</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:70%;--fill-clr:#ce93d8"></div></div></td></tr>
+        <tr><td>5m</td><td>Intraday FVGs</td><td>Best scalp timeframe</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:82%;--fill-clr:#00bcd4"></div></div></td></tr>
+        <tr><td>15m</td><td>Kill zone FVGs</td><td>High quality entries</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:88%;--fill-clr:#00bcd4"></div></div></td></tr>
+        <tr><td>1H</td><td>Daily FVGs</td><td>Swing confluence</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:91%;--fill-clr:#00e676"></div></div></td></tr>
+      </table>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight (Hidden from Retail)</div>
+      <p>Most retail traders use FVGs incorrectly — they sell the FVG when price enters, but that's not the institutional approach. Institutions use FVGs as <strong>magnets</strong> (targets) and as <strong>launch pads</strong> (reaction zones after fill). The <strong>highest probability play</strong>: FVG forms on 15m → price retraces to fill → confirm on 1m/5m with displacement → enter. This is the Silver Bullet setup in a nutshell.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 3. BREAKER BLOCKS ──────────────── -->
+<div class="strategy-card" style="--card-accent:#76ff03; --icon-bg:rgba(118,255,3,.1);"
+     data-tags="reversal swing intraday" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">🔄</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 03</div>
+      <div class="card-title">Breaker Blocks</div>
+      <div class="card-tags">
+        <span class="tag hot">REVERSAL</span>
+        <span class="tag">Swing</span>
+        <span class="verdict strong">STRONG</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">71%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p>A <strong>Breaker Block</strong> is a <em>failed Order Block that flips polarity</em>. When price sweeps through an OB that couldn't hold, that zone transforms: a bullish OB that failed becomes a <strong>bearish Breaker</strong>, and a bearish OB that failed becomes a <strong>bullish Breaker</strong>. Institutions use the liquidity from those failed OB stops to load the new direction.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry Checklist</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#76ff03">
+          <div class="step-num">1</div>
+          <p>Identify an <strong>OB that was violated</strong> — price closed THROUGH the OB rather than respecting it.</p>
+        </div>
+        <div class="step" style="--step-clr:#76ff03">
+          <div class="step-num">2</div>
+          <p>Mark the zone of the <strong>original OB</strong>. This is now the Breaker block zone.</p>
+        </div>
+        <div class="step" style="--step-clr:#76ff03">
+          <div class="step-num">3</div>
+          <p>Wait for price to <strong>return to the Breaker zone from the other side</strong>. The failed support is now resistance, and vice versa.</p>
+        </div>
+        <div class="step" style="--step-clr:#76ff03">
+          <div class="step-num">4</div>
+          <p>Enter on a <strong>lower-TF displacement</strong> away from the Breaker. SL beyond the original OB extreme.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry / Exit Parameters</div>
+      <div class="ee-grid">
+        <div class="ee-box long"><h4>📈 Bullish Breaker</h4>
+          <div class="ee-row"><span class="ee-label">Setup</span><span class="ee-val">Failed bearish OB swept</span></div>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">Retest of breaker zone</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Below original OB low</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--green)">1:4 – 1:10</span></div>
+        </div>
+        <div class="ee-box short"><h4>📉 Bearish Breaker</h4>
+          <div class="ee-row"><span class="ee-label">Setup</span><span class="ee-val">Failed bullish OB swept</span></div>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">Retest of breaker zone</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Above original OB high</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--red)">1:4 – 1:10</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight</div>
+      <p>Breakers carry the <strong>highest R:R of all ICT setups</strong> because retail traders placed stops at the old OB and got hunted. Those stops funded the institutional reversal. When price returns to test the Breaker zone, virtually NO retail trader sees it coming because they already got stopped out — making this one of the cleanest institutional setups on any chart.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 4. LIQUIDITY SWEEPS ──────────────── -->
+<div class="strategy-card" style="--card-accent:#ffd600; --icon-bg:rgba(255,214,0,.1);"
+     data-tags="reversal intraday swing" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">💧</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 04</div>
+      <div class="card-title">Liquidity Sweeps</div>
+      <div class="card-tags">
+        <span class="tag hot">STOP HUNT</span>
+        <span class="tag yellow">REVERSAL</span>
+        <span class="verdict elite">ELITE</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">78%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p><strong>Liquidity Sweeps</strong> (Stop Hunts) are the single most important ICT concept. All traders place stop losses above swing highs and below swing lows. Institutions NEED this liquidity (volume) to fill their large positions. So they engineer a <strong>false breakout</strong> to collect stops, then reverse — leaving retail traders wondering why "the breakout failed."</p>
+      <br>
+      <p>🟡 <strong>BSL (Buy-Side Liq)</strong> = Stop clusters above recent swing highs.<br>
+         🟡 <strong>SSL (Sell-Side Liq)</strong> = Stop clusters below recent swing lows.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry Checklist</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">1</div>
+          <p>Mark all <strong>significant swing highs and lows</strong> — these are liquidity pools. Equal highs/lows (EQH/EQL) are especially strong targets.</p>
+        </div>
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">2</div>
+          <p>Wait for price to <strong>spike above/below the level</strong> and CLOSE back below/above it within the same or next candle.</p>
+        </div>
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">3</div>
+          <p>Confirm: the sweep should happen <strong>inside a Kill Zone</strong> (London/NY open) for maximum probability.</p>
+        </div>
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">4</div>
+          <p>Enter <strong>after close back inside the level</strong> with SL above the sweep wick. Target: opposite liquidity pool.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry / Exit Parameters</div>
+      <div class="ee-grid">
+        <div class="ee-box long"><h4>📈 After SSL Sweep (Long)</h4>
+          <div class="ee-row"><span class="ee-label">Trigger</span><span class="ee-val">Low swept, close above</span></div>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">Re-close above SSL level</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Below sweep wick low</span></div>
+          <div class="ee-row"><span class="ee-label">Target</span><span class="ee-val">BSL above / FVG</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--green)">1:3 – 1:6</span></div>
+        </div>
+        <div class="ee-box short"><h4>📉 After BSL Sweep (Short)</h4>
+          <div class="ee-row"><span class="ee-label">Trigger</span><span class="ee-val">High swept, close below</span></div>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">Re-close below BSL level</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Above sweep wick high</span></div>
+          <div class="ee-row"><span class="ee-label">Target</span><span class="ee-val">SSL below / FVG</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--red)">1:3 – 1:6</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight (Hidden from Retail)</div>
+      <p>The #1 reason retail traders lose is <strong>placing stops at obvious levels</strong>. Every trader using basic technical analysis places stops at the same places — swing highs/lows, round numbers, moving averages. Institutions know exactly where these are because they can SEE the order book. They engineer a move to these levels specifically to <strong>take your stop</strong> and use that liquidity to enter their real position. Trade WITH the sweep, not against it.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 5. MARKET STRUCTURE ──────────────── -->
+<div class="strategy-card" style="--card-accent:#2196f3; --icon-bg:rgba(33,150,243,.12);"
+     data-tags="swing continuation reversal" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">📊</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 05</div>
+      <div class="card-title">Market Structure (BOS / CHoCH)</div>
+      <div class="card-tags">
+        <span class="tag">Swing</span>
+        <span class="tag">Trend Filter</span>
+        <span class="verdict strong">STRONG</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">72%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p><strong>BOS (Break of Structure)</strong> = Price breaks above the most recent swing high (bullish) or below swing low (bearish) — confirming trend continuation. <strong>CHoCH (Change of Character)</strong> = The first opposite-direction BOS after a trend — indicating a potential reversal. This is the FOUNDATION of all ICT analysis — you must know the structure before taking any setup.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Structure Rules</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#2196f3">
+          <div class="step-num">1</div>
+          <p><strong>Bullish Structure</strong>: Higher Highs (HH) + Higher Lows (HL). Only take LONGS. Short setups are countertrend.</p>
+        </div>
+        <div class="step" style="--step-clr:#2196f3">
+          <div class="step-num">2</div>
+          <p><strong>Bearish Structure</strong>: Lower Lows (LL) + Lower Highs (LH). Only take SHORTS. Long setups are countertrend.</p>
+        </div>
+        <div class="step" style="--step-clr:#2196f3">
+          <div class="step-num">3</div>
+          <p><strong>CHoCH</strong> is the EARLIEST signal of reversal. After CHoCH, wait for the first retracement OB/FVG to confirm the new direction.</p>
+        </div>
+        <div class="step" style="--step-clr:#2196f3">
+          <div class="step-num">4</div>
+          <p><strong>EQH/EQL (Equal Highs/Lows)</strong> = Liquidity magnets. When price forms double tops/bottoms, smart money WILL sweep them before reversing.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Multi-TF Structure Alignment</div>
+      <table class="tf-table">
+        <tr><th>TF</th><th>Structure</th><th>Purpose</th><th class="bar-cell">Weight</th></tr>
+        <tr><td>Weekly</td><td>Macro bias</td><td>Overall direction</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:100%;--fill-clr:#2196f3"></div></div></td></tr>
+        <tr><td>Daily</td><td>Swing bias</td><td>Premium/discount</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:88%;--fill-clr:#2196f3"></div></div></td></tr>
+        <tr><td>4H/1H</td><td>Intraday bias</td><td>Setup direction</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:72%;--fill-clr:#ffd600"></div></div></td></tr>
+        <tr><td>15m/5m</td><td>Entry structure</td><td>CHoCH for entry</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:55%;--fill-clr:#ff9800"></div></div></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 6. KILL ZONES ──────────────── -->
+<div class="strategy-card" style="--card-accent:#69f0ae; --icon-bg:rgba(105,240,174,.1);"
+     data-tags="intraday scalp swing" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">🕐</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 06</div>
+      <div class="card-title">Kill Zones (Session Windows)</div>
+      <div class="card-tags">
+        <span class="tag green">TIME FILTER</span>
+        <span class="tag">Intraday</span>
+        <span class="verdict strong">STRONG</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">+23%</div><div class="wr-lbl">WIN BOOST</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p><strong>Kill Zones</strong> are specific time windows when institutional volume enters the market. ALL major moves happen inside these windows. Trading outside Kill Zones dramatically reduces win rate. This is the <strong>most overlooked advantage</strong> retail traders ignore — they trade 24/7 and wonder why they lose. Professionals ONLY trade during these 4 windows.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">The 4 Kill Zones (New York Time)</div>
+      <div class="kz-timeline">
+        <div class="kz-row">
+          <div class="kz-dot" style="background:#7c4dff"></div>
+          <div class="kz-info">
+            <div class="kz-name">🌏 Asian Kill Zone</div>
+            <div class="kz-time">18:00 – 00:00 NY | 23:00 – 05:00 London | 04:30 – 05:30 IST</div>
+          </div>
+          <div class="kz-prob med">MEDIUM</div>
+        </div>
+        <div class="kz-row">
+          <div class="kz-dot" style="background:#0091ea"></div>
+          <div class="kz-info">
+            <div class="kz-name">🇬🇧 London Kill Zone</div>
+            <div class="kz-time">02:00 – 05:00 NY | 07:00 – 10:00 London | 12:30 – 15:30 IST</div>
+          </div>
+          <div class="kz-prob high">HIGH 🔥</div>
+        </div>
+        <div class="kz-row">
+          <div class="kz-dot" style="background:#00c853"></div>
+          <div class="kz-info">
+            <div class="kz-name">🗽 New York Kill Zone</div>
+            <div class="kz-time">07:00 – 10:00 NY | 12:00 – 15:00 London | 17:30 – 20:30 IST</div>
+          </div>
+          <div class="kz-prob high">HIGHEST 🔥🔥</div>
+        </div>
+        <div class="kz-row">
+          <div class="kz-dot" style="background:#ff6d00"></div>
+          <div class="kz-info">
+            <div class="kz-name">🔔 London Close</div>
+            <div class="kz-time">10:00 – 12:00 NY | 15:00 – 17:00 London | 20:30 – 22:30 IST</div>
+          </div>
+          <div class="kz-prob med">MEDIUM</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">IST Kill Zone Reference (India)</div>
+      <table class="tf-table">
+        <tr><th>Kill Zone</th><th>IST Start</th><th>IST End</th><th class="bar-cell">Probability</th></tr>
+        <tr><td>🌏 Asian KZ</td><td>04:30 IST</td><td>10:00 IST</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:55%;--fill-clr:#7c4dff"></div></div></td></tr>
+        <tr><td>🇬🇧 London KZ</td><td>12:30 IST</td><td>15:30 IST</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:82%;--fill-clr:#0091ea"></div></div></td></tr>
+        <tr><td>🗽 NY Open KZ</td><td>17:30 IST</td><td>20:30 IST</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:95%;--fill-clr:#00c853"></div></div></td></tr>
+        <tr><td>🔔 London Close</td><td>20:30 IST</td><td>22:30 IST</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:60%;--fill-clr:#ff6d00"></div></div></td></tr>
+      </table>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight</div>
+      <p>Kill Zones are when the <strong>algorithm model re-prices the market</strong>. Institutions don't trade manually — algos run on schedules. The London open and NY open are when the <strong>Judas Swing</strong> (false move to take stops) happens before the real daily move. A setup that forms INSIDE a Kill Zone is 23–40% more likely to work than the same setup outside these windows.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 7. OTE FIBONACCI ──────────────── -->
+<div class="strategy-card" style="--card-accent:#ffd600; --icon-bg:rgba(255,214,0,.1);"
+     data-tags="intraday swing continuation" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">📐</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 07</div>
+      <div class="card-title">OTE Fibonacci</div>
+      <div class="card-tags">
+        <span class="tag yellow">PRECISION ENTRY</span>
+        <span class="tag">Intraday</span>
+        <span class="verdict solid">SOLID</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">69%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p><strong>OTE (Optimal Trade Entry)</strong> is ICT's proprietary Fibonacci framework. After a displacement move (impulse), price retraces. The OTE zone is the <strong>62% – 79%</strong> retracement where institutional algorithms re-enter the original direction. The <strong>70.5%</strong> is the "sweet spot" and often the most precise entry point.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">The 3 Levels</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">62%</div>
+          <p><strong>Conservative OTE Start</strong> — early entry zone. Less precise, used only with strong market structure confirmation.</p>
+        </div>
+        <div class="step" style="--step-clr:#ff9800">
+          <div class="step-num">70.5</div>
+          <p><strong>OTE Sweet Spot</strong> — the most watched level by institutional algorithms. Expect strong reactions here. Highest probability entry.</p>
+        </div>
+        <div class="step" style="--step-clr:#ff5722">
+          <div class="step-num">79%</div>
+          <p><strong>OTE Last Defense</strong> — if price goes past 79%, the OTE is invalid. This is your SL trigger. Beyond 79% = no setup.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry / Exit Parameters</div>
+      <div class="ee-grid">
+        <div class="ee-box long"><h4>📈 Bullish OTE</h4>
+          <div class="ee-row"><span class="ee-label">Setup</span><span class="ee-val">Swing low → Swing high</span></div>
+          <div class="ee-row"><span class="ee-label">Entry Zone</span><span class="ee-val">62% – 79% retracement</span></div>
+          <div class="ee-row"><span class="ee-label">Sweet Spot</span><span class="ee-val">70.5% level</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Below swing low</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--green)">1:3 – 1:5</span></div>
+        </div>
+        <div class="ee-box short"><h4>📉 Bearish OTE</h4>
+          <div class="ee-row"><span class="ee-label">Setup</span><span class="ee-val">Swing high → Swing low</span></div>
+          <div class="ee-row"><span class="ee-label">Entry Zone</span><span class="ee-val">62% – 79% retrace up</span></div>
+          <div class="ee-row"><span class="ee-label">Sweet Spot</span><span class="ee-val">70.5% level</span></div>
+          <div class="ee-row"><span class="ee-label">Stop Loss</span><span class="ee-val">Above swing high</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--red)">1:3 – 1:5</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 8. SILVER BULLET ──────────────── -->
+<div class="strategy-card highlight" style="--card-accent:#ffd600; --icon-bg:rgba(255,214,0,.15);"
+     data-tags="scalp intraday" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">🥈</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 08</div>
+      <div class="card-title">Silver Bullet Setup</div>
+      <div class="card-tags">
+        <span class="tag hot">SCALP KING</span>
+        <span class="tag green">LOW TF</span>
+        <span class="tag yellow">TIME-BASED</span>
+        <span class="verdict elite">ELITE</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">82%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p>The <strong>Silver Bullet</strong> is ICT's most precise scalping strategy, built around specific <strong>30-minute time windows</strong> where an FVG forms and price fills it — offering a clean 1:3+ trade. It works on the 1m, 5m, and 15m chart specifically during 3 time windows per day. <strong>This is THE setup for prop firm challenges.</strong></p>
+      <br>
+      <p>📅 Requires: Forex pairs, NQ, ES, Gold, DXY<br>
+         ⏰ Works ONLY during the 3 windows below</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">The 3 Silver Bullet Windows (NY Time)</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">AM</div>
+          <p><strong>03:00 – 04:00 AM NY</strong> (08:00–09:00 London | 13:30–14:30 IST)<br>London open FVG window. Very powerful for GBP/EUR pairs.</p>
+        </div>
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">MID</div>
+          <p><strong>10:00 – 11:00 AM NY</strong> (15:00–16:00 London | 20:30–21:30 IST)<br>Post-NY open reaction window. Best for indices (NQ/ES) and Gold.</p>
+        </div>
+        <div class="step" style="--step-clr:#ffd600">
+          <div class="step-num">PM</div>
+          <p><strong>02:00 – 03:00 PM NY</strong> (19:00–20:00 London | 00:30–01:30 IST+1)<br>London close / afternoon session. Good for Forex reversals.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry Checklist (5 Rules)</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#ff9800">
+          <div class="step-num">1</div>
+          <p>Determine <strong>daily bias</strong> before the window opens (bullish or bearish based on HTF structure).</p>
+        </div>
+        <div class="step" style="--step-clr:#ff9800">
+          <div class="step-num">2</div>
+          <p>Watch the <strong>5m or 15m chart</strong> for the window opening. Wait for a <strong>displacement candle</strong> (large body, closing at or near its high/low).</p>
+        </div>
+        <div class="step" style="--step-clr:#ff9800">
+          <div class="step-num">3</div>
+          <p>Identify the <strong>FVG created by that displacement</strong>. This is your entry zone.</p>
+        </div>
+        <div class="step" style="--step-clr:#ff9800">
+          <div class="step-num">4</div>
+          <p>Wait for price to <strong>retrace into the FVG</strong>. Enter at the 50% of the FVG. SL beyond the FVG extreme.</p>
+        </div>
+        <div class="step" style="--step-clr:#ff9800">
+          <div class="step-num">5</div>
+          <p>TP = <strong>previous liquidity pool</strong> (swing high/low from before the displacement). Minimum 1:3R. Close position before the window ends.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry / Exit Parameters</div>
+      <div class="ee-grid">
+        <div class="ee-box long"><h4>📈 Bullish Silver Bullet</h4>
+          <div class="ee-row"><span class="ee-label">Trigger</span><span class="ee-val">Bullish displacement in window</span></div>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">50% of bullish FVG</span></div>
+          <div class="ee-row"><span class="ee-label">SL</span><span class="ee-val">Below FVG low (5–10 pip)</span></div>
+          <div class="ee-row"><span class="ee-label">TP</span><span class="ee-val">BSL / Old high / FVG above</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--green)">Min 1:3</span></div>
+        </div>
+        <div class="ee-box short"><h4>📉 Bearish Silver Bullet</h4>
+          <div class="ee-row"><span class="ee-label">Trigger</span><span class="ee-val">Bearish displacement in window</span></div>
+          <div class="ee-row"><span class="ee-label">Entry</span><span class="ee-val">50% of bearish FVG</span></div>
+          <div class="ee-row"><span class="ee-label">SL</span><span class="ee-val">Above FVG high (5–10 pip)</span></div>
+          <div class="ee-row"><span class="ee-label">TP</span><span class="ee-val">SSL / Old low / FVG below</span></div>
+          <div class="ee-row"><span class="ee-label">R:R</span><span class="ee-val" style="color:var(--red)">Min 1:3</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight — Why Silver Bullet Works</div>
+      <p>The Silver Bullet works because institutions <strong>re-price the market at these specific times</strong>. The algo turns on, creates a displacement, then creates an FVG. When price fills the FVG, the algorithm continues in the original direction. The 10–11 AM window is the most powerful because it's when the <strong>London session closes</strong> and NY re-establishes direction. For <strong>Indian traders (IST)</strong>, the 20:30–21:30 window is the easiest to trade as it's evening time — perfect for watching the chart without rushing.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 9. ASIAN RANGE ──────────────── -->
+<div class="strategy-card" style="--card-accent:#26c6da; --icon-bg:rgba(38,198,218,.1);"
+     data-tags="swing intraday reversal" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">🌏</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 09</div>
+      <div class="card-title">Asian Range</div>
+      <div class="card-tags">
+        <span class="tag">Swing</span>
+        <span class="tag">Intraday</span>
+        <span class="verdict solid">SOLID</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">70%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p>The <strong>Asian Range</strong> (18:00–00:00 NY / 23:00–05:00 GMT) is the daily accumulation phase. During Asia, price consolidates in a tight range. London/NY sessions EXPAND out of this range. The <strong>Asian High and Low become key liquidity levels</strong> — London almost always sweeps one side before the real move begins.</p>
+    </div>
+    <div class="card-section">
+      <div class="section-title">Entry Checklist</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#26c6da">
+          <div class="step-num">1</div>
+          <p>Mark the <strong>Asian session High and Low</strong> from the previous session (or current if still in Asia).</p>
+        </div>
+        <div class="step" style="--step-clr:#26c6da">
+          <div class="step-num">2</div>
+          <p>Wait for London open. Watch for a <strong>sweep of the Asian High or Low</strong> — this is the Judas Swing (manipulation phase).</p>
+        </div>
+        <div class="step" style="--step-clr:#26c6da">
+          <div class="step-num">3</div>
+          <p>After the sweep, look for a <strong>CHoCH on the lower timeframe</strong> (5m/15m) and an FVG or OB forming in the opposite direction.</p>
+        </div>
+        <div class="step" style="--step-clr:#26c6da">
+          <div class="step-num">4</div>
+          <p>Trade the REVERSAL: if Asian High swept → SHORT. If Asian Low swept → LONG. TP = opposite range extreme + 50–100% extension.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight</div>
+      <p>The Asian Range gives you the <strong>daily game plan</strong> every morning before London opens. 70%+ of trading days follow this pattern: Asia consolidates → London sweeps one extreme → NY moves in the opposite direction. The key is WHICH side gets swept at London open. Once you see the sweep, the direction of the day is almost certain.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────── 10. POWER OF 3 ──────────────── -->
+<div class="strategy-card" style="--card-accent:#e91e63; --icon-bg:rgba(233,30,99,.1);"
+     data-tags="swing intraday scalp reversal continuation" onclick="toggleCard(this)">
+  <div class="card-header">
+    <div class="card-icon">🔺</div>
+    <div class="card-meta">
+      <div class="card-num">SETUP 10</div>
+      <div class="card-title">Power of 3 (PO3)</div>
+      <div class="card-tags">
+        <span class="tag hot">FRAMEWORK</span>
+        <span class="tag">All TF</span>
+        <span class="verdict elite">ELITE</span>
+      </div>
+    </div>
+    <div class="winrate-badge"><div class="wr-val">80%</div><div class="wr-lbl">WIN RATE</div></div>
+  </div>
+  <div class="card-body">
+    <div class="card-section">
+      <div class="section-title">What Is It?</div>
+      <p>The <strong>Power of 3 (PO3)</strong> — also called AMD (Accumulation, Manipulation, Distribution) — is ICT's master framework that explains how EVERY significant price move is engineered by institutions. Once you see PO3, you'll never miss a "fake breakout" again.</p>
+      <div class="po3-visual">
+        <div class="po3-phase accum">
+          <div class="po3-num">①</div>
+          <div>ACCUMULATION<br><span style="font-size:.55rem;opacity:.7">Asia / Pre-Market<br>Tight range</span></div>
+        </div>
+        <div class="po3-phase manip">
+          <div class="po3-num">②</div>
+          <div>MANIPULATION<br><span style="font-size:.55rem;opacity:.7">London Open<br>Judas Swing / Sweep</span></div>
+        </div>
+        <div class="po3-phase distrib">
+          <div class="po3-num">③</div>
+          <div>DISTRIBUTION<br><span style="font-size:.55rem;opacity:.7">NY Session<br>Real Move</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">The 3 Phases Explained</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#9c27b0">
+          <div class="step-num">①</div>
+          <p><strong>Accumulation (Asia)</strong>: Market consolidates in a tight range. Institutions are quietly building positions. No clear direction. This creates the "coiled spring."</p>
+        </div>
+        <div class="step" style="--step-clr:#ff5722">
+          <div class="step-num">②</div>
+          <p><strong>Manipulation (London)</strong>: The Judas Swing. Price moves OPPOSITE to the final direction to sweep stops and grab liquidity. This is the "fake move" that traps retail traders.</p>
+        </div>
+        <div class="step" style="--step-clr:#4caf50">
+          <div class="step-num">③</div>
+          <p><strong>Distribution (New York)</strong>: The real institutional move. Price rockets in the TRUE direction, completely opposite to the Judas Swing. Retail traders who got stopped are watching in disbelief.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">How to Trade PO3</div>
+      <div class="steps">
+        <div class="step" style="--step-clr:#e91e63">
+          <div class="step-num">A</div>
+          <p>During <strong>Asia</strong>: Mark the range. No trading. Just observe and plan.</p>
+        </div>
+        <div class="step" style="--step-clr:#e91e63">
+          <div class="step-num">B</div>
+          <p>At <strong>London open</strong>: Watch for the Judas Swing. If price sweeps the Asian HIGH → expect the day to go LOWER (bearish). If sweeps Asian LOW → expect HIGHER (bullish).</p>
+        </div>
+        <div class="step" style="--step-clr:#e91e63">
+          <div class="step-num">C</div>
+          <p>During <strong>NY open</strong>: Enter in the TRUE direction with OB or FVG entry. This is when the distribution phase creates the cleanest intraday trend.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card-section">
+      <div class="section-title">💡 Pro Insight — The Most Hidden Secret</div>
+      <p>PO3 occurs on <strong>EVERY timeframe</strong> — the daily, weekly, monthly, AND the 5-minute chart all follow this exact pattern. On the 5m chart, you'll see PO3 play out in 60–90 minutes within the Silver Bullet windows. This fractal nature means once you internalize PO3, you can decode institutional intention on any timeframe. The Judas Swing is <strong>never an accident</strong> — it's always a deliberate engineered move to grab liquidity before distribution.</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- /strategies-grid -->
+
+<!-- RISK MANAGEMENT -->
+<div class="risk-section">
+  <h3>⚠️ Institutional Risk Management Rules</h3>
+  <div class="risk-grid">
+    <div class="risk-item">
+      <h4>Position Sizing</h4>
+      <p>Risk max 0.5%–1% per trade. For prop firm challenges: 0.25%–0.5%. NEVER more than 2% total open risk.</p>
+    </div>
+    <div class="risk-item">
+      <h4>Minimum R:R</h4>
+      <p>Never take a trade with less than 1:3 risk-to-reward. ICT setups regularly offer 1:5 to 1:10 when properly timed.</p>
+    </div>
+    <div class="risk-item">
+      <h4>Max Daily Drawdown</h4>
+      <p>Stop trading at -2% daily loss. Most prop firms have a 5% daily DD limit — protect yourself with a 2% self-imposed limit.</p>
+    </div>
+    <div class="risk-item">
+      <h4>Kill Zone Only</h4>
+      <p>Only take trades inside the 4 Kill Zones. Never trade during news events. The market outside KZ is engineered to confuse.</p>
+    </div>
+    <div class="risk-item">
+      <h4>Confluence Required</h4>
+      <p>Require at least 3 confluences before entering: (1) HTF Bias aligned, (2) Kill Zone active, (3) OB/FVG + Liquidity sweep.</p>
+    </div>
+    <div class="risk-item">
+      <h4>News Filter</h4>
+      <p>Avoid trading 30 minutes before and 30 minutes after high-impact news. Institutions use news as a liquidity event, not a trade signal.</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- /left -->
+
+<!-- RIGHT SIDEBAR -->
+<div class="sidebar">
+
+  <!-- Kill Zone Quick Ref -->
+  <div class="panel">
+    <div class="panel-hdr">🕐 Kill Zones (IST)</div>
+    <div class="panel-body">
+      <div class="kz-row" style="margin-bottom:8px">
+        <div class="kz-dot" style="background:#7c4dff"></div>
+        <div class="kz-info">
+          <div class="kz-name" style="font-size:.65rem">Asia KZ</div>
+          <div class="kz-time">04:30 – 10:00 IST</div>
+        </div>
+        <div class="kz-prob med">MED</div>
+      </div>
+      <div class="kz-row" style="margin-bottom:8px">
+        <div class="kz-dot" style="background:#0091ea"></div>
+        <div class="kz-info">
+          <div class="kz-name" style="font-size:.65rem">London KZ</div>
+          <div class="kz-time">12:30 – 15:30 IST</div>
+        </div>
+        <div class="kz-prob high">HIGH 🔥</div>
+      </div>
+      <div class="kz-row" style="margin-bottom:8px">
+        <div class="kz-dot" style="background:#00c853"></div>
+        <div class="kz-info">
+          <div class="kz-name" style="font-size:.65rem">NY Kill Zone</div>
+          <div class="kz-time">17:30 – 20:30 IST</div>
+        </div>
+        <div class="kz-prob high">BEST 🔥🔥</div>
+      </div>
+      <div class="kz-row">
+        <div class="kz-dot" style="background:#ffd600"></div>
+        <div class="kz-info">
+          <div class="kz-name" style="font-size:.65rem">Silver Bullet AM</div>
+          <div class="kz-time">20:30 – 21:30 IST</div>
+        </div>
+        <div class="kz-prob high">SCALP 🥈</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Best Markets -->
+  <div class="panel">
+    <div class="panel-hdr">🌍 Best Markets for ICT</div>
+    <div class="panel-body">
+      <table class="tf-table" style="width:100%">
+        <tr><th>Market</th><th>Setup</th><th class="bar-cell">Suitability</th></tr>
+        <tr><td>NQ/ES</td><td>All ICT</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:97%;--fill-clr:#00e676"></div></div></td></tr>
+        <tr><td>XAUUSD</td><td>All ICT</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:94%;--fill-clr:#00e676"></div></div></td></tr>
+        <tr><td>GBP/USD</td><td>FVG, OB</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:88%;--fill-clr:#00bcd4"></div></div></td></tr>
+        <tr><td>EUR/USD</td><td>All ICT</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:85%;--fill-clr:#00bcd4"></div></div></td></tr>
+        <tr><td>BTC/USD</td><td>OB, FVG</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:72%;--fill-clr:#ffd600"></div></div></td></tr>
+        <tr><td>BankNifty</td><td>FVG, KZ</td><td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:65%;--fill-clr:#ffd600"></div></div></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Confluence Score Calculator -->
+  <div class="panel">
+    <div class="panel-hdr">⭐ Trade Quality Checker</div>
+    <div class="panel-body">
+      <p style="font-size:.65rem; color:var(--muted); margin-bottom:12px;">Check boxes for your setup confluence:</p>
+      <div id="confChecks" style="display:flex; flex-direction:column; gap:8px;">
+      </div>
+      <div class="score-display" style="margin-top:16px;">
+        <div class="score-ring" id="scoreRing">0</div>
+        <div style="font-size:.65rem; color:var(--muted);">CONFLUENCE SCORE</div>
+        <div id="scoreVerdict" style="margin-top:8px; font-size:.7rem; color:var(--accent2);">Add confluences above</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Power of 3 Visual -->
+  <div class="panel">
+    <div class="panel-hdr">🔺 Power of 3 Today</div>
+    <div class="panel-body">
+      <div class="po3-visual" style="height:70px; border-radius:4px; cursor:pointer;" onclick="advancePO3()">
+        <div class="po3-phase accum" id="po3a" style="transition:flex .5s; flex:1.5">
+          <div class="po3-num" style="font-size:.8rem">①</div>
+          <div style="font-size:.58rem">ACCUMULATE<br>Asia Range</div>
+        </div>
+        <div class="po3-phase manip" id="po3m" style="transition:flex .5s; flex:1">
+          <div class="po3-num" style="font-size:.8rem">②</div>
+          <div style="font-size:.58rem">MANIPULATE<br>Judas Swing</div>
+        </div>
+        <div class="po3-phase distrib" id="po3d" style="transition:flex .5s; flex:1">
+          <div class="po3-num" style="font-size:.8rem">③</div>
+          <div style="font-size:.58rem">DISTRIBUTE<br>Real Move</div>
+        </div>
+      </div>
+      <p style="font-size:.6rem; color:var(--muted); margin-top:8px; text-align:center;">Click to advance phase →</p>
+    </div>
+  </div>
+
+  <!-- Prop Firm Tips -->
+  <div class="panel">
+    <div class="panel-hdr">🏆 Prop Firm Challenge Tips</div>
+    <div class="panel-body">
+      <div class="conf-list">
+        <div class="conf-item"><div class="conf-dot" style="background:var(--green)"></div>Trade ONLY Silver Bullet + FVG setups</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--green)"></div>Max 1 trade per Kill Zone window</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--green)"></div>Risk 0.25%–0.5% per trade only</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--green)"></div>Skip all news events (±30 min)</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--accent2)"></div>Require 3+ confluences minimum</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--accent2)"></div>HTF bias must align with trade</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--red)"></div>Never average down losing trades</div>
+        <div class="conf-item"><div class="conf-dot" style="background:var(--red)"></div>Stop at daily -2% loss</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+
+</div><!-- /layout -->
+</div><!-- /container -->
+
+<!-- FOOTER -->
+<div class="footer">
+  <strong>ICT Institutional Setups Pro</strong> — Educational purposes only. Past performance does not guarantee future results.<br>
+  <span style="color:#334d66">All setups are based on ICT (Inner Circle Trader) methodology. Always backtest before live trading.</span>
+</div>
+
+<script>
+// ── TOGGLE CARD EXPAND/COLLAPSE ──
+function toggleCard(card) {
+  const body = card.querySelector('.card-body');
+  const isOpen = body.classList.contains('open');
+  document.querySelectorAll('.card-body').forEach(b => b.classList.remove('open'));
+  document.querySelectorAll('.strategy-card').forEach(c => c.classList.remove('expanded'));
+  if (!isOpen) {
+    body.classList.add('open');
+    card.classList.add('expanded');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ── FILTER CARDS ──
+function filterCards(filter, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.strategy-card').forEach(card => {
+    const tags = card.dataset.tags || '';
+    if (filter === 'all' || tags.includes(filter)) {
+      card.style.display = '';
+      card.style.animation = 'fadeIn .3s ease both';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+// ── CONFLUENCE SCORE CALCULATOR ──
+const checks = [
+  { label: "Higher Timeframe Bias Aligned", weight: 2 },
+  { label: "Inside Kill Zone (London / NY)", weight: 2 },
+  { label: "Order Block Identified", weight: 1 },
+  { label: "Fair Value Gap Present", weight: 1 },
+  { label: "Liquidity Sweep Occurred", weight: 2 },
+  { label: "Market Structure (BOS/CHoCH)", weight: 1 },
+  { label: "OTE Zone (62–79%)", weight: 1 },
+  { label: "Asian Range High/Low Near", weight: 1 },
+];
+
+const confContainer = document.getElementById('confChecks');
+checks.forEach((c, i) => {
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 6px;border-radius:3px;transition:background .15s;';
+  div.innerHTML = `
+    <input type="checkbox" id="conf${i}" style="cursor:pointer;accent-color:#00e5ff;">
+    <label for="conf${i}" style="font-size:.65rem;color:#cdd9e5;cursor:pointer;flex:1">${c.label}</label>
+    <span style="font-size:.6rem;color:#5a7a9a">+${c.weight}</span>
+  `;
+  div.addEventListener('mouseenter', () => div.style.background = 'rgba(255,255,255,.04)');
+  div.addEventListener('mouseleave', () => div.style.background = '');
+  div.querySelector('input').addEventListener('change', updateScore);
+  confContainer.appendChild(div);
+});
+
+function updateScore() {
+  let score = 0;
+  let maxScore = 0;
+  checks.forEach((c, i) => {
+    maxScore += c.weight;
+    if (document.getElementById('conf'+i).checked) score += c.weight;
+  });
+  const ring = document.getElementById('scoreRing');
+  const verdict = document.getElementById('scoreVerdict');
+  ring.textContent = score;
+  // remove classes
+  ring.className = 'score-ring';
+  if (score === 0)      { ring.classList.add('s0'); verdict.textContent = 'No confluences selected'; verdict.style.color = '#3d5a7a'; }
+  else if (score <= 2)  { ring.classList.add('s1'); verdict.textContent = 'Too weak — Skip this trade'; verdict.style.color = '#607d8b'; }
+  else if (score <= 4)  { ring.classList.add('s2'); verdict.textContent = 'Marginal — Consider waiting'; verdict.style.color = '#ffb300'; }
+  else if (score <= 6)  { ring.classList.add('s3'); verdict.textContent = 'Decent — Trade with caution'; verdict.style.color = '#ffd600'; }
+  else if (score <= 8)  { ring.classList.add('s4'); verdict.textContent = '✅ High Quality — Execute!'; verdict.style.color = '#00e676'; }
+  else                  { ring.classList.add('s5'); verdict.textContent = '🔥 ELITE Setup — Full size!'; verdict.style.color = '#00e5ff'; }
+}
+
+// ── PO3 PHASE ANIMATION ──
+let po3Phase = 0;
+function advancePO3() {
+  po3Phase = (po3Phase + 1) % 3;
+  const a = document.getElementById('po3a');
+  const m = document.getElementById('po3m');
+  const d = document.getElementById('po3d');
+  if (po3Phase === 0) { a.style.flex='2'; m.style.flex='1'; d.style.flex='1'; }
+  if (po3Phase === 1) { a.style.flex='1'; m.style.flex='2'; d.style.flex='1'; }
+  if (po3Phase === 2) { a.style.flex='1'; m.style.flex='1'; d.style.flex='2'; }
+}
+
+// ── STAGGER CARD ANIMATION ──
+document.querySelectorAll('.strategy-card').forEach((card, i) => {
+  card.style.animationDelay = (i * 0.06) + 's';
+});
+</script>
+</body>
+</html>

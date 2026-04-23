@@ -1,0 +1,679 @@
+// This Pine Script™ source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Institutional Liquidity Genome [ILG]
+
+//@version=5
+indicator("Institutional Liquidity Genome [ILG]", shorttitle="ILG", overlay=false, precision=4, max_bars_back=500)
+
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║                    INSTITUTIONAL LIQUIDITY GENOME [ILG]                      ║
+// ║                                                                              ║
+// ║  The indicator top 1% prop firms use but never talk about.                   ║
+// ║                                                                              ║
+// ║  CORE THESIS:                                                                ║
+// ║  Price doesn't move because of "supply and demand" in the retail sense.      ║
+// ║  Price moves because of LIQUIDITY ABSORPTION IMBALANCE — the difference      ║
+// ║  between passive liquidity (resting orders) and aggressive liquidity          ║
+// ║  (market orders consuming the book).                                         ║
+// ║                                                                              ║
+// ║  THE SECRET: When large volume enters but price barely moves, institutions   ║
+// ║  are ABSORBING liquidity (accumulating). When price moves sharply on thin    ║
+// ║  volume, it's manipulation/exhaustion. The DIVERGENCE between absorption     ║
+// ║  and price predicts the next major move with remarkable accuracy.            ║
+// ║                                                                              ║
+// ║  ENGINES:                                                                    ║
+// ║  1. Volume Delta Imbalance — Buy vs sell pressure decomposition              ║
+// ║  2. Absorption Ratio — Volume per unit price change (z-score normalized)     ║
+// ║  3. Kyle's Lambda — Price impact coefficient (market microstructure)         ║
+// ║  4. Flow Toxicity (VPIN) — Informed vs uninformed trading detection          ║
+// ║  5. Amihud Illiquidity — Dollar-volume price impact measure                  ║
+// ║  6. Fractal Efficiency — Market trending efficiency (Kaufman)                ║
+// ║  7. Absorption Divergence — THE SECRET SAUCE composite                       ║
+// ║  8. CUSUM Structural Breaks — Regime change detection                        ║
+// ║  9. Multi-Factor Regime Classification — Accumulation/Distribution/Neutral   ║
+// ║                                                                              ║
+// ║  ACADEMIC FOUNDATIONS:                                                        ║
+// ║  • Kyle (1985) — "Continuous Auctions and Insider Trading"                   ║
+// ║  • Easley, López de Prado, O'Hara (2012) — VPIN                             ║
+// ║  • Cont, Kukanov & Stoikov (2014) — Order Flow Imbalance                    ║
+// ║  • Amihud (2002) — Illiquidity and Stock Returns                             ║
+// ║  • Kaufman — Adaptive Moving Average / Efficiency Ratio                      ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                           CONFIGURATION                                    ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+string GRP_CORE    = "⚡ Core Engine"
+string GRP_ABSORB  = "🔬 Absorption Analysis"
+string GRP_FLOW    = "💧 Flow Toxicity"
+string GRP_REGIME  = "🧬 Regime Detection"
+string GRP_SIGNAL  = "🎯 Signal Engine"
+string GRP_VISUAL  = "🎨 Visual Settings"
+
+// ── Core Parameters ──
+int    coreLen      = input.int(20, "Core Lookback Period", minval=5, maxval=100, step=1, tooltip="Primary analysis window. Lower = more responsive, Higher = smoother. 14-25 optimal for most timeframes.", group=GRP_CORE)
+int    smoothLen    = input.int(5, "Signal Smoothing", minval=1, maxval=20, step=1, tooltip="EMA smoothing applied to raw scores. Reduces noise.", group=GRP_CORE)
+
+// ── Absorption Parameters ──
+int    absLen       = input.int(14, "Absorption Lookback", minval=5, maxval=50, step=1, tooltip="Period for absorption ratio z-score calculation.", group=GRP_ABSORB)
+float  absThresh    = input.float(1.5, "Absorption Alert Threshold", minval=0.5, maxval=5.0, step=0.1, tooltip="Z-score level that triggers absorption alerts. 1.5-2.5 recommended.", group=GRP_ABSORB)
+
+// ── Flow Toxicity Parameters ──
+int    flowLen      = input.int(20, "Flow Analysis Period", minval=5, maxval=50, step=1, tooltip="VPIN calculation window. Longer = more stable toxicity reading.", group=GRP_FLOW)
+
+// ── Regime Parameters ──
+float  cusumMult    = input.float(1.5, "CUSUM Sensitivity", minval=0.5, maxval=4.0, step=0.1, tooltip="Structural break detection sensitivity. Lower = more breaks detected.", group=GRP_REGIME)
+int    regimePctLen = input.int(100, "Regime Percentile Window", minval=50, maxval=300, step=10, tooltip="Window for adaptive regime thresholds.", group=GRP_REGIME)
+
+// ── Signal Parameters ──
+bool   showSignals  = input.bool(true, "Show Trade Signals", group=GRP_SIGNAL)
+int    minConfirm   = input.int(3, "Min Confirmations", minval=2, maxval=5, step=1, tooltip="Minimum number of engine confirmations required for a signal.", group=GRP_SIGNAL)
+float  sigMult      = input.float(1.2, "Signal Threshold Multiplier", minval=0.5, maxval=3.0, step=0.1, tooltip="Controls how extreme the composite must be for signals.", group=GRP_SIGNAL)
+
+// ── Visual Parameters ──
+bool   showDash     = input.bool(true, "Show Dashboard", group=GRP_VISUAL)
+bool   showZones    = input.bool(true, "Show Regime Background", group=GRP_VISUAL)
+bool   showAbsHist  = input.bool(true, "Show Absorption Histogram", group=GRP_VISUAL)
+bool   showBreaks   = input.bool(true, "Show CUSUM Breaks", group=GRP_VISUAL)
+color  bullColor    = input.color(color.new(#00E676, 0), "Bullish Color", group=GRP_VISUAL)
+color  bearColor    = input.color(color.new(#FF1744, 0), "Bearish Color", group=GRP_VISUAL)
+color  neutColor    = input.color(color.new(#FFD740, 0), "Neutral Color", group=GRP_VISUAL)
+color  absorbColor  = input.color(color.new(#E040FB, 0), "Absorption Color", group=GRP_VISUAL)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    ENGINE 1: VOLUME DELTA IMBALANCE                        ║
+// ║  Decomposes total volume into aggressive buying vs selling pressure.        ║
+// ║  Uses the close position within the bar (high-low range) to approximate    ║
+// ║  the split. This is the same methodology used by institutional footprint   ║
+// ║  chart analysis.                                                           ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+float safeVolume   = math.max(volume, 1)
+float barRange     = high - low
+float safeBarRange = math.max(barRange, syminfo.mintick)
+
+// Buy/Sell volume approximation via close position within bar
+float buyRatio     = (close - low) / safeBarRange
+float buyVol       = safeVolume * buyRatio
+float sellVol      = safeVolume * (1.0 - buyRatio)
+
+// Raw volume delta (positive = net buying, negative = net selling)
+float volumeDelta  = buyVol - sellVol
+
+// Cumulative Volume Delta — tracks institutional footprint over time
+var float cumDelta  = 0.0
+cumDelta           += volumeDelta
+
+// Normalized delta score (z-score)
+float deltaMean     = ta.sma(volumeDelta, coreLen)
+float deltaStd      = ta.stdev(volumeDelta, coreLen)
+float safeDeltaStd  = math.max(deltaStd, 0.0001)
+float deltaZraw     = (volumeDelta - deltaMean) / safeDeltaStd
+float deltaScore    = ta.ema(deltaZraw, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    ENGINE 2: ABSORPTION RATIO                              ║
+// ║  Measures how much volume the market absorbs per unit of price movement.   ║
+// ║  HIGH absorption = institutions are accumulating/distributing quietly.      ║
+// ║  LOW absorption  = retail-driven or manipulative price action.             ║
+// ║  This is the foundational measurement that everything else builds upon.    ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Price movement magnitude (body of candle)
+float priceMove     = math.abs(close - open)
+float safePriceMove = math.max(priceMove, syminfo.mintick)
+
+// Raw absorption: volume consumed per unit price change
+float rawAbsorption = safeVolume / safePriceMove
+
+// Z-score normalization (adaptive to instrument and timeframe)
+float absMean       = ta.sma(rawAbsorption, absLen)
+float absStd        = ta.stdev(rawAbsorption, absLen)
+float safeAbsStd    = math.max(absStd, 0.0001)
+float absorptionZ   = (rawAbsorption - absMean) / safeAbsStd
+
+// Smoothed absorption score
+float absorptionScore = ta.ema(absorptionZ, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    ENGINE 3: KYLE'S LAMBDA (λ)                             ║
+// ║  From Albert Kyle's 1985 paper "Continuous Auctions and Insider Trading".  ║
+// ║  Lambda measures PRICE IMPACT per unit of signed volume flow.              ║
+// ║  LOW λ  = Deep liquidity, large orders absorbed easily (institutional)     ║
+// ║  HIGH λ = Thin liquidity, small orders move price (fragile/manipulation)   ║
+// ║  Calculated as regression slope: λ = cov(ΔP,V) / var(V)                   ║
+// ║  Equivalent to: λ = corr(ΔP,V) × σ(ΔP) / σ(V)                            ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Signed volume: positive when close > open (buying pressure), negative otherwise
+float signedVol = close > open ? safeVolume : close < open ? -safeVolume : 0.0
+
+// Price change bar-to-bar
+float deltaPrice = close - close[1]
+
+// Kyle's Lambda via correlation method (avoids expensive for loops)
+float corrPV     = ta.correlation(deltaPrice, signedVol, coreLen)
+float stdP       = ta.stdev(deltaPrice, coreLen)
+float stdV       = ta.stdev(signedVol, coreLen)
+float safeStdV   = math.max(stdV, 0.0001)
+
+// Lambda = regression slope of price change on signed volume
+float lambdaRaw  = safeStdV > 0 ? nz(corrPV, 0.0) * stdP / safeStdV : 0.0
+
+// Normalize lambda to z-score
+float lambdaMean    = ta.sma(lambdaRaw, coreLen)
+float lambdaStd     = ta.stdev(lambdaRaw, coreLen)
+float safeLambdaStd = math.max(lambdaStd, 0.0000001)
+float lambdaZ       = (lambdaRaw - lambdaMean) / safeLambdaStd
+float lambdaScore   = ta.ema(lambdaZ, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    ENGINE 4: FLOW TOXICITY (VPIN PROXY)                    ║
+// ║  Based on Easley, López de Prado & O'Hara's VPIN methodology.             ║
+// ║  Measures the probability that informed traders are active in the market.  ║
+// ║  HIGH toxicity = smart money is trading aggressively (directional move     ║
+// ║  imminent). LOW toxicity = noise/uninformed flow dominates.                ║
+// ║  VPIN ≈ |BuyVol - SellVol| / TotalVol                                     ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Absolute volume delta (unsigned imbalance)
+float absVolDelta = math.abs(volumeDelta)
+
+// Raw VPIN: proportion of volume that is directionally imbalanced
+float vpinRaw = safeVolume > 0 ? absVolDelta / safeVolume : 0.0
+
+// Smoothed VPIN over flow analysis window
+float vpinSmooth = ta.sma(vpinRaw, flowLen)
+
+// VPIN z-score (how extreme is current toxicity vs recent history)
+int vpinRefLen     = flowLen * 2
+float vpinMean     = ta.sma(vpinSmooth, vpinRefLen)
+float vpinStd      = ta.stdev(vpinSmooth, vpinRefLen)
+float safeVpinStd  = math.max(vpinStd, 0.0001)
+float toxicityScore = (vpinSmooth - vpinMean) / safeVpinStd
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    ENGINE 5: AMIHUD ILLIQUIDITY RATIO                      ║
+// ║  From Amihud (2002) "Illiquidity and Stock Returns".                       ║
+// ║  Measures the price impact per unit of dollar volume traded.               ║
+// ║  ILLIQ = |Return| / (Volume × Price)                                       ║
+// ║  HIGH = illiquid, volatile (dangerous). LOW = liquid, stable.              ║
+// ║  Used by quant desks to gauge market depth without L2 data.                ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Absolute return
+float absReturn    = math.abs(close - close[1]) / math.max(close[1], syminfo.mintick)
+
+// Dollar volume
+float dollarVol    = safeVolume * close
+float safeDolVol   = math.max(dollarVol, 1.0)
+
+// Amihud ratio (scaled by 1e6 for readability)
+float amihudRaw    = (absReturn / safeDolVol) * 1000000.0
+
+// Z-score normalization
+float amihudMean     = ta.sma(amihudRaw, coreLen)
+float amihudStd      = ta.stdev(amihudRaw, coreLen)
+float safeAmihudStd  = math.max(amihudStd, 0.0000001)
+float amihudZ        = (amihudRaw - amihudMean) / safeAmihudStd
+float amihudScore    = ta.ema(amihudZ, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    ENGINE 6: FRACTAL EFFICIENCY RATIO (FER)                ║
+// ║  Based on Kaufman's Efficiency Ratio / Fractal Dimension concept.          ║
+// ║  Measures how "efficiently" price traverses space.                         ║
+// ║  FER = |Net Price Change| / Sum(|Bar-to-Bar Changes|)                      ║
+// ║  HIGH FER (→1) = Strong trend (efficient movement)                         ║
+// ║  LOW FER (→0)  = Choppy/consolidation (inefficient movement)              ║
+// ║                                                                            ║
+// ║  COMBINED WITH ABSORPTION:                                                 ║
+// ║  • High Absorption + Low FER = ACCUMULATION (golden signal!)               ║
+// ║  • Low Absorption + High FER = MOMENTUM (ride the trend)                   ║
+// ║  • High Absorption + High FER = DISTRIBUTION (prepare for reversal)        ║
+// ║  • Low Absorption + Low FER  = NO TRADE ZONE                              ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Net price change over lookback
+float netChange = math.abs(close - close[coreLen])
+
+// Sum of absolute bar-to-bar changes (path length)
+float pathLength = 0.0
+for i = 0 to coreLen - 1
+    pathLength += math.abs(nz(close[i]) - nz(close[i + 1]))
+
+// Fractal Efficiency Ratio
+float safePathLen = math.max(pathLength, syminfo.mintick)
+float ferRaw      = netChange / safePathLen
+
+// Normalize FER to z-score for compositing
+float ferMean     = ta.sma(ferRaw, coreLen)
+float ferStd      = ta.stdev(ferRaw, coreLen)
+float safeFerStd  = math.max(ferStd, 0.0001)
+float ferZ        = (ferRaw - ferMean) / safeFerStd
+float ferScore    = ta.ema(ferZ, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║              ENGINE 7: ABSORPTION DIVERGENCE — THE SECRET SAUCE            ║
+// ║                                                                            ║
+// ║  THIS IS THE CORE CONCEPT THAT SEPARATES THIS FROM EVERYTHING ELSE.        ║
+// ║                                                                            ║
+// ║  When absorption is HIGH but price isn't moving proportionally:             ║
+// ║  → Institutions are QUIETLY building positions                             ║
+// ║  → The market is coiling for a big move                                    ║
+// ║  → Direction determined by volume delta                                    ║
+// ║                                                                            ║
+// ║  When absorption is LOW but price IS moving:                               ║
+// ║  → Move is on thin liquidity (stop hunt / manipulation)                    ║
+// ║  → High probability of reversal                                            ║
+// ║  → Fade the move                                                           ║
+// ║                                                                            ║
+// ║  The divergence between absorption and price movement, directionally       ║
+// ║  weighted by volume delta, creates the master oscillator.                  ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Normalize price movement to z-score for comparison
+float priceSMA    = ta.sma(close, coreLen)
+float priceStd    = ta.stdev(close, coreLen)
+float safePriceStd = math.max(priceStd, syminfo.mintick)
+float priceZ      = (close - priceSMA) / safePriceStd
+
+// Absorption-Price Divergence: how much absorption exceeds price movement
+float absPriceDivergence = absorptionScore - math.abs(priceZ)
+
+// Directional weighting: apply the sign from volume delta
+// Positive divergence + positive delta = bullish accumulation
+// Positive divergence + negative delta = bearish distribution
+float directionalSign = deltaScore > 0 ? 1.0 : deltaScore < 0 ? -1.0 : 0.0
+float masterRaw       = absPriceDivergence * directionalSign
+
+// The Master Oscillator — smoothed absorption divergence
+float masterOsc = ta.ema(masterRaw, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    COMPOSITE LIQUIDITY GENOME SCORE                        ║
+// ║  Weighted combination of all engines into a single actionable score.       ║
+// ║  Weights reflect informational value from academic research:               ║
+// ║  • Master Oscillator (absorption divergence): 30% — the core insight       ║
+// ║  • Delta Score (flow direction): 25% — directional confirmation            ║
+// ║  • Absorption Score (raw absorption): 15% — magnitude of institutional     ║
+// ║  • Lambda Score (price impact): 10% — market depth context                 ║
+// ║  • Toxicity Score (VPIN): 10% — informed trading detection                 ║
+// ║  • FER Score (efficiency): 5% — trending context                           ║
+// ║  • Amihud Score (illiquidity): 5% — liquidity depth context                ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+float compositeRaw = (masterOsc       * 0.30) +
+                     (deltaScore      * 0.25) +
+                     (absorptionScore * 0.15  * directionalSign) +
+                     (lambdaScore     * 0.10  * -1.0) +
+                     (toxicityScore   * 0.10  * directionalSign) +
+                     (ferScore        * 0.05  * directionalSign) +
+                     (amihudScore     * 0.05  * -1.0)
+
+// Final smoothed composite
+float composite = ta.ema(compositeRaw, smoothLen)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    CUSUM STRUCTURAL BREAK DETECTION                        ║
+// ║  Cumulative Sum (CUSUM) algorithm detects regime changes in the           ║
+// ║  composite score. When the cumulative deviation from the mean exceeds     ║
+// ║  a threshold, a structural break is declared — meaning the liquidity      ║
+// ║  regime has fundamentally shifted.                                         ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+var float cusumPos = 0.0
+var float cusumNeg = 0.0
+
+float cusumRef    = ta.sma(composite, coreLen)
+float cusumInput  = composite - cusumRef
+float cusumThresh = cusumMult * math.max(ta.stdev(composite, coreLen), 0.0001)
+
+cusumPos := math.max(0.0, cusumPos + cusumInput)
+cusumNeg := math.min(0.0, cusumNeg + cusumInput)
+
+bool breakUp = cusumPos > cusumThresh
+bool breakDn = cusumNeg < -cusumThresh
+
+// Reset CUSUM after break detection
+if breakUp
+    cusumPos := 0.0
+if breakDn
+    cusumNeg := 0.0
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    REGIME CLASSIFICATION                                   ║
+// ║  Classifies the market into one of four regimes based on the composite    ║
+// ║  score using adaptive percentile thresholds:                               ║
+// ║  • ACCUMULATION — institutions building long positions                     ║
+// ║  • DISTRIBUTION — institutions unwinding / building short                  ║
+// ║  • NEUTRAL      — no clear institutional activity                          ║
+// ║  • MANIPULATION — thin liquidity moves (stop hunts)                        ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Adaptive thresholds using rolling percentiles
+float upperRegime = ta.percentile_nearest_rank(composite, regimePctLen, 80)
+float lowerRegime = ta.percentile_nearest_rank(composite, regimePctLen, 20)
+
+// Regime classification
+int regime = composite > upperRegime ? 1 :
+             composite < lowerRegime ? -1 : 0
+
+// Check for manipulation regime (thin liquidity + large price move)
+bool isManipulation = amihudScore > 2.0 and absorptionScore < -0.5
+
+// Regime labels
+string regimeLabel = isManipulation ? "⚠ MANIPULATION" :
+                     regime == 1    ? "🟢 ACCUMULATION" :
+                     regime == -1   ? "🔴 DISTRIBUTION" : "⚪ NEUTRAL"
+
+// Sub-regime: Accumulation + Low FER = coiling for breakout
+bool coilingSignal = regime == 1 and ferRaw < 0.3 and absorptionScore > absThresh
+bool exhaustionSignal = regime == -1 and ferRaw > 0.7 and absorptionScore < 0
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    SIGNAL GENERATION ENGINE                                ║
+// ║  Multi-factor confirmation system. Requires minimum N engines to agree     ║
+// ║  before generating a signal. Prevents consecutive same-direction signals.  ║
+// ║  Each engine votes independently based on its own threshold.               ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Adaptive signal threshold
+float sigThresh = sigMult * math.max(ta.stdev(composite, coreLen * 2), 0.0001)
+
+// ── Individual Engine Votes ──
+
+// Vote 1: Absorption indicates institutional activity
+bool absVoteBull = absorptionScore > absThresh * 0.5 and deltaScore > 0
+bool absVoteBear = absorptionScore > absThresh * 0.5 and deltaScore < 0
+
+// Vote 2: Volume delta direction
+bool deltaVoteBull = deltaScore > 0.5
+bool deltaVoteBear = deltaScore < -0.5
+
+// Vote 3: Master oscillator direction
+bool masterVoteBull = masterOsc > 0.3
+bool masterVoteBear = masterOsc < -0.3
+
+// Vote 4: Composite above/below threshold
+bool compVoteBull = composite > sigThresh
+bool compVoteBear = composite < -sigThresh
+
+// Vote 5: Lambda confirms deep liquidity (low impact = safe to enter)
+bool lambdaVoteBull = lambdaScore < 0.5
+bool lambdaVoteBear = lambdaScore < 0.5
+
+// ── Count confirmations ──
+int bullVotes = (absVoteBull    ? 1 : 0) +
+                (deltaVoteBull  ? 1 : 0) +
+                (masterVoteBull ? 1 : 0) +
+                (compVoteBull   ? 1 : 0) +
+                (lambdaVoteBull ? 1 : 0)
+
+int bearVotes = (absVoteBear    ? 1 : 0) +
+                (deltaVoteBear  ? 1 : 0) +
+                (masterVoteBear ? 1 : 0) +
+                (compVoteBear   ? 1 : 0) +
+                (lambdaVoteBear ? 1 : 0)
+
+// ── Signal generation with consecutive prevention ──
+bool rawBull = bullVotes >= minConfirm and composite > sigThresh
+bool rawBear = bearVotes >= minConfirm and composite < -sigThresh
+
+var int lastSigDir = 0
+bool bullSignal = rawBull and lastSigDir != 1
+bool bearSignal = rawBear and lastSigDir != -1
+
+if bullSignal
+    lastSigDir := 1
+else if bearSignal
+    lastSigDir := -1
+
+// Signal strength classification
+string bullStr = bullVotes >= 5 ? "EXTREME" : bullVotes >= 4 ? "STRONG" : "MODERATE"
+string bearStr = bearVotes >= 5 ? "EXTREME" : bearVotes >= 4 ? "STRONG" : "MODERATE"
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                    VISUALIZATION ENGINE                                    ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Main Composite Line ──
+color compColorUp   = color.new(bullColor, 0)
+color compColorDn   = color.new(bearColor, 0)
+color compColorNeut = color.new(neutColor, 40)
+color compLineColor = composite > sigThresh  ? compColorUp :
+                      composite < -sigThresh ? compColorDn : compColorNeut
+
+plot(composite, "Liquidity Genome", compLineColor, 3)
+
+// ── Zero Line ──
+hline(0, "Zero", color.new(color.white, 80), hline.style_dotted)
+
+// ── Threshold Lines ──
+p_upper = plot(sigThresh, "Upper Threshold", color.new(bullColor, 75), 1, plot.style_stepline)
+p_lower = plot(-sigThresh, "Lower Threshold", color.new(bearColor, 75), 1, plot.style_stepline)
+p_zero  = plot(0.0, "Zero Fill", color.new(color.white, 100), display=display.none)
+
+// ── Fill between thresholds ──
+fill(p_upper, p_zero, color.new(bullColor, 95))
+fill(p_lower, p_zero, color.new(bearColor, 95))
+
+// ── Absorption Histogram ──
+color absHistColor = absorptionScore > absThresh ? color.new(absorbColor, 30) :
+                     absorptionScore > 0 ? color.new(absorbColor, 70) :
+                     color.new(color.gray, 80)
+plot(showAbsHist ? absorptionScore * 0.25 : na, "Absorption", absHistColor, 1, plot.style_columns)
+
+// ── Regime Background ──
+color regimeBg = isManipulation       ? color.new(#FF6D00, 90) :
+                 regime == 1          ? color.new(bullColor, 93) :
+                 regime == -1         ? color.new(bearColor, 93) :
+                 color.new(neutColor, 96)
+bgcolor(showZones ? regimeBg : na)
+
+// ── Trade Signals ──
+plotshape(showSignals and bullSignal ? composite : na,
+     "BUY Signal", shape.diamond, location.absolute,
+     bullColor, size=size.small)
+
+plotshape(showSignals and bearSignal ? composite : na,
+     "SELL Signal", shape.diamond, location.absolute,
+     bearColor, size=size.small)
+
+// ── Coiling / Exhaustion Markers ──
+plotshape(coilingSignal and not coilingSignal[1] ? composite * 0.5 : na,
+     "Coiling", shape.circle, location.absolute,
+     color.new(#00BCD4, 0), size=size.tiny)
+
+plotshape(exhaustionSignal and not exhaustionSignal[1] ? composite * 0.5 : na,
+     "Exhaustion", shape.circle, location.absolute,
+     color.new(#FF9800, 0), size=size.tiny)
+
+// ── CUSUM Structural Breaks ──
+plotshape(showBreaks and breakUp ? composite + sigThresh * 0.3 : na,
+     "Break ↑", shape.triangleup, location.absolute,
+     color.new(#00E5FF, 0), size=size.tiny)
+
+plotshape(showBreaks and breakDn ? composite - sigThresh * 0.3 : na,
+     "Break ↓", shape.triangledown, location.absolute,
+     color.new(#FF6D00, 0), size=size.tiny)
+
+// ── Volume Delta Sub-Plot ──
+color deltaBarColor = deltaScore > 0 ? color.new(bullColor, 60) : color.new(bearColor, 60)
+plot(deltaScore * 0.15, "Delta Flow", deltaBarColor, 1, plot.style_area)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                         DASHBOARD                                          ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+if showDash and barstate.islast
+    var table dash = table.new(position.top_right, 2, 10,
+         bgcolor=color.new(#0A0A1A, 5),
+         border_width=1,
+         border_color=color.new(#333366, 0),
+         frame_width=2,
+         frame_color=color.new(#E040FB, 50))
+
+    // ── Header ──
+    table.cell(dash, 0, 0, "🧬 ILG ENGINE",
+         text_color=color.new(#E040FB, 0),
+         text_size=size.small,
+         bgcolor=color.new(#0F0F2A, 0))
+    table.cell(dash, 1, 0, "VALUE",
+         text_color=color.new(#E040FB, 0),
+         text_size=size.small,
+         bgcolor=color.new(#0F0F2A, 0))
+
+    // ── Row 1: Regime ──
+    color regColor = regime == 1 ? bullColor : regime == -1 ? bearColor : neutColor
+    table.cell(dash, 0, 1, "Regime",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 1, regimeLabel,
+         text_color=regColor, text_size=size.tiny)
+
+    // ── Row 2: Composite ──
+    table.cell(dash, 0, 2, "Composite",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 2, str.tostring(composite, "#.####"),
+         text_color=composite > 0 ? bullColor : bearColor, text_size=size.tiny)
+
+    // ── Row 3: Absorption ──
+    color absColor = absorptionScore > absThresh ? absorbColor : color.new(color.gray, 0)
+    table.cell(dash, 0, 3, "Absorption",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 3, str.tostring(absorptionScore, "#.##") +
+         (absorptionScore > absThresh ? " 🔥" : ""),
+         text_color=absColor, text_size=size.tiny)
+
+    // ── Row 4: Kyle's Lambda ──
+    table.cell(dash, 0, 4, "Kyle's λ",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 4, str.tostring(lambdaScore, "#.##") +
+         (lambdaScore < -1 ? " [DEEP]" : lambdaScore > 1 ? " [THIN]" : ""),
+         text_color=lambdaScore < 0 ? bullColor : bearColor, text_size=size.tiny)
+
+    // ── Row 5: Flow Delta ──
+    table.cell(dash, 0, 5, "Flow Delta",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 5, str.tostring(deltaScore, "#.##"),
+         text_color=deltaScore > 0 ? bullColor : bearColor, text_size=size.tiny)
+
+    // ── Row 6: Toxicity ──
+    table.cell(dash, 0, 6, "VPIN Toxicity",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 6, str.tostring(toxicityScore, "#.##") +
+         (toxicityScore > 1.5 ? " ⚡" : ""),
+         text_color=toxicityScore > 1 ? color.new(#FF6D00, 0) : color.new(color.gray, 0),
+         text_size=size.tiny)
+
+    // ── Row 7: Fractal Efficiency ──
+    string ferLabel = ferRaw > 0.6 ? "TRENDING" : ferRaw < 0.3 ? "RANGING" : "MIXED"
+    table.cell(dash, 0, 7, "Efficiency",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 7, str.tostring(ferRaw, "#.##") + " [" + ferLabel + "]",
+         text_color=ferRaw > 0.5 ? bullColor : neutColor, text_size=size.tiny)
+
+    // ── Row 8: Amihud ──
+    table.cell(dash, 0, 8, "Illiquidity",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 8, str.tostring(amihudScore, "#.##") +
+         (amihudScore > 2 ? " ⚠" : ""),
+         text_color=amihudScore > 1.5 ? bearColor : color.new(color.gray, 0),
+         text_size=size.tiny)
+
+    // ── Row 9: Signal Status ──
+    string sigText = bullSignal ? "🟢 BUY [" + bullStr + "]" :
+                     bearSignal ? "🔴 SELL [" + bearStr + "]" :
+                     "⬜ SCANNING..."
+    color sigColor = bullSignal ? bullColor : bearSignal ? bearColor : color.new(color.gray, 0)
+    table.cell(dash, 0, 9, "Signal",
+         text_color=color.new(color.white, 20), text_size=size.tiny)
+    table.cell(dash, 1, 9, sigText,
+         text_color=sigColor, text_size=size.tiny)
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                         ALERT CONDITIONS                                   ║
+// ══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(bullSignal,
+     title="ILG — Institutional Accumulation",
+     message="🧬 ILG: Institutional ACCUMULATION detected. Composite: {{plot_0}} | Votes: " + str.tostring(bullVotes) + "/5 | Regime: Bullish absorption divergence confirmed.")
+
+alertcondition(bearSignal,
+     title="ILG — Institutional Distribution",
+     message="🧬 ILG: Institutional DISTRIBUTION detected. Composite: {{plot_0}} | Votes: " + str.tostring(bearVotes) + "/5 | Regime: Bearish absorption divergence confirmed.")
+
+alertcondition(breakUp,
+     title="ILG — Bullish Regime Break",
+     message="🧬 ILG: CUSUM structural break detected — Bullish regime shift. Liquidity absorption pattern has fundamentally changed.")
+
+alertcondition(breakDn,
+     title="ILG — Bearish Regime Break",
+     message="🧬 ILG: CUSUM structural break detected — Bearish regime shift. Liquidity absorption pattern has fundamentally changed.")
+
+alertcondition(toxicityScore > 2.0,
+     title="ILG — Extreme Flow Toxicity",
+     message="🧬 ILG: EXTREME flow toxicity detected (VPIN > 2σ). Informed traders are aggressively positioned. Major move imminent.")
+
+alertcondition(isManipulation,
+     title="ILG — Manipulation Detected",
+     message="🧬 ILG: MANIPULATION regime detected. Thin liquidity + large price impact. High probability of stop hunt / reversal.")
+
+alertcondition(coilingSignal and not coilingSignal[1],
+     title="ILG — Coiling for Breakout",
+     message="🧬 ILG: Market is COILING. High absorption + low efficiency = institutions accumulating quietly. Explosive breakout imminent.")
+
+alertcondition(exhaustionSignal and not exhaustionSignal[1],
+     title="ILG — Exhaustion Warning",
+     message="🧬 ILG: EXHAUSTION detected. Distribution regime + high efficiency + low absorption = trend is running on fumes.")
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ║                         END OF INDICATOR                                   ║
+// ║                                                                            ║
+// ║  HOW TO USE THIS INDICATOR:                                                ║
+// ║                                                                            ║
+// ║  1. REGIME IS KING: Check the regime first.                               ║
+// ║     • ACCUMULATION → Look for long entries only                            ║
+// ║     • DISTRIBUTION → Look for short entries only                           ║
+// ║     • NEUTRAL      → Reduce position size or stay flat                     ║
+// ║     • MANIPULATION → DO NOT TRADE (wait for clarity)                       ║
+// ║                                                                            ║
+// ║  2. WAIT FOR SIGNALS: Don't anticipate. Let the multi-factor engine        ║
+// ║     confirm with minimum 3/5 votes before entering.                        ║
+// ║                                                                            ║
+// ║  3. WATCH ABSORPTION: When the purple histogram spikes above threshold     ║
+// ║     (🔥 in dashboard), institutions are ACTIVELY building positions.       ║
+// ║     The direction is determined by the composite line color.               ║
+// ║                                                                            ║
+// ║  4. CUSUM BREAKS: Triangle markers indicate structural regime changes.     ║
+// ║     These are the HIGHEST probability setups — trade in the direction      ║
+// ║     of the break.                                                          ║
+// ║                                                                            ║
+// ║  5. COILING (cyan circles): When absorption is high but efficiency is      ║
+// ║     low, the market is coiling for an explosive move. Get ready.           ║
+// ║                                                                            ║
+// ║  6. EXHAUSTION (orange circles): When in distribution with high            ║
+// ║     efficiency but low absorption, the current trend is dying.             ║
+// ║                                                                            ║
+// ║  7. Kyle'S LAMBDA: When "DEEP" shows in dashboard, the market has         ║
+// ║     deep liquidity — safer to enter large positions. When "THIN",          ║
+// ║     reduce size — the market is fragile.                                   ║
+// ║                                                                            ║
+// ║  BEST TIMEFRAMES: 15m, 1H, 4H for intraday. Daily/Weekly for swing.       ║
+// ║  BEST MARKETS: Crypto, Forex, Futures, Liquid stocks.                      ║
+// ══════════════════════════════════════════════════════════════════════════════

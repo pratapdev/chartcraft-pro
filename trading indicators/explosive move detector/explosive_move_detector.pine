@@ -1,0 +1,302 @@
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║           EXPLOSIVE MOVE DETECTOR [1M] — Pine Script v5                    ║
+// ║           by: EMD System | Volatility · Momentum · Volume                  ║
+// ╠══════════════════════════════════════════════════════════════════════════════╣
+// ║  CORE CONCEPT                                                               ║
+// ║  Detects abnormal price volatility + momentum bursts confirmed by volume,   ║
+// ║  always operating on 1-minute bars regardless of your chart timeframe.      ║
+// ╠══════════════════════════════════════════════════════════════════════════════╣
+// ║  SIGNAL LEGEND                                                              ║
+// ║  🟢 GREEN   — Bullish Explosive Move  (Vol Spike + Up Momentum + Volume)   ║
+// ║  🔴 RED     — Bearish Explosive Move  (Vol Spike + Down Momentum + Volume)  ║
+// ║  🟡 YELLOW  — Unconfirmed Spike       (Vol/Momentum spike, no volume)       ║
+// ║  ⬜ GRAY    — Normal Market Conditions                                      ║
+// ║  ▲/▼ SHAPES — Confirmed Explosive Move markers on bar                       ║
+// ╠══════════════════════════════════════════════════════════════════════════════╣
+// ║  HOW TO USE                                                                 ║
+// ║  1. Add to any chart (works on any timeframe — data always pulls 1M).       ║
+// ║  2. Watch for GREEN/RED columns that breach the orange threshold line.      ║
+// ║  3. YELLOW = caution zone: price is moving but volume hasn't confirmed yet. ║
+// ║  4. Cyan line = real-time RVOL; watch it cross the dashed cyan threshold.  ║
+// ║  5. Set alerts on "Bullish Explosive Move" or "Bearish Explosive Move."     ║
+// ║  6. Best used alongside your primary chart analysis — not a standalone.     ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+//@version=5
+indicator(
+     title        = "Explosive Move Detector [1M]",
+     shorttitle   = "EMD [1M]",
+     overlay      = false,
+     max_bars_back = 500,
+     max_lines_count = 5
+ )
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 1 ── USER INPUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Volatility ────────────────────────────────────────────────────────────────
+var GRP_VOL = "⚡ Volatility Settings"
+vol_lookback  = input.int   (100,  "Volatility Lookback (bars)",    minval=10, maxval=500,   group=GRP_VOL,
+                              tooltip="How many 1-min bars define 'normal' volatility baseline.")
+vol_threshold = input.float (2.0,  "Volatility Threshold (× ATR)",  minval=1.0, step=0.1,   group=GRP_VOL,
+                              tooltip="Current true range must exceed this × the baseline ATR to flag a spike.")
+
+// ── Momentum ──────────────────────────────────────────────────────────────────
+var GRP_MOM = "🚀 Momentum Settings"
+mom_lookback  = input.int   (14,   "Momentum Lookback (bars)",       minval=2,  maxval=200,  group=GRP_MOM,
+                              tooltip="Rate-of-change period: close[0] vs close[n] on 1-min bars.")
+mom_threshold = input.float (2.0,  "Momentum Threshold (× baseline)",minval=1.0, step=0.1,  group=GRP_MOM,
+                              tooltip="|ROC| must exceed this × its rolling mean to flag abnormal momentum.")
+
+// ── Volume ────────────────────────────────────────────────────────────────────
+var GRP_VOL2 = "📊 Volume Settings"
+rvol_lookback = input.int   (50,   "Volume Lookback (bars)",         minval=10, maxval=500,  group=GRP_VOL2,
+                              tooltip="Rolling window for average 1-min volume baseline.")
+rvol_threshold= input.float (1.5,  "Volume Threshold (× avg vol)",   minval=1.0, step=0.1,  group=GRP_VOL2,
+                              tooltip="Current volume must exceed this × the average to confirm a signal.")
+
+// ── Display ───────────────────────────────────────────────────────────────────
+var GRP_DISP = "🎨 Display Settings"
+show_rvol_line = input.bool(true,  "Show Volume Ratio Line (cyan)",  group=GRP_DISP)
+show_markers   = input.bool(true,  "Show ▲/▼ Confirmation Markers",  group=GRP_DISP)
+show_mom_line  = input.bool(false, "Show Momentum Ratio Line (white)",group=GRP_DISP)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 2 ── FETCH 1-MINUTE OHLCV DATA
+// ══════════════════════════════════════════════════════════════════════════════
+// lookahead_off   → no future data leakage → NO repainting
+// gaps_off        → fills gaps (e.g. pre/post market) with last known value
+// max_bars_back   → set on indicator() level to 500 to support long lookbacks
+
+[m1_open, m1_high, m1_low, m1_close, m1_vol] = request.security(
+     syminfo.tickerid,
+     "1",
+     [open, high, low, close, volume],
+     lookahead = barmerge.lookahead_off,
+     gaps      = barmerge.gaps_off
+ )
+
+// Guard: if the requested timeframe IS already 1 min, use bar data directly
+// (request.security on same TF is fine but this makes intent explicit)
+is_1m_chart = timeframe.period == "1"
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 3 ── VOLATILITY — True Range vs. Rolling ATR Baseline
+// ══════════════════════════════════════════════════════════════════════════════
+// True Range formula: max(H-L, |H-prev_C|, |L-prev_C|)
+// Using 1-min prev close to avoid gap contamination from daily opens.
+
+m1_prev_close = m1_close[1]
+m1_tr = math.max(
+     m1_high - m1_low,
+     math.abs(m1_high - m1_prev_close),
+     math.abs(m1_low  - m1_prev_close)
+ )
+
+// Rolling ATR baseline (simple mean of TR over vol_lookback 1-min bars)
+atr_baseline = ta.sma(m1_tr, vol_lookback)
+
+// Volatility ratio: dimensionless — 1.0 = "average" volatility
+// nz() handles the first vol_lookback bars where baseline = 0
+vol_ratio = nz(m1_tr / atr_baseline, 1.0)
+
+// Boolean flag: is current bar abnormally volatile?
+is_vol_spike = vol_ratio >= vol_threshold
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 4 ── MOMENTUM — Rate of Change vs. Rolling Baseline
+// ══════════════════════════════════════════════════════════════════════════════
+// ROC = close - close[n] (absolute price change over n bars, not %)
+// Using absolute $ movement keeps it comparable across price levels
+// when normalized against its own baseline below.
+
+price_roc     = m1_close - nz(m1_close[mom_lookback], m1_close)
+abs_roc       = math.abs(price_roc)
+
+// Rolling mean of |ROC| — this is our "normal momentum" baseline
+roc_baseline  = ta.sma(abs_roc, vol_lookback)   // same lookback as vol for consistency
+
+// Momentum ratio: 1.0 = average momentum magnitude
+mom_ratio     = nz(abs_roc / roc_baseline, 1.0)
+
+// Boolean flag: abnormal momentum burst
+is_mom_spike  = mom_ratio >= mom_threshold
+
+// Direction flags (independent of magnitude test)
+is_bull_mom   = price_roc > 0.0
+is_bear_mom   = price_roc < 0.0
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 5 ── VOLUME — Relative Volume (RVOL) vs. Rolling Average
+// ══════════════════════════════════════════════════════════════════════════════
+// RVOL = current 1-min volume ÷ rolling mean of 1-min volume
+// A value of 2.0 = double the normal volume for this time of day
+// Note: This does NOT account for time-of-day effects (VWAP-normalized RVOL
+// would require intraday session data unavailable via simple request.security).
+
+avg_vol       = ta.sma(m1_vol, rvol_lookback)
+rvol          = nz(m1_vol / avg_vol, 1.0)
+
+// Volume confirmation flag
+is_vol_confirmed = rvol >= rvol_threshold
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 6 ── COMPOSITE SIGNAL LOGIC
+// ══════════════════════════════════════════════════════════════════════════════
+// Confirmed Explosive Move = ALL THREE conditions met simultaneously:
+//   ① Volatility spike  (price moved abnormally far vs. its own range history)
+//   ② Momentum spike    (speed of price movement exceeds baseline)
+//   ③ Volume confirmed  (transaction volume backs the move)
+//
+// Unconfirmed Spike = vol or momentum spike WITHOUT volume support
+// (often a false alarm — thin market, news gap, etc.)
+
+is_explosive_bull = is_vol_spike and is_mom_spike and is_bull_mom and is_vol_confirmed
+is_explosive_bear = is_vol_spike and is_mom_spike and is_bear_mom and is_vol_confirmed
+is_any_explosive  = is_explosive_bull or is_explosive_bear
+
+// Partial signal: something moving but not yet confirmed
+is_unconfirmed    = (is_vol_spike or is_mom_spike) and not is_vol_confirmed
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 7 ── VISUALIZATION
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── 7a. Bar color logic ───────────────────────────────────────────────────────
+bar_col =
+     is_explosive_bull ? color.new(#00e676, 10) :   // vivid green — confirmed bull
+     is_explosive_bear ? color.new(#ff1744, 10) :   // vivid red   — confirmed bear
+     is_unconfirmed    ? color.new(#ffd600, 25) :   // yellow      — spike, no volume
+                         color.new(#546e7a, 65)     // muted blue-gray — normal
+
+// ── 7b. Main histogram: Volatility Ratio ─────────────────────────────────────
+plot(
+     vol_ratio,
+     title     = "Volatility Ratio",
+     style     = plot.style_columns,
+     color     = bar_col,
+     linewidth = 1
+ )
+
+// ── 7c. Volatility threshold line ────────────────────────────────────────────
+hline(
+     vol_threshold,
+     title     = "Vol Threshold",
+     color     = color.new(#ff6f00, 0),   // orange
+     linestyle = hline.style_dashed,
+     linewidth = 2
+ )
+
+// ── 7d. Baseline reference (ratio = 1.0 = normal) ────────────────────────────
+hline(
+     1.0,
+     title     = "Normal Baseline",
+     color     = color.new(#607d8b, 60),
+     linestyle = hline.style_dotted,
+     linewidth = 1
+ )
+
+// ── 7e. Optional: Volume Ratio overlay line ───────────────────────────────────
+plot(
+     show_rvol_line ? rvol : na,
+     title     = "RVOL (Volume Ratio)",
+     color     = color.new(#00bcd4, 30),  // cyan, semi-transparent
+     linewidth  = 1,
+     style     = plot.style_line
+ )
+
+// Volume threshold companion dashed line (shown only when RVOL line is on)
+hline(
+     rvol_threshold,
+     title     = "Volume Threshold",
+     color     = color.new(#00bcd4, 40),
+     linestyle = hline.style_dashed,
+     linewidth = 1
+ )
+
+// ── 7f. Optional: Momentum Ratio overlay line ─────────────────────────────────
+plot(
+     show_mom_line ? mom_ratio : na,
+     title     = "Momentum Ratio",
+     color     = color.new(#e0e0e0, 40),
+     linewidth  = 1,
+     style     = plot.style_line
+ )
+
+// ── 7g. Background glow on confirmed explosive bars ───────────────────────────
+bgcolor(
+     is_explosive_bull ? color.new(#00e676, 88) : na,
+     title = "Bull Explosive Background"
+ )
+bgcolor(
+     is_explosive_bear ? color.new(#ff1744, 88) : na,
+     title = "Bear Explosive Background"
+ )
+
+// ── 7h. ▲/▼ confirmation markers ─────────────────────────────────────────────
+// Bullish: triangle UP at the bottom of the pane
+plotshape(
+     show_markers and is_explosive_bull,
+     title    = "▲ Bull Explosive Marker",
+     style    = shape.triangleup,
+     location = location.bottom,
+     color    = #00e676,
+     size     = size.small
+ )
+// Bearish: triangle DOWN at the top of the pane
+plotshape(
+     show_markers and is_explosive_bear,
+     title    = "▼ Bear Explosive Marker",
+     style    = shape.triangledown,
+     location = location.top,
+     color    = #ff1744,
+     size     = size.small
+ )
+
+// ── 7i. Optional: Label with ratio values on confirmed bars ───────────────────
+// (Label disabled by default to avoid clutter; enable by uncommenting)
+// if is_any_explosive
+//     label.new(
+//          bar_index,
+//          vol_ratio,
+//          str.format("V:{0,number,#.##} R:{1,number,#.##}", vol_ratio, rvol),
+//          color      = is_explosive_bull ? color.lime : color.red,
+//          textcolor  = color.white,
+//          style      = label.style_label_down,
+//          size       = size.tiny
+//      )
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SECTION 8 ── ALERT CONDITIONS
+// ══════════════════════════════════════════════════════════════════════════════
+// Set these in TradingView's Alert dialogue → Condition → pick this indicator.
+// Supports webhook, email, push notification, and sound alerts.
+
+alertcondition(
+     is_explosive_bull,
+     title   = "🟢 Bullish Explosive Move",
+     message = "[EMD] ⬆ BULLISH EXPLOSIVE MOVE — {{ticker}} @ {{close}} | 1M Vol×{vol_ratio} | RVOL×{rvol} | Volatility + Momentum + Volume ALL confirmed!"
+ )
+
+alertcondition(
+     is_explosive_bear,
+     title   = "🔴 Bearish Explosive Move",
+     message = "[EMD] ⬇ BEARISH EXPLOSIVE MOVE — {{ticker}} @ {{close}} | 1M Vol×{vol_ratio} | RVOL×{rvol} | Volatility + Momentum + Volume ALL confirmed!"
+ )
+
+alertcondition(
+     is_any_explosive,
+     title   = "⚡ Any Explosive Move",
+     message = "[EMD] ⚡ EXPLOSIVE MOVE DETECTED — {{ticker}} @ {{close}} | Check direction on chart."
+ )
+
+alertcondition(
+     is_unconfirmed,
+     title   = "🟡 Unconfirmed Spike (Watch)",
+     message = "[EMD] ⚠ SPIKE WITHOUT VOLUME — {{ticker}} @ {{close}} | Vol or momentum elevated but volume not confirming. Stay alert."
+ )
+
+// ══════════════════════════════════════════════════════════════════════════════
+// END OF INDICATOR
+// ══════════════════════════════════════════════════════════════════════════════

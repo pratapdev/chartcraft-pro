@@ -1,0 +1,477 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  ⚡ SMC ELITE PRO – Liquidity Hunter v4.0
+//  Strategy: Smart Money Concepts | Liquidity Sweeps + FVG + Order Block
+//
+//  CORE PHILOSOPHY (what prop firms actually do):
+//  1. Institutions NEED liquidity to fill large orders
+//  2. They engineer stop-hunt moves to COLLECT liquidity
+//  3. The resulting displacement candle reveals their TRUE direction
+//  4. The Fair Value Gap (imbalance) left behind = their re-entry zone
+//  5. YOU enter when price returns to that FVG / Order Block
+//
+//  COMPONENTS:
+//  ├─ Market Structure  → BOS / CHoCH (trend direction filter)
+//  ├─ Liquidity Pools   → BSL / SSL (equal highs/lows = stop clusters)
+//  ├─ Fair Value Gaps   → Institutional imbalance zones (entry)
+//  ├─ Order Blocks      → Last opposing candle before displacement (entry)
+//  └─ Entry Signal      → Sweep + Displacement confirmation
+//
+//  RECOMMENDED USAGE:
+//  • Timeframes : 15m entry  |  1H/4H bias  |  Daily premium-discount
+//  • Markets    : Forex majors, US indices (ES/NQ), BTC/ETH
+//  • Sessions   : London Open (2–5 AM EST)  |  NY Open (7–10 AM EST)
+// ════════════════════════════════════════════════════════════════════════════
+//@version=5
+indicator("⚡ SMC Elite Pro – Liquidity Hunter", shorttitle="SMC·ELITE", overlay=true,
+          max_lines_count  = 500,
+          max_boxes_count  = 500,
+          max_labels_count = 500)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  INPUTS
+// ════════════════════════════════════════════════════════════════════════════
+
+g_str  = "── MARKET STRUCTURE ─────────────────────────────────────────────────"
+ms_len     = input.int  (10,    "Pivot Length (bars left/right)",  group=g_str, minval=3, maxval=30,
+                          tooltip="Higher = less but more significant swing points")
+show_swing = input.bool (true,  "Show Swing H/L Labels",           group=g_str)
+show_bos   = input.bool (true,  "Show Break of Structure (BOS)",   group=g_str)
+show_choch = input.bool (true,  "Show Change of Character (CHoCH)",group=g_str)
+
+g_fvg  = "── FAIR VALUE GAPS ──────────────────────────────────────────────────"
+show_fvg   = input.bool (true,  "Show FVGs",               group=g_fvg)
+fvg_ext    = input.int  (80,    "Extend Bars Forward",     group=g_fvg, minval=10, maxval=500)
+fvg_bull   = input.color(color.new(#00BFA5, 82), "Bullish FVG Color", group=g_fvg)
+fvg_bear   = input.color(color.new(#FF1744, 82), "Bearish FVG Color", group=g_fvg)
+
+g_ob   = "── ORDER BLOCKS ─────────────────────────────────────────────────────"
+show_ob    = input.bool (true,  "Show Order Blocks",      group=g_ob)
+ob_ext     = input.int  (40,    "Extend Bars Forward",    group=g_ob, minval=5, maxval=300)
+ob_mult    = input.float(1.5,   "Displacement ATR Multiplier", group=g_ob, minval=0.5, maxval=5.0, step=0.1,
+                          tooltip="Minimum candle body size (× ATR) to qualify as a displacement move")
+ob_bull    = input.color(color.new(#00E676, 88), "Bullish OB Color", group=g_ob)
+ob_bear    = input.color(color.new(#FF1744, 88), "Bearish OB Color", group=g_ob)
+
+g_liq  = "── LIQUIDITY POOLS ──────────────────────────────────────────────────"
+show_liq   = input.bool (true,  "Show Liquidity Levels (BSL/SSL)",  group=g_liq)
+liq_lb     = input.int  (30,    "Lookback Bars",                    group=g_liq, minval=5, maxval=100)
+liq_tol    = input.float(0.08,  "Equal Level Tolerance (%)",        group=g_liq, minval=0.01, maxval=1.0, step=0.01,
+                          tooltip="How close two highs/lows must be to be considered 'equal' (stop cluster)")
+
+g_sig  = "── ENTRY SIGNALS ────────────────────────────────────────────────────"
+show_sig   = input.bool (true,  "Show Entry Signals",         group=g_sig)
+min_rr     = input.float(2.0,   "Minimum R:R Ratio",          group=g_sig, minval=1.0, step=0.5)
+sig_ext    = input.int  (30,    "SL/TP Line Extension Bars",  group=g_sig, minval=5, maxval=200)
+sweep_conf = input.float(0.4,   "Sweep Displacement (× ATR)", group=g_sig, minval=0.1, maxval=3.0, step=0.1,
+                          tooltip="Minimum size of the displacement candle body after the sweep")
+show_alerts= input.bool (true,  "Enable Alerts",              group=g_sig)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  BASE CALCULATIONS
+// ════════════════════════════════════════════════════════════════════════════
+atr14  = ta.atr(14)
+ph     = ta.pivothigh(high, ms_len, ms_len)
+pl     = ta.pivotlow (low,  ms_len, ms_len)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SWING STRUCTURE TRACKING
+// ════════════════════════════════════════════════════════════════════════════
+var float sh1    = na          // Most recent confirmed swing high value
+var float sl1    = na          // Most recent confirmed swing low value
+var int   sh1Bar = na          // Bar index of most recent swing high
+var int   sl1Bar = na          // Bar index of most recent swing low
+var bool  bull   = true        // Current market bias (true = bullish)
+
+if not na(ph)
+    sh1    := ph
+    sh1Bar := bar_index - ms_len
+    if show_swing
+        label.new(bar_index - ms_len, ph,
+                  text  = "H",
+                  yloc  = yloc.abovebar,
+                  color = color.new(#EF5350, 78),
+                  textcolor = #EF5350,
+                  style = label.style_none,
+                  size  = size.tiny)
+
+if not na(pl)
+    sl1    := pl
+    sl1Bar := bar_index - ms_len
+    if show_swing
+        label.new(bar_index - ms_len, pl,
+                  text  = "L",
+                  yloc  = yloc.belowbar,
+                  color = color.new(#26A69A, 78),
+                  textcolor = #26A69A,
+                  style = label.style_none,
+                  size  = size.tiny)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  BREAK OF STRUCTURE (BOS) & CHANGE OF CHARACTER (CHoCH)
+//
+//  BOS   = Continuation: trend confirms itself by breaking previous extreme
+//  CHoCH = Reversal: price breaks opposite extreme, bias flips
+// ════════════════════════════════════════════════════════════════════════════
+if not na(sh1) and ta.crossover(close, sh1)
+    isBOS  = bull                                // in uptrend = continuation BOS; downtrend = reversal CHoCH
+    txt    = isBOS ? "BOS ▲" : "CHoCH ▲"
+    col    = isBOS ? color.new(#26A69A, 0) : color.new(#FFD700, 0)
+    doShow = (isBOS and show_bos) or (not isBOS and show_choch)
+    if doShow
+        line.new(sh1Bar, sh1, bar_index, sh1,
+                 color = color.new(col, 55), style = line.style_dashed, width = 1)
+        label.new(bar_index, sh1, txt,
+                  color     = color.new(col, 78),
+                  textcolor = col,
+                  style     = label.style_label_left,
+                  size      = size.small)
+    if not bull
+        bull := true
+
+if not na(sl1) and ta.crossunder(close, sl1)
+    isBOS  = not bull
+    txt    = isBOS ? "BOS ▼" : "CHoCH ▼"
+    col    = isBOS ? color.new(#EF5350, 0) : color.new(#FFD700, 0)
+    doShow = (isBOS and show_bos) or (not isBOS and show_choch)
+    if doShow
+        line.new(sl1Bar, sl1, bar_index, sl1,
+                 color = color.new(col, 55), style = line.style_dashed, width = 1)
+        label.new(bar_index, sl1, txt,
+                  color     = color.new(col, 78),
+                  textcolor = col,
+                  style     = label.style_label_left,
+                  size      = size.small)
+    if bull
+        bull := false
+
+// ════════════════════════════════════════════════════════════════════════════
+//  FAIR VALUE GAPS (FVG) — 3-Candle Imbalance
+//
+//  Bullish FVG : high[2] < low[0]  → gap left as price rockets upward
+//  Bearish FVG : low[2]  > high[0] → gap left as price crashes downward
+//
+//  WHY IT WORKS: Institutions execute so aggressively they skip price levels.
+//  Price will return to fill the imbalance — that's where smart money ADDS.
+// ════════════════════════════════════════════════════════════════════════════
+var box[] bFVG = array.new_box(0)
+var box[] rFVG = array.new_box(0)
+
+if show_fvg and barstate.isconfirmed
+    // ── Bullish FVG
+    if low > high[2] and (low - high[2]) > 0
+        array.push(bFVG,
+            box.new(bar_index - 2, low, bar_index + fvg_ext, high[2],
+                    border_color = fvg_bull,
+                    bgcolor      = fvg_bull,
+                    border_width = 1))
+
+    // ── Bearish FVG
+    if high < low[2] and (low[2] - high) > 0
+        array.push(rFVG,
+            box.new(bar_index - 2, low[2], bar_index + fvg_ext, high,
+                    border_color = fvg_bear,
+                    bgcolor      = fvg_bear,
+                    border_width = 1))
+
+// Maintain bull FVGs — extend and grey-out on mitigation
+for i = array.size(bFVG) - 1 to 0
+    b = array.get(bFVG, i)
+    box.set_right(b, bar_index + fvg_ext)
+    if low <= box.get_top(b)           // candle entered the FVG = mitigated
+        box.set_bgcolor     (b, color.new(color.gray, 93))
+        box.set_border_color(b, color.new(color.gray, 80))
+        array.remove(bFVG, i)
+
+// Maintain bear FVGs
+for i = array.size(rFVG) - 1 to 0
+    b = array.get(rFVG, i)
+    box.set_right(b, bar_index + fvg_ext)
+    if high >= box.get_bottom(b)
+        box.set_bgcolor     (b, color.new(color.gray, 93))
+        box.set_border_color(b, color.new(color.gray, 80))
+        array.remove(rFVG, i)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ORDER BLOCKS (OB) — Last Opposing Candle Before Displacement
+//
+//  Bullish OB : Last BEARISH candle right before a powerful bullish impulse
+//  Bearish OB : Last BULLISH candle right before a powerful bearish impulse
+//
+//  WHY IT WORKS: Institutions place pending orders at these levels.
+//  When price returns, their orders fire — causing the bounce/rejection.
+// ════════════════════════════════════════════════════════════════════════════
+var box[] bOB = array.new_box(0)
+var box[] rOB = array.new_box(0)
+
+if show_ob and barstate.isconfirmed
+    bodySize  = math.abs(close - open)
+    prevBear  = close[1] < open[1]
+    prevBull  = close[1] > open[1]
+    bullDisp  = close > open and bodySize > atr14 * ob_mult
+    bearDisp  = close < open and bodySize > atr14 * ob_mult
+
+    // ── Bullish OB
+    if bullDisp and prevBear
+        obHigh = math.max(open[1], close[1])
+        obLow  = math.min(open[1], close[1])
+        array.push(bOB,
+            box.new(bar_index - 1, obHigh, bar_index + ob_ext, obLow,
+                    border_color = color.new(#00E676, 35),
+                    bgcolor      = ob_bull,
+                    border_width = 1))
+
+    // ── Bearish OB
+    if bearDisp and prevBull
+        obHigh = math.max(open[1], close[1])
+        obLow  = math.min(open[1], close[1])
+        array.push(rOB,
+            box.new(bar_index - 1, obHigh, bar_index + ob_ext, obLow,
+                    border_color = color.new(#FF1744, 35),
+                    bgcolor      = ob_bear,
+                    border_width = 1))
+
+// Maintain OBs — extend and remove on full mitigation
+for i = array.size(bOB) - 1 to 0
+    b = array.get(bOB, i)
+    box.set_right(b, bar_index + ob_ext)
+    if low  <= box.get_top(b) and high >= box.get_bottom(b)
+        box.set_bgcolor(b, color.new(color.gray, 93))
+        array.remove(bOB, i)
+
+for i = array.size(rOB) - 1 to 0
+    b = array.get(rOB, i)
+    box.set_right(b, bar_index + ob_ext)
+    if high >= box.get_bottom(b) and low <= box.get_top(b)
+        box.set_bgcolor(b, color.new(color.gray, 93))
+        array.remove(rOB, i)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  LIQUIDITY POOLS — Equal Highs (BSL) & Equal Lows (SSL)
+//
+//  BSL = BuySide Liquidity   = Equal highs → retail LONG stop-losses cluster here
+//  SSL = SellSide Liquidity  = Equal lows  → retail SHORT stop-losses cluster here
+//
+//  WHY IT WORKS: Retail traders place stops at obvious levels.
+//  Institutions sweep these stops to fill their own large orders.
+//  After the sweep, price snaps back hard — THAT is the trade.
+//
+//  Only evaluated at confirmed pivot bars (no noise).
+// ════════════════════════════════════════════════════════════════════════════
+if show_liq and not na(ph)
+    pivP   = ph
+    pivBar = bar_index - ms_len
+    found  = false
+    for i = 1 to liq_lb
+        if not found and not na(high[i + ms_len])
+            refH = high[i + ms_len]
+            if math.abs(pivP - refH) / pivP * 100 <= liq_tol
+                line.new(pivBar - i, pivP, pivBar + 25, pivP,
+                         color = color.new(#FF6B6B, 40),
+                         style = line.style_dotted,
+                         width = 2)
+                label.new(pivBar + 25, pivP, " BSL 🏹",
+                          color     = color.new(#FF6B6B, 82),
+                          textcolor = #FF6B6B,
+                          style     = label.style_label_right,
+                          size      = size.tiny)
+                found := true
+
+if show_liq and not na(pl)
+    pivP   = pl
+    pivBar = bar_index - ms_len
+    found  = false
+    for i = 1 to liq_lb
+        if not found and not na(low[i + ms_len])
+            refL = low[i + ms_len]
+            if math.abs(pivP - refL) / pivP * 100 <= liq_tol
+                line.new(pivBar - i, pivP, pivBar + 25, pivP,
+                         color = color.new(#4ECDC4, 40),
+                         style = line.style_dotted,
+                         width = 2)
+                label.new(pivBar + 25, pivP, " SSL 🏹",
+                          color     = color.new(#4ECDC4, 82),
+                          textcolor = #4ECDC4,
+                          style     = label.style_label_right,
+                          size      = size.tiny)
+                found := true
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ★ ENTRY SIGNALS — The Complete Setup ★
+//
+//  LONG SIGNAL (all must be true):
+//  [1] Price wicks BELOW the 20-bar swing low (sweeps sellside liquidity)
+//  [2] Candle CLOSES back above that low (failed breakdown = trap)
+//  [3] Candle is BULLISH with meaningful body (displacement confirmed)
+//
+//  SHORT SIGNAL (mirror):
+//  [1] Price wicks ABOVE the 20-bar swing high (sweeps buyside liquidity)
+//  [2] Candle CLOSES back below that high (failed breakout = trap)
+//  [3] Candle is BEARISH with meaningful body
+//
+//  ENTRY  : Close of sweep candle (or limit at FVG/OB retest)
+//  STOP   : Beyond the wick extreme (+ ATR buffer)
+//  TARGET : Opposite liquidity pool (R:R configurable)
+// ════════════════════════════════════════════════════════════════════════════
+ssl_level = ta.lowest (low[1],  20)   // Sellside liquidity (recent swing low)
+bsl_level = ta.highest(high[1], 20)   // Buyside liquidity  (recent swing high)
+
+// Long setup: sweep of SSL
+long_sweep  = low  < ssl_level                            // wick below SSL
+long_reclaim = close > ssl_level                          // close back above
+long_body   = (close - open) > atr14 * sweep_conf        // meaningful bullish body
+long_signal = long_sweep and long_reclaim and long_body and close > open
+
+// Short setup: sweep of BSL
+short_sweep  = high > bsl_level
+short_reclaim = close < bsl_level
+short_body   = (open - close) > atr14 * sweep_conf
+short_signal = short_sweep and short_reclaim and short_body and close < open
+
+// ─────── LONG ENTRY LABELS & LINES ───────────────────────────────────────
+if show_sig and long_signal and barstate.isconfirmed
+    sl_px = low  - atr14 * 0.25
+    tp_px = close + (close - sl_px) * min_rr
+    risk  = close - sl_px
+    rr_str = str.tostring(min_rr, "#.#") + "R"
+
+    label.new(bar_index, sl_px - atr14 * 0.7,
+              text      = "▲  LONG  ▲\n" +
+                          "Entry : " + str.tostring(close,   format.mintick) + "\n" +
+                          "SL    : " + str.tostring(sl_px,   format.mintick) + "\n" +
+                          "TP ("  + rr_str + "): " + str.tostring(tp_px, format.mintick),
+              color     = #00C853,
+              textcolor = color.white,
+              style     = label.style_label_up,
+              size      = size.normal)
+
+    line.new(bar_index, sl_px, bar_index + sig_ext, sl_px,
+             color = color.new(#FF1744, 45), width = 1, style = line.style_dashed)
+    line.new(bar_index, tp_px, bar_index + sig_ext, tp_px,
+             color = color.new(#00E676, 45), width = 1, style = line.style_dashed)
+    line.new(bar_index, close, bar_index + sig_ext, close,
+             color = color.new(color.white, 70), width = 1, style = line.style_dotted)
+
+    if show_alerts
+        alert("⚡ SMC LONG  | Liquidity Sweep ↑ | Entry: " + str.tostring(close, format.mintick) +
+              " | SL: " + str.tostring(sl_px, format.mintick) +
+              " | TP: " + str.tostring(tp_px, format.mintick),
+              alert.freq_once_per_bar)
+
+// ─────── SHORT ENTRY LABELS & LINES ──────────────────────────────────────
+if show_sig and short_signal and barstate.isconfirmed
+    sl_px = high + atr14 * 0.25
+    tp_px = close - (sl_px - close) * min_rr
+    rr_str = str.tostring(min_rr, "#.#") + "R"
+
+    label.new(bar_index, sl_px + atr14 * 0.7,
+              text      = "▼  SHORT  ▼\n" +
+                          "Entry : " + str.tostring(close,   format.mintick) + "\n" +
+                          "SL    : " + str.tostring(sl_px,   format.mintick) + "\n" +
+                          "TP ("  + rr_str + "): " + str.tostring(tp_px, format.mintick),
+              color     = #D50000,
+              textcolor = color.white,
+              style     = label.style_label_down,
+              size      = size.normal)
+
+    line.new(bar_index, sl_px, bar_index + sig_ext, sl_px,
+             color = color.new(#FF1744, 45), width = 1, style = line.style_dashed)
+    line.new(bar_index, tp_px, bar_index + sig_ext, tp_px,
+             color = color.new(#00E676, 45), width = 1, style = line.style_dashed)
+    line.new(bar_index, close, bar_index + sig_ext, close,
+             color = color.new(color.white, 70), width = 1, style = line.style_dotted)
+
+    if show_alerts
+        alert("⚡ SMC SHORT | Liquidity Sweep ↓ | Entry: " + str.tostring(close, format.mintick) +
+              " | SL: " + str.tostring(sl_px, format.mintick) +
+              " | TP: " + str.tostring(tp_px, format.mintick),
+              alert.freq_once_per_bar)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PREMIUM / DISCOUNT MATRIX (100-bar equilibrium)
+//
+//  Price above 75% of range = PREMIUM  → look for SHORTS only
+//  Price below 25% of range = DISCOUNT → look for LONGS only
+//  Price near 50%           = EQUILIBRIUM → neutral, wait for edge
+// ════════════════════════════════════════════════════════════════════════════
+h100  = ta.highest(high, 100)
+l100  = ta.lowest (low,  100)
+eq100 = (h100 + l100) / 2.0
+p75   = l100 + (h100 - l100) * 0.75
+d25   = l100 + (h100 - l100) * 0.25
+
+plot(eq100, "Equilibrium (50%)", color = color.new(#FFD700, 65), linewidth = 1, style = plot.style_line)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  BACKGROUND: Market Bias Visual
+// ════════════════════════════════════════════════════════════════════════════
+bgcolor(bull ? color.new(#26A69A, 96) : color.new(#EF5350, 96), title = "Market Bias Background")
+
+// ════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD TABLE
+// ════════════════════════════════════════════════════════════════════════════
+var table dash = table.new(
+     position      = position.top_right,
+     columns       = 2,
+     rows          = 9,
+     bgcolor       = color.new(#050510, 8),
+     border_color  = color.new(#1a1a3e, 45),
+     border_width  = 1,
+     frame_color   = color.new(#2a2a5e, 35),
+     frame_width   = 1)
+
+if barstate.islast
+    // Header
+    table.cell(dash, 0, 0, "⚡ SMC ELITE PRO",
+               text_color   = #FFD700,
+               text_size    = size.small,
+               bgcolor      = color.new(#050510, 8),
+               text_halign  = text.align_center)
+    table.cell(dash, 1, 0, "v4.0",
+               text_color = color.gray, text_size = size.tiny, bgcolor = color.new(#050510, 8))
+
+    // Bias
+    biasCol = bull ? #00E676 : #FF4444
+    table.cell(dash, 0, 1, "Trend Bias",   text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 1, bull ? "🟢 BULL" : "🔴 BEAR", text_color = biasCol, text_size = size.small)
+
+    // Premium / Discount zone
+    zoneStr = close >= p75 ? "🔴 Premium" : close <= d25 ? "🟢 Discount" : "⚪ Equilibrium"
+    zoneCol = close >= p75 ? #EF5350     : close <= d25 ? #26A69A     : color.silver
+    table.cell(dash, 0, 2, "Price Zone",   text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 2, zoneStr,        text_color = zoneCol,      text_size = size.small)
+
+    // Equilibrium
+    table.cell(dash, 0, 3, "Equilibrium",  text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 3, str.tostring(eq100, format.mintick), text_color = #FFD700, text_size = size.small)
+
+    // BSL / SSL
+    table.cell(dash, 0, 4, "BSL (Stops ↑)", text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 4, str.tostring(bsl_level, format.mintick), text_color = #FF6B6B, text_size = size.small)
+
+    table.cell(dash, 0, 5, "SSL (Stops ↓)", text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 5, str.tostring(ssl_level, format.mintick), text_color = #4ECDC4, text_size = size.small)
+
+    // ATR
+    table.cell(dash, 0, 6, "ATR(14)",      text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 6, str.tostring(atr14, format.mintick), text_color = color.white, text_size = size.small)
+
+    // Last Swing
+    table.cell(dash, 0, 7, "Last Swing H", text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 7, not na(sh1) ? str.tostring(sh1, format.mintick) : "—",
+               text_color = #EF5350, text_size = size.small)
+
+    table.cell(dash, 0, 8, "Last Swing L", text_color = color.silver, text_size = size.small)
+    table.cell(dash, 1, 8, not na(sl1) ? str.tostring(sl1, format.mintick) : "—",
+               text_color = #26A69A, text_size = size.small)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ALERT CONDITIONS (set in TradingView Alert dialog)
+// ════════════════════════════════════════════════════════════════════════════
+alertcondition(long_signal  and barstate.isconfirmed, "SMC LONG  — Liquidity Sweep", "SMC: Bullish Liquidity Sweep Detected")
+alertcondition(short_signal and barstate.isconfirmed, "SMC SHORT — Liquidity Sweep", "SMC: Bearish Liquidity Sweep Detected")
+
+// ════════════════════════════════════════════════════════════════════════════
+//  END OF SCRIPT
+//  Tip: Use on 15m chart with 1H bias filter for highest win rate
+//  Best pairs: EURUSD, GBPUSD, NAS100, BTCUSD
+// ════════════════════════════════════════════════════════════════════════════

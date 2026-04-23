@@ -1,0 +1,524 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  🏦 ICT SMART MONEY PRO — PROP FIRM EDITION
+//  Pine Script v5
+//  Setups: Order Block+FVG | Killzone+OTE | Liquidity Sweep+CHoCH |
+//          Silver Bullet | Breaker Block
+//  Features: Kill Zones • Order Blocks • FVGs • Liquidity • BOS/CHoCH
+//             OTE Fib Zones • Entry Signals • SL/TP Lines • Info Panel
+// ════════════════════════════════════════════════════════════════════════════
+//@version=5
+indicator("🏦 ICT Smart Money Pro — Prop Firm", shorttitle="ICT SMC Pro", overlay=true, max_lines_count=500, max_labels_count=300, max_boxes_count=200)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SETUP SELECTION
+// ─────────────────────────────────────────────────────────────────────────────
+i_setup = input.string(defval  = "Order Block + FVG",title   = "⚡ SELECT ICT SETUP",options = ["Order Block + FVG","Killzone + OTE Entry","Liquidity Sweep + CHoCH","Silver Bullet (10-11 AM EST)","Breaker Block"],tooltip = "Each setup is a distinct ICT entry model. The panel shows step-by-step instructions. Signals fire when ALL conditions align.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — KILL ZONES
+// ─────────────────────────────────────────────────────────────────────────────
+G1 = "🕐 Kill Zones (all times UTC / adjust if needed)"
+i_showKZ  = input.bool(true,  "Show Kill Zone Backgrounds",   group=G1)
+i_showLDN = input.bool(true,  "London Open  07:00-10:00 UTC", group=G1)
+i_showNY  = input.bool(true,  "NY Open      12:00-15:00 UTC", group=G1)
+i_showLC  = input.bool(true,  "London Close 15:00-17:00 UTC", group=G1)
+c_ldn     = input.color(color.new(#1565c0, 87), "London Color",       group=G1)
+c_ny      = input.color(color.new(#e65100, 87), "NY Open Color",      group=G1)
+c_lc      = input.color(color.new(#6a1b9a, 87), "London Close Color", group=G1)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — ORDER BLOCKS
+// ─────────────────────────────────────────────────────────────────────────────
+G2 = "📦 Order Blocks"
+i_showOB    = input.bool(true, "Show Order Blocks",        group=G2)
+i_obStrength= input.int(5,     "Lookback Bars for Impulse",group=G2, minval=2, maxval=15,tooltip="How many candles back to find the last opposing candle before a BOS impulse")
+i_showOBMid = input.bool(true, "Show 50% Midline",         group=G2)
+c_bullOB    = input.color(color.new(#00c853, 80), "Bullish OB Color", group=G2)
+c_bearOB    = input.color(color.new(#d50000, 80), "Bearish OB Color", group=G2)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — FAIR VALUE GAPS
+// ─────────────────────────────────────────────────────────────────────────────
+G3 = "⬜ Fair Value Gaps"
+i_showFVG  = input.bool(true, "Show FVGs",          group=G3)
+i_autoFill = input.bool(true, "Remove Filled FVGs", group=G3)
+c_bullFVG  = input.color(color.new(#00897b, 85), "Bullish FVG Color", group=G3)
+c_bearFVG  = input.color(color.new(#f57c00, 85), "Bearish FVG Color", group=G3)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — MARKET STRUCTURE
+// ─────────────────────────────────────────────────────────────────────────────
+G4 = "🏗 Market Structure (BOS / CHoCH)"
+i_showStr = input.bool(true, "Show BOS / CHoCH Labels", group=G4)
+i_strLen  = input.int(10,    "Swing Lookback Bars",     group=G4, minval=3, maxval=50,tooltip="Pivot length for swing high/low detection. Higher = fewer but stronger pivots")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — LIQUIDITY
+// ─────────────────────────────────────────────────────────────────────────────
+G5 = "💧 Liquidity Levels"
+i_showLiq = input.bool(true, "Show Swing H/L (Resting Liquidity)", group=G5)
+i_liqLen  = input.int(15,    "Swing Length",                       group=G5, minval=3, maxval=50)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — RISK MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+G6 = "🎯 Risk Management"
+i_risk    = input.float(0.5, "Risk % per Trade",    group=G6, minval=0.1, maxval=2.0,  step=0.1,tooltip="Prop firm standard: 0.5% risk per trade keeps you well within drawdown limits")
+i_minRR   = input.float(3.0, "Minimum R:R Target",  group=G6, minval=1.0, maxval=10.0, step=0.5)
+i_showRisk= input.bool(true, "Show SL / TP Lines",  group=G6)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INPUTS — DISPLAY
+// ─────────────────────────────────────────────────────────────────────────────
+G7 = "🖥 Display"
+i_showPanel = input.bool(true, "Show Info Panel", group=G7)
+i_panelPos  = input.string("Top Right", "Panel Position",options=["Top Right", "Top Left", "Bottom Right", "Bottom Left"], group=G7)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  KILL ZONES  (UTC session times)
+//  EST + 5h = UTC:  London KZ 02-05 EST → 07-10 UTC
+//                   NY Open  07-10 EST → 12-15 UTC
+//                   London Close 10-12 EST → 15-17 UTC
+//                   Silver Bullet 10-11 EST → 15-16 UTC
+// ─────────────────────────────────────────────────────────────────────────────
+inSess(s) => not na(time(timeframe.period, s, "UTC"))
+
+isLDN = inSess("0700-1000")
+isNY  = inSess("1200-1500")
+isLC  = inSess("1500-1700")
+isSB  = inSess("1500-1600")   // Silver Bullet subset (inside LC)
+isKZ  = (i_showLDN and isLDN) or (i_showNY and isNY) or (i_showLC and isLC)
+
+bgcolor(i_showKZ and i_showLDN and isLDN and not isLC ? c_ldn : na, title="London KZ")
+bgcolor(i_showKZ and i_showNY  and isNY  and not isLC ? c_ny  : na, title="NY Open KZ")
+bgcolor(i_showKZ and i_showLC  and isLC               ? c_lc  : na, title="London Close KZ")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MARKET STRUCTURE  — Swing H/L → BOS → CHoCH
+// ─────────────────────────────────────────────────────────────────────────────
+pivH = ta.pivothigh(high, i_strLen, i_strLen)
+pivL = ta.pivotlow(low,  i_strLen, i_strLen)
+
+var float lastSH   = na
+var float lastSL   = na
+var bool  isBull   = true   // structural bias
+
+// Capture bias BEFORE updating so CHoCH check uses prior state
+prevBull = isBull
+
+if not na(pivH)
+    lastSH := pivH
+if not na(pivL)
+    lastSL := pivL
+
+// BOS = Break of Structure (close crosses confirmed swing level)
+bullBOS = not na(lastSH) and close > lastSH and close[1] <= lastSH
+bearBOS = not na(lastSL) and close < lastSL and close[1] >= lastSL
+
+// CHoCH = BOS against the PRIOR structural bias → reversal signal
+bullCHoCH = bullBOS and not prevBull   // was bearish, now breaks high
+bearCHoCH = bearBOS and prevBull       // was bullish, now breaks low
+
+// Update bias
+if bullBOS
+    isBull := true
+if bearBOS
+    isBull := false
+
+atr14 = ta.atr(14)
+
+if i_showStr
+    if bullBOS
+        label.new(bar_index, low - atr14 * 0.3,text      = bullCHoCH ? "⚡ CHoCH" : "BOS ▲",color     = bullCHoCH ? color.new(color.yellow, 5) : color.new(color.green, 10),textcolor = color.black,style     = label.style_label_up,size      = bullCHoCH ? size.normal : size.small)
+    if bearBOS
+        label.new(bar_index, high + atr14 * 0.3,text      = bearCHoCH ? "⚡ CHoCH" : "BOS ▼",color     = bearCHoCH ? color.new(color.yellow, 5) : color.new(color.red, 10),textcolor = color.black,style     = label.style_label_down,size      = bearCHoCH ? size.normal : size.small)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ORDER BLOCKS
+//  Bullish OB = last bearish candle before a bullish BOS
+//  Bearish OB = last bullish candle before a bearish BOS
+// ─────────────────────────────────────────────────────────────────────────────
+var box[]  bullOBs  = array.new_box()
+var box[]  bearOBs  = array.new_box()
+var line[] bullMids = array.new_line()
+var line[] bearMids = array.new_line()
+
+MAX_OB = 5
+
+// Bullish OB — triggered on bullish BOS
+if i_showOB and bullBOS
+    idx = 1
+    for j = 1 to i_obStrength
+        if close[j] < open[j]   // last bearish candle in the run-up
+            idx := j
+            break
+    obHi = math.max(open[idx], close[idx])
+    obLo = math.min(open[idx], close[idx])
+    b = box.new(bar_index - idx, obHi, bar_index + 60, obLo,border_color=color.new(#00c853, 30), bgcolor=c_bullOB, border_width=1)
+    array.push(bullOBs, b)
+    if i_showOBMid
+        m = line.new(bar_index - idx, (obHi + obLo) / 2, bar_index + 60, (obHi + obLo) / 2,color=color.new(#00c853, 20), style=line.style_dashed, width=1)
+        array.push(bullMids, m)
+    if array.size(bullOBs) > MAX_OB
+        box.delete(array.shift(bullOBs))
+    if array.size(bullMids) > MAX_OB
+        line.delete(array.shift(bullMids))
+
+// Bearish OB — triggered on bearish BOS
+if i_showOB and bearBOS
+    idx = 1
+    for j = 1 to i_obStrength
+        if close[j] > open[j]   // last bullish candle in the sell-off
+            idx := j
+            break
+    obHi = math.max(open[idx], close[idx])
+    obLo = math.min(open[idx], close[idx])
+    b = box.new(bar_index - idx, obHi, bar_index + 60, obLo,border_color=color.new(#d50000, 30), bgcolor=c_bearOB, border_width=1)
+    array.push(bearOBs, b)
+    if i_showOBMid
+        m = line.new(bar_index - idx, (obHi + obLo) / 2, bar_index + 60, (obHi + obLo) / 2,color=color.new(#d50000, 20), style=line.style_dashed, width=1)
+        array.push(bearMids, m)
+    if array.size(bearOBs) > MAX_OB
+        box.delete(array.shift(bearOBs))
+    if array.size(bearMids) > MAX_OB
+        line.delete(array.shift(bearMids))
+
+// Fade (grey out) mitigated OBs — when price trades through the zone
+if i_showOB
+    if array.size(bullOBs) > 0
+        for i = 0 to array.size(bullOBs) - 1
+            bx = array.get(bullOBs, i)
+            if not na(bx) and low < box.get_bottom(bx)
+                box.set_bgcolor(bx,      color.new(#00c853, 95))
+                box.set_border_color(bx, color.new(#00c853, 82))
+    if array.size(bearOBs) > 0
+        for i = 0 to array.size(bearOBs) - 1
+            bx = array.get(bearOBs, i)
+            if not na(bx) and high > box.get_top(bx)
+                box.set_bgcolor(bx,      color.new(#d50000, 95))
+                box.set_border_color(bx, color.new(#d50000, 82))
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  FAIR VALUE GAPS (FVG)
+//  Bullish FVG: gap between high[2] and low[0]  (price skipped up)
+//  Bearish FVG: gap between low[2] and high[0]  (price skipped down)
+// ─────────────────────────────────────────────────────────────────────────────
+var box[] bullFVGs = array.new_box()
+var box[] bearFVGs = array.new_box()
+
+MAX_FVG = 8
+
+bullFVGcond = i_showFVG and high[2] < low[0]    // gap above
+bearFVGcond = i_showFVG and low[2]  > high[0]   // gap below
+
+if bullFVGcond
+    b = box.new(bar_index - 2, low[0], bar_index + 40, high[2],border_color=color.new(#00897b, 40), bgcolor=c_bullFVG, border_width=1)
+    array.push(bullFVGs, b)
+    if array.size(bullFVGs) > MAX_FVG
+        box.delete(array.shift(bullFVGs))
+
+if bearFVGcond
+    b = box.new(bar_index - 2, high[0], bar_index + 40, low[2],border_color=color.new(#f57c00, 40), bgcolor=c_bearFVG, border_width=1)
+    array.push(bearFVGs, b)
+    if array.size(bearFVGs) > MAX_FVG
+        box.delete(array.shift(bearFVGs))
+
+// Remove FVGs that have been filled (price traded through them)
+if i_showFVG and i_autoFill
+    if array.size(bullFVGs) > 0
+        for i = array.size(bullFVGs) - 1 to 0
+            bx = array.get(bullFVGs, i)
+            if not na(bx) and low <= box.get_bottom(bx)
+                box.delete(bx)
+                array.remove(bullFVGs, i)
+    if array.size(bearFVGs) > 0
+        for i = array.size(bearFVGs) - 1 to 0
+            bx = array.get(bearFVGs, i)
+            if not na(bx) and high >= box.get_top(bx)
+                box.delete(bx)
+                array.remove(bearFVGs, i)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LIQUIDITY LEVELS  — Swing highs/lows = resting stops
+// ─────────────────────────────────────────────────────────────────────────────
+liqH = ta.pivothigh(high, i_liqLen, i_liqLen)
+liqL = ta.pivotlow(low,  i_liqLen, i_liqLen)
+
+if i_showLiq
+    if not na(liqH)
+        line.new(bar_index - i_liqLen, liqH, bar_index + 50, liqH,color=color.new(#1565c0, 10), style=line.style_dotted, width=2)
+        label.new(bar_index - i_liqLen, liqH + atr14 * 0.2, "BSL ▲",color=color.new(#1565c0, 20), textcolor=color.white,style=label.style_label_right, size=size.tiny,tooltip="Buy-Side Liquidity — resting stops above swing high. Institutions hunt these.")
+    if not na(liqL)
+        line.new(bar_index - i_liqLen, liqL, bar_index + 50, liqL,color=color.new(#b71c1c, 10), style=line.style_dotted, width=2)
+        label.new(bar_index - i_liqLen, liqL - atr14 * 0.2, "SSL ▼",color=color.new(#b71c1c, 20), textcolor=color.white,style=label.style_label_right, size=size.tiny,tooltip="Sell-Side Liquidity — resting stops below swing low. Institutions hunt these.")
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  OTE ZONE VISUALIZATION (for Killzone + OTE setup)
+//  OTE = Optimal Trade Entry: 61.8% – 79% Fib of last impulse
+// ─────────────────────────────────────────────────────────────────────────────
+sh20 = ta.highest(high, 20)
+sl20 = ta.lowest(low,   20)
+rng20 = sh20 - sl20
+
+// Bullish OTE zone: price retraces into 61.8-79% from recent high (buy discount)
+ote_bull_hi = sh20 - rng20 * 0.618  // 61.8% retrace from high
+ote_bull_lo = sh20 - rng20 * 0.79   // 79%   retrace from high
+// Bearish OTE zone: price retraces into 61.8-79% from recent low (sell premium)
+ote_bear_lo = sl20 + rng20 * 0.618
+ote_bear_hi = sl20 + rng20 * 0.79
+
+inBullOTE = close <= ote_bull_hi and close >= ote_bull_lo
+inBearOTE = close >= ote_bear_lo and close <= ote_bear_hi
+
+var line oteHiLine = na
+var line oteLoLine = na
+
+if i_setup == "Killzone + OTE Entry" and isKZ and barstate.islast
+    if not na(oteHiLine)
+        line.delete(oteHiLine)
+    if not na(oteLoLine)
+        line.delete(oteLoLine)
+    oteHiLine := line.new(bar_index - 20, isBull ? ote_bull_hi : ote_bear_hi,bar_index + 20, isBull ? ote_bull_hi : ote_bear_hi,color=color.new(#ffd54f, 10), style=line.style_dashed, width=2)
+    oteLoLine := line.new(bar_index - 20, isBull ? ote_bull_lo : ote_bear_lo,bar_index + 20, isBull ? ote_bull_lo : ote_bear_lo,color=color.new(#ffd54f, 10), style=line.style_dashed, width=2)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HELPER: Is price inside a bullish/bearish OB?
+// ─────────────────────────────────────────────────────────────────────────────
+isInBullOB() =>
+    result = false
+    if array.size(bullOBs) > 0
+        for i = 0 to array.size(bullOBs) - 1
+            bx = array.get(bullOBs, i)
+            if not na(bx) and low >= box.get_bottom(bx) and close <= box.get_top(bx) * 1.002
+                result := true
+    result
+
+isInBearOB() =>
+    result = false
+    if array.size(bearOBs) > 0
+        for i = 0 to array.size(bearOBs) - 1
+            bx = array.get(bearOBs, i)
+            if not na(bx) and high <= box.get_top(bx) and close >= box.get_bottom(bx) * 0.998
+                result := true
+    result
+
+hasBullFVG = array.size(bullFVGs) > 0
+hasBearFVG = array.size(bearFVGs) > 0
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SETUP-SPECIFIC SIGNALS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Setup 1: Order Block + FVG ────────────────────────────────────────────────
+// Long: price retraces into bullish OB, FVG present, bullish structure, in KZ
+// Short: price retraces into bearish OB, FVG present, bearish structure, in KZ
+s1Bull = i_setup == "Order Block + FVG" and
+         isInBullOB() and hasBullFVG and isBull and isKZ and close > open
+
+s1Bear = i_setup == "Order Block + FVG" and
+         isInBearOB() and hasBearFVG and not isBull and isKZ and close < open
+
+// ── Setup 2: Killzone + OTE Entry ────────────────────────────────────────────
+// Long: in bullish OTE zone (61.8-79% retrace from high), bullish structure, in KZ
+// Short: in bearish OTE zone, bearish structure, in KZ
+s2Bull = i_setup == "Killzone + OTE Entry" and
+         inBullOTE and isBull and isKZ and close > open
+
+s2Bear = i_setup == "Killzone + OTE Entry" and
+         inBearOTE and not isBull and isKZ and close < open
+
+// ── Setup 3: Liquidity Sweep + CHoCH ─────────────────────────────────────────
+// Long: price wicks below recent low (sweep), then closes bullish → CHoCH confirms
+// Short: price wicks above recent high (sweep), then closes bearish → CHoCH confirms
+recentLow  = ta.lowest(low,  i_liqLen)
+recentHigh = ta.highest(high, i_liqLen)
+bullSweep  = low[1] < recentLow[2]  and close > open    // swept below, closed up
+bearSweep  = high[1] > recentHigh[2] and close < open   // swept above, closed down
+
+s3Bull = i_setup == "Liquidity Sweep + CHoCH" and bullSweep and bullCHoCH
+s3Bear = i_setup == "Liquidity Sweep + CHoCH" and bearSweep and bearCHoCH
+
+// ── Setup 4: Silver Bullet (10–11 AM EST = 15:00–16:00 UTC) ──────────────────
+// Same logic as OB entry but ONLY valid in the Silver Bullet time window
+s4Bull = i_setup == "Silver Bullet (10-11 AM EST)" and
+         isInBullOB() and isSB and isBull and close > open
+
+s4Bear = i_setup == "Silver Bullet (10-11 AM EST)" and
+         isInBearOB() and isSB and not isBull and close < open
+
+// ── Setup 5: Breaker Block ────────────────────────────────────────────────────
+// A Breaker is a failed OB — price broke through it, now retests from the other side
+// Bullish Breaker: bearish BOS broke below a prior low, now a bullish BOS retests that area
+// Simplified: bullish BOS where price dips back to structural level then closes above
+s5Bull = i_setup == "Breaker Block" and
+         bullBOS and not na(lastSH) and low <= lastSH * 1.002 and close > lastSH and isKZ
+
+s5Bear = i_setup == "Breaker Block" and
+         bearBOS and not na(lastSL) and high >= lastSL * 0.998 and close < lastSL and isKZ
+
+// Combined signals
+bullSignal = s1Bull or s2Bull or s3Bull or s4Bull or s5Bull
+bearSignal = s1Bear or s2Bear or s3Bear or s4Bear or s5Bear
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ENTRY LABELS + SL / TP LINES
+// ─────────────────────────────────────────────────────────────────────────────
+if bullSignal and not bullSignal[1]
+    ep  = close
+    sl  = ep - atr14 * 1.5
+    tp1 = ep + atr14 * 1.5 * (i_minRR * 0.5)   // 50% at half target
+    tp2 = ep + atr14 * 1.5 * i_minRR             // 50% at full target
+
+    label.new(bar_index, low - atr14 * 0.8,"🟢 LONG ENTRY\n" +"━━━━━━━━━━━━━━━━━━━\n" +"Entry : " + str.tostring(ep,  format.mintick) + "\n" +"SL    : " + str.tostring(sl,  format.mintick) + "  ← hard stop\n" +"TP 1  : " + str.tostring(tp1, format.mintick) + "  (close 50%)\n" +"TP 2  : " + str.tostring(tp2, format.mintick) + "  (close 50%)\n" +"R:R   : 1:" + str.tostring(i_minRR, "#.#") + "\n" +"Risk  : " + str.tostring(i_risk, "#.#") + "% of account",color     = color.new(#00c853, 5),textcolor = color.white,style     = label.style_label_up,size      = size.normal)
+
+    if i_showRisk
+        line.new(bar_index, sl,  bar_index + 55, sl,  color=color.red,    width=2, style=line.style_dashed)
+        line.new(bar_index, tp1, bar_index + 55, tp1, color=color.yellow, width=1, style=line.style_dashed)
+        line.new(bar_index, tp2, bar_index + 55, tp2, color=color.green,  width=2, style=line.style_dashed)
+        line.new(bar_index, ep,  bar_index + 55, ep,  color=color.white,  width=1, style=line.style_dotted)
+        label.new(bar_index + 55, sl,  "SL",  color=color.red,    textcolor=color.white, style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 55, tp1, "TP1", color=color.yellow, textcolor=color.black, style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 55, tp2, "TP2", color=color.green,  textcolor=color.black, style=label.style_label_left, size=size.tiny)
+
+if bearSignal and not bearSignal[1]
+    ep  = close
+    sl  = ep + atr14 * 1.5
+    tp1 = ep - atr14 * 1.5 * (i_minRR * 0.5)
+    tp2 = ep - atr14 * 1.5 * i_minRR
+
+    label.new(bar_index, high + atr14 * 0.8,"🔴 SHORT ENTRY\n" +"━━━━━━━━━━━━━━━━━━━\n" +"Entry : " + str.tostring(ep,  format.mintick) + "\n" +"SL    : " + str.tostring(sl,  format.mintick) + "  ← hard stop\n" +"TP 1  : " + str.tostring(tp1, format.mintick) + "  (close 50%)\n" +"TP 2  : " + str.tostring(tp2, format.mintick) + "  (close 50%)\n" +"R:R   : 1:" + str.tostring(i_minRR, "#.#") + "\n" +"Risk  : " + str.tostring(i_risk, "#.#") + "% of account",color     = color.new(#d50000, 5),textcolor = color.white,style     = label.style_label_down,size      = size.normal)
+
+    if i_showRisk
+        line.new(bar_index, sl,  bar_index + 55, sl,  color=color.red,    width=2, style=line.style_dashed)
+        line.new(bar_index, tp1, bar_index + 55, tp1, color=color.yellow, width=1, style=line.style_dashed)
+        line.new(bar_index, tp2, bar_index + 55, tp2, color=color.green,  width=2, style=line.style_dashed)
+        line.new(bar_index, ep,  bar_index + 55, ep,  color=color.white,  width=1, style=line.style_dotted)
+        label.new(bar_index + 55, sl,  "SL",  color=color.red,    textcolor=color.white, style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 55, tp1, "TP1", color=color.yellow, textcolor=color.black, style=label.style_label_left, size=size.tiny)
+        label.new(bar_index + 55, tp2, "TP2", color=color.green,  textcolor=color.black, style=label.style_label_left, size=size.tiny)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  INFO PANEL — Setup instructions + live status
+// ─────────────────────────────────────────────────────────────────────────────
+if i_showPanel and barstate.islast
+    panPos = switch i_panelPos
+        "Top Right"    => position.top_right
+        "Top Left"     => position.top_left
+        "Bottom Right" => position.bottom_right
+        "Bottom Left"  => position.bottom_left
+        => position.top_right
+
+    // Status strings
+    kzTxt   = isLDN ? "🔵 LONDON KZ" : isNY ? "🟠 NY OPEN KZ" : isLC ? "🟣 LONDON CLOSE" : "⚫ NO KILL ZONE"
+    biasTxt = isBull ? "🟢 BULLISH" : "🔴 BEARISH"
+    tfTxt   = timeframe.in_seconds() <= 300  ? "✅ 1m-5m (LTF Entry)" :
+              timeframe.in_seconds() <= 900  ? "✅ 15m (Confirmation)" :
+              timeframe.in_seconds() <= 3600 ? "✅ 1H (Setup TF)"     :
+                                               "📊 4H-Daily (HTF Bias)"
+
+    // Instructions per setup
+    i1 = ""
+    i2 = ""
+    i3 = ""
+    i4 = ""
+    i5 = ""
+    i6 = ""
+    best_tf = ""
+
+    if i_setup == "Order Block + FVG"
+        i1      := "① Establish HTF bias on Daily / 4H chart"
+        i2      := "② Wait for London or NY Kill Zone to open"
+        i3      := "③ Price retraces into a bullish / bearish OB"
+        i4      := "④ A FVG must exist inside or near the OB"
+        i5      := "⑤ Enter at OB midline on confirmation candle"
+        i6      := "SL: Below / above OB  •  TP: 1:" + str.tostring(i_minRR, "#.#") + " to next liquidity"
+        best_tf := "4H bias → 1H setup → 15m entry → 5m confirm"
+    else if i_setup == "Killzone + OTE Entry"
+        i1      := "① Find the most recent swing high and swing low"
+        i2      := "② Wait for price to begin retracing the impulse"
+        i3      := "③ OTE zone = 61.8%–79% Fib of swing (shown on chart)"
+        i4      := "④ Must be inside a Kill Zone (London / NY)"
+        i5      := "⑤ Enter on a CHoCH or reversal candle at 79% level"
+        i6      := "SL: Beyond swing extreme  •  TP: Previous HH or LL"
+        best_tf := "15m for structure → 5m or 1m for entry timing"
+    else if i_setup == "Liquidity Sweep + CHoCH"
+        i1      := "① Mark swing H/L — these are resting stop pools"
+        i2      := "② Wait for price to wick BEYOND the level (sweep)"
+        i3      := "③ Candle must close BACK inside the prior range"
+        i4      := "④ CHoCH on 5m confirms the sweep reversal (required)"
+        i5      := "⑤ Enter on retest of CHoCH level after reversal"
+        i6      := "SL: Beyond the sweep wick  •  TP: 1:" + str.tostring(i_minRR, "#.#")
+        best_tf := "15m / 5m structure → 1m for sweep + CHoCH entry"
+    else if i_setup == "Silver Bullet (10-11 AM EST)"
+        i1      := "① Window: 10:00–11:00 AM EST only (15:00-16:00 UTC)"
+        i2      := "② Use 15m to identify premium / discount of the day"
+        i3      := "③ Drop to 5m / 1m — look for a fresh OB or FVG"
+        i4      := "④ Bias = continuation of AM session direction"
+        i5      := "⑤ Enter at 1m OB during Silver Bullet window"
+        i6      := "SL: 5-10 pips behind OB  •  TP: 1:" + str.tostring(i_minRR, "#.#") + " or HTF FVG"
+        best_tf := "5m for bias → 1m for entry (only 60-min window)"
+    else // Breaker Block
+        i1      := "① Find an Order Block that price has broken THROUGH"
+        i2      := "② The Breaker = old OB flipped to opposite signal role"
+        i3      := "③ Wait for price to return to that zone from new side"
+        i4      := "④ Confirm with BOS or CHoCH on LTF"
+        i5      := "⑤ Enter on retest during Kill Zone hours"
+        i6      := "SL: Back inside the Breaker  •  TP: 1:" + str.tostring(i_minRR, "#.#")
+        best_tf := "1H for breaker ID → 15m / 5m for entry"
+
+    var table t = table.new(panPos, 2, 16,bgcolor      = color.new(#0d1117, 3),border_color = color.new(#30363d, 0),border_width = 1,frame_color  = color.new(#58a6ff, 20),frame_width  = 2)
+
+    H = color.new(#161b22, 0)   // header row bg
+    R = color.new(#0d1117, 0)   // data row bg
+
+    table.cell(t, 0, 0, "🏦  ICT SMART MONEY PRO",text_color=color.new(#58a6ff, 0), text_size=size.small, bgcolor=H)
+    table.cell(t, 1, 0, "PROP FIRM EDITION",text_color=color.new(#58a6ff, 30), text_size=size.tiny, bgcolor=H)
+
+    table.cell(t, 0, 1, "Setup",     text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 1, i_setup,     text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 0, 2, "Kill Zone", text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 2, kzTxt,       text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 0, 3, "Bias",      text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 3, biasTxt,     text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 0, 4, "Timeframe", text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 4, tfTxt,       text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 0, 5, "Risk",      text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 5, str.tostring(i_risk, "#.#") + "% | 1:" + str.tostring(i_minRR, "#.#") + " R:R",text_color=color.white, text_size=size.tiny, bgcolor=R)
+    table.cell(t, 0, 6, "Active OBs", text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 6, "Bull:" + str.tostring(array.size(bullOBs)) +
+                         "  Bear:" + str.tostring(array.size(bearOBs)),text_color=color.white, text_size=size.tiny, bgcolor=R)
+    table.cell(t, 0, 7, "Active FVGs", text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 7, "Bull:" + str.tostring(array.size(bullFVGs)) +
+                         "  Bear:" + str.tostring(array.size(bearFVGs)),text_color=color.white, text_size=size.tiny, bgcolor=R)
+
+    table.cell(t, 0, 8, "── SETUP INSTRUCTIONS ──",text_color=color.new(#58a6ff, 0), text_size=size.tiny, bgcolor=H)
+    table.cell(t, 1, 8, "", bgcolor=H)
+
+    table.cell(t, 0,  9, i1, text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1,  9, "", bgcolor=R)
+    table.cell(t, 0, 10, i2, text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 10, "", bgcolor=R)
+    table.cell(t, 0, 11, i3, text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 11, "", bgcolor=R)
+    table.cell(t, 0, 12, i4, text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 12, "", bgcolor=R)
+    table.cell(t, 0, 13, i5, text_color=color.white,           text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 13, "", bgcolor=R)
+    table.cell(t, 0, 14, "🎯 " + i6,text_color=color.new(#ffd54f, 0), text_size=size.tiny, bgcolor=H)
+    table.cell(t, 1, 14, "", bgcolor=H)
+    table.cell(t, 0, 15, "📐 Best TF: " + best_tf,text_color=color.new(#8b949e, 0), text_size=size.tiny, bgcolor=R)
+    table.cell(t, 1, 15, "", bgcolor=R)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ALERTS
+// ─────────────────────────────────────────────────────────────────────────────
+// alertcondition(bullSignal and not bullSignal[1],"🟢 ICT Long Signal","ICT Long Entry — {{ticker}} | Setup: " + i_setup + " | Check chart for SL/TP")
+
+// alertcondition(bearSignal and not bearSignal[1],"🔴 ICT Short Signal","ICT Short Entry — {{ticker}} | Setup: " + i_setup + " | Check chart for SL/TP")
+
+// alertcondition(bullBOS and not bullBOS[1],   "BOS Bullish ▲",  "Bullish Break of Structure on {{ticker}}")
+// alertcondition(bearBOS and not bearBOS[1],   "BOS Bearish ▼",  "Bearish Break of Structure on {{ticker}}")
+// alertcondition(bullCHoCH and not bullCHoCH[1], "⚡ CHoCH Bull", "Bullish CHoCH — potential reversal on {{ticker}}")
+// alertcondition(bearCHoCH and not bearCHoCH[1], "⚡ CHoCH Bear", "Bearish CHoCH — potential reversal on {{ticker}}")
+// alertcondition(bullFVGcond, "Bull FVG Created",  "New Bullish FVG on {{ticker}}")
+// alertcondition(bearFVGcond, "Bear FVG Created",  "New Bearish FVG on {{ticker}}")

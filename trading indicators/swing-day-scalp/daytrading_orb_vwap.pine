@@ -1,0 +1,230 @@
+// ============================================================
+// ORB + VWAP DAY TRADING INDICATOR
+// Based on Toby Crabel / prop desk standard methodology
+// Timeframe : 5-minute (REQUIRED)
+// Markets   : Stocks, Futures (ES/NQ), ETFs
+// Version   : Pine Script v5
+// ============================================================
+// HOW TO USE
+// 1. Add to TradingView on 5-MINUTE chart ONLY
+// 2. Orange box = opening range (9:30–10:00 EST, first 6 bars)
+// 3. Blue line = VWAP (must be below price for longs)
+// 4. Green triangle = valid long entry (above ORH + volume)
+// 5. Red triangle = valid short entry (below ORL + volume)
+// 6. Red dashed = stop loss | Cyan dashed = Target 1 (2:1 R:R)
+// 7. Orange dashed = Target 2 (trail with 9 EMA after T1)
+// 8. Only trade 9:30–11:30am. Hard stop at 11:30.
+// ============================================================
+
+//@version=5
+indicator("ORB + VWAP Day Trading [Crabel]", shorttitle="ORB·VWAP", overlay=true, max_bars_back=500)
+
+// ── INPUTS ───────────────────────────────────────────────────
+grp1 = "Opening Range"
+or_bars   = input.int(6,    "Range Bars (6 = 30min on 5min chart)",group=grp1, minval=2, maxval=12)
+sess_open = input.session("0930-1130", "Active Trading Session",   group=grp1)
+
+grp2 = "Filters"
+vol_mult  = input.float(1.5,"Breakout Volume Multiplier (×avg)",   group=grp2, step=0.1)
+vol_avg_len = input.int(20, "Volume Average Lookback",              group=grp2)
+require_vwap = input.bool(true, "Require VWAP alignment",          group=grp2)
+
+grp3 = "Risk"
+rr_target1 = input.float(2.0,"Target 1 R:R",                      group=grp3, step=0.5)
+rr_target2 = input.float(3.0,"Target 2 R:R",                      group=grp3, step=0.5)
+max_trades  = input.int(2,   "Max Trades per Day",                  group=grp3, minval=1, maxval=5)
+
+grp4 = "Display"
+show_or_box   = input.bool(true, "Show Opening Range Box",          group=grp4)
+show_ema9     = input.bool(true, "Show 9 EMA (trail guide)",        group=grp4)
+show_signals  = input.bool(true, "Show Entry Signals",              group=grp4)
+show_levels   = input.bool(true, "Show Stop/Target Levels",         group=grp4)
+
+// ── SESSION & TIME ────────────────────────────────────────────
+is_new_day    = ta.change(time("D")) != 0
+in_session    = not na(time(timeframe.period, sess_open))
+
+// ── VWAP ─────────────────────────────────────────────────────
+// Manual VWAP: reset each session
+var float vwap_sum    = 0.0
+var float vwap_vol    = 0.0
+var float vwap_val    = na
+
+if is_new_day
+    vwap_sum := 0.0
+    vwap_vol := 0.0
+
+vwap_sum += (high + low + close) / 3 * volume
+vwap_vol += volume
+vwap_val  := vwap_sum / vwap_vol
+
+plot(vwap_val, "VWAP", color=#4fc3f7, linewidth=2)
+
+// ── 9 EMA ─────────────────────────────────────────────────────
+ema9 = ta.ema(close, 9)
+plot(show_ema9 ? ema9 : na, "9 EMA", color=#ff7043, linewidth=1)
+
+// ── OPENING RANGE CALCULATION ────────────────────────────────
+// Capture high/low of first N bars after session open
+var float or_high   = na
+var float or_low    = na
+var int   or_count  = 0
+var bool  or_locked = false  // once locked, don't update
+
+if is_new_day
+    or_high   := na
+    or_low    := na
+    or_count  := 0
+    or_locked := false
+
+if not or_locked and in_session
+    or_count += 1
+    or_high  := na(or_high) ? high : math.max(or_high, high)
+    or_low   := na(or_low)  ? low  : math.min(or_low,  low)
+    if or_count >= or_bars
+        or_locked := true   // range is now fixed
+
+// ── OR BOX (draw over the range-formation period) ─────────────
+or_width = na(or_high) or na(or_low) ? na : or_high - or_low
+
+// Extend ORH / ORL lines across the day
+plot(or_locked ? or_high : na, "OR High", color=color.new(#00c853, 0),  linewidth=1, style=plot.style_linebr)
+plot(or_locked ? or_low  : na, "OR Low",  color=color.new(#ff1744, 0), linewidth=1, style=plot.style_linebr)
+
+// Shaded OR box (only during formation)
+bgcolor(show_or_box and not or_locked and in_session ? color.new(#f5a623, 92) : na, title="OR Formation Window")
+
+// ── ORH / ORL LABELS (once per day on lock) ──────────────────
+if or_locked and not or_locked[1]
+    label.new(bar_index, or_high, " ORH " + str.tostring(or_high, "#.##"),
+         color=color.new(#00c853, 80), textcolor=#00c853, style=label.style_label_right, size=size.small)
+    label.new(bar_index, or_low, " ORL " + str.tostring(or_low, "#.##"),
+         color=color.new(#ff1744, 80), textcolor=#ff1744, style=label.style_label_right, size=size.small)
+
+// ── VOLUME FILTER ─────────────────────────────────────────────
+vol_avg        = ta.sma(volume, vol_avg_len)
+is_high_volume = volume >= vol_avg * vol_mult
+
+// ── ENTRY CONDITIONS ──────────────────────────────────────────
+// Long: close above ORH, candle closes in upper third, volume spike, VWAP below
+candle_upper_third_long  = close >= (high + low * 2) / 3   // closes in upper third
+vwap_long_filter = require_vwap ? close > vwap_val : true
+long_entry = or_locked and in_session and
+     close > or_high and
+     candle_upper_third_long and
+     is_high_volume and
+     vwap_long_filter and
+     not (close[1] > or_high)   // first bar to close above (no chasing)
+
+// Short: close below ORL, candle closes in lower third, volume spike, VWAP above
+candle_lower_third_short = close <= (low + high * 2) / 3
+vwap_short_filter = require_vwap ? close < vwap_val : true
+short_entry = or_locked and in_session and
+     close < or_low and
+     candle_lower_third_short and
+     is_high_volume and
+     vwap_short_filter and
+     not (close[1] < or_low)    // first bar to close below (no chasing)
+
+// ── TRADE STATE MACHINE ───────────────────────────────────────
+var float entry_p  = na
+var float stop_p   = na
+var float t1_p     = na
+var float t2_p     = na
+var bool  in_long  = false
+var bool  in_short = false
+var int   trades_today = 0
+
+if is_new_day
+    trades_today := 0
+
+risk = na(or_width) ? na : or_width
+
+// Enter long
+if long_entry and not in_long and not in_short and trades_today < max_trades
+    entry_p     := close
+    stop_p      := or_low                     // stop = ORL
+    t1_p        := entry_p + risk * rr_target1
+    t2_p        := entry_p + risk * rr_target2
+    in_long     := true
+    trades_today := trades_today + 1
+
+// Enter short
+if short_entry and not in_long and not in_short and trades_today < max_trades
+    entry_p     := close
+    stop_p      := or_high                    // stop = ORH
+    t1_p        := entry_p - risk * rr_target1
+    t2_p        := entry_p - risk * rr_target2
+    in_short    := true
+    trades_today := trades_today + 1
+
+// Exit long
+if in_long
+    if low <= stop_p or high >= t2_p or not in_session
+        in_long  := false
+        entry_p  := na
+        stop_p   := na
+        t1_p     := na
+        t2_p     := na
+
+// Exit short
+if in_short
+    if high >= stop_p or low <= t2_p or not in_session
+        in_short := false
+        entry_p  := na
+        stop_p   := na
+        t1_p     := na
+        t2_p     := na
+
+// ── PLOT LEVELS ───────────────────────────────────────────────
+plot(show_levels and (in_long or in_short) ? stop_p : na, "Stop",     color=color.new(#ff1744, 0), linewidth=1, style=plot.style_linebr)
+plot(show_levels and (in_long or in_short) ? t1_p   : na, "Target 1", color=color.new(#4fc3f7, 0), linewidth=1, style=plot.style_linebr)
+plot(show_levels and (in_long or in_short) ? t2_p   : na, "Target 2", color=color.new(#00e676, 0), linewidth=1, style=plot.style_linebr)
+
+// ── ENTRY SIGNALS ─────────────────────────────────────────────
+plotshape(show_signals and long_entry,  title="Long Entry",
+     style=shape.triangleup,   location=location.belowbar,
+     color=color.new(#00e676, 0), size=size.normal, text="ORB\nLONG")
+
+plotshape(show_signals and short_entry, title="Short Entry",
+     style=shape.triangledown, location=location.abovebar,
+     color=color.new(#ff5252, 0), size=size.normal, text="ORB\nSHORT")
+
+// Stop hit markers
+long_stop_hit  = in_long[1]  and low  <= stop_p[1]
+short_stop_hit = in_short[1] and high >= stop_p[1]
+plotshape(show_signals and (long_stop_hit or short_stop_hit), title="Stop Hit",
+     style=shape.xcross, location=location.abovebar,
+     color=color.new(#ff1744, 0), size=size.small, text="STOP")
+
+// T1 markers
+long_t1  = in_long[1]  and high >= t1_p[1]
+short_t1 = in_short[1] and low  <= t1_p[1]
+plotshape(show_signals and (long_t1 or short_t1), title="Target 1",
+     style=shape.circle, location=location.abovebar,
+     color=color.new(#4fc3f7, 0), size=size.small, text="T1")
+
+// ── STATS TABLE ───────────────────────────────────────────────
+var table info = table.new(position.bottom_right, 2, 6,
+     bgcolor=#0b0c16, border_color=#222338, border_width=1)
+
+if barstate.islast
+    table.cell(info, 0, 0, "ORB SETUP",        text_color=#50527a, text_size=size.tiny, bgcolor=#0b0c16)
+    table.cell(info, 1, 0, "VALUE",             text_color=#50527a, text_size=size.tiny, bgcolor=#0b0c16)
+    table.cell(info, 0, 1, "OR High",           text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 1, 1, na(or_high) ? "forming" : str.tostring(or_high,"#.##"), text_color=#00c853, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 0, 2, "OR Low",            text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 1, 2, na(or_low)  ? "forming" : str.tostring(or_low, "#.##"), text_color=#ff5252, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 0, 3, "OR Width",          text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 1, 3, na(or_width) ? "-" : str.tostring(or_width,"#.##"),     text_color=#f5a623, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 0, 4, "VWAP",              text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 1, 4, str.tostring(vwap_val,"#.##"),                           text_color=#4fc3f7, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 0, 5, "Trades Today",      text_color=#c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+    table.cell(info, 1, 5, str.tostring(trades_today) + " / " + str.tostring(max_trades), text_color=trades_today >= max_trades ? #ff5252 : #c8cad8, text_size=size.tiny, bgcolor=#0e0f1d)
+
+// ── ALERTS ────────────────────────────────────────────────────
+alertcondition(long_entry,       "ORB Long Entry",   "ORB LONG: {{ticker}} broke above ORH on volume. VWAP below. Enter long.")
+alertcondition(short_entry,      "ORB Short Entry",  "ORB SHORT: {{ticker}} broke below ORL on volume. VWAP above. Enter short.")
+alertcondition(long_stop_hit,    "Long Stop Hit",    "STOP HIT: {{ticker}} long position stopped out at ORL.")
+alertcondition(short_stop_hit,   "Short Stop Hit",   "STOP HIT: {{ticker}} short position stopped out at ORH.")
+alertcondition(long_t1 or short_t1, "Target 1 Hit", "TARGET 1 hit: {{ticker}}. Take 50% off, trail rest with 9 EMA.")

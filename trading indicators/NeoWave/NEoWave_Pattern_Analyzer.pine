@@ -1,0 +1,640 @@
+// ════════════════════════════════════════════════════════════════════
+// NEoWave Pattern Analyzer — Trading Heights Style
+// Based on Glenn Neely's NEoWave Theory
+//
+// Patterns Detected:
+//  • Flat Corrections     (a:3 / b:3 / c:5)
+//  • Diametric Formations (a-b-c-d-e-f-g, Expanding & Contracting)
+//  • Expanding Triangles  (i, a, b, c, d, e)
+//  • Terminal Impulse     (all sub-waves = 3, wedge channel)
+//  • X-Wave Markers       (complex correction connectors)
+//  • Auto Fibonacci       (key NEoWave ratios: 0.618, 1.0, 1.618, 2.618)
+//  • Key Invalidation Level
+// ════════════════════════════════════════════════════════════════════
+//@version=5
+indicator("NEoWave Pattern Analyzer [Trading Heights]",
+     overlay        = true,
+     max_bars_back  = 500,
+     max_lines_count = 300,
+     max_labels_count = 300,
+     max_boxes_count  = 50)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ INPUTS
+// ───────────────────────────────────────────────────────────────────
+grp_pivot  = "── Pivot Settings ──"
+grp_pat    = "── Pattern Detection ──"
+grp_fib    = "── Fibonacci ──"
+grp_key    = "── Key Levels ──"
+grp_disp   = "── Display ──"
+
+pivotLen    = input.int(5,     "Pivot Strength",        minval=2, maxval=30,  group=grp_pivot)
+pivotSrc    = input.source(close, "Price Source",                             group=grp_pivot)
+
+showFlat    = input.bool(true,  "Detect Flat (a:3 b:3 c:5)",                 group=grp_pat)
+showDiamet  = input.bool(true,  "Detect Diametric (a–g)",                    group=grp_pat)
+showTriangle= input.bool(true,  "Detect Expanding Triangle",                  group=grp_pat)
+showTerminal= input.bool(true,  "Detect Terminal Impulse",                    group=grp_pat)
+flatTol     = input.float(0.15, "Flat B-Wave Tolerance (±%)", minval=0.05, maxval=0.40, step=0.05, group=grp_pat)
+
+showFib     = input.bool(true,  "Auto Fibonacci Retracement",                 group=grp_fib)
+showFibExt  = input.bool(true,  "Fibonacci Extensions (1.272, 1.618, 2.618)",group=grp_fib)
+
+useKeyLevel = input.bool(true,  "Show Key Invalidation Level",                group=grp_key)
+keyLevel    = input.float(66800,"Key Level ($)",             minval=0,        group=grp_key)
+keyLabel    = input.string("Bearish BELOW", "Key Level Label",                group=grp_key)
+
+showChannel = input.bool(true,  "Auto Wave Channel",                          group=grp_disp)
+showTable   = input.bool(true,  "Info Panel",                                 group=grp_disp)
+tablePos    = input.string("Top Right", "Panel Position",
+     options=["Top Right","Top Left","Bottom Right","Bottom Left"],           group=grp_disp)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ COLORS — Trading Heights palette (dark teal / red / green)
+// ───────────────────────────────────────────────────────────────────
+C_TEAL    = color.new(#00897B, 0)
+C_RED     = color.new(#E53935, 0)
+C_GREEN   = color.new(#43A047, 0)
+C_ORANGE  = color.new(#FB8C00, 0)
+C_PURPLE  = color.new(#8E24AA, 0)
+C_BLUE    = color.new(#1E88E5, 0)
+C_YELLOW  = color.new(#FDD835, 0)
+C_GRAY    = color.new(#90A4AE, 0)
+C_WHITE   = color.white
+C_DARK    = color.new(#0D1117, 80)
+
+C_FLAT    = C_TEAL
+C_DIA_EXP = C_ORANGE
+C_DIA_CON = C_PURPLE
+C_TRI     = C_ORANGE
+C_TERM    = C_RED
+C_CHAN    = color.new(#90A4AE, 50)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ PIVOT DETECTION
+// ───────────────────────────────────────────────────────────────────
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow (low,  pivotLen, pivotLen)
+
+var float[] pPrice  = array.new_float()
+var int[]   pBar    = array.new_int()
+var bool[]  pIsHigh = array.new_bool()
+
+if not na(ph)
+    array.push(pPrice,  ph)
+    array.push(pBar,    bar_index - pivotLen)
+    array.push(pIsHigh, true)
+
+if not na(pl)
+    array.push(pPrice,  pl)
+    array.push(pBar,    bar_index - pivotLen)
+    array.push(pIsHigh, false)
+
+// Trim to last 60 pivots
+MAX_P = 60
+if array.size(pPrice) > MAX_P
+    array.shift(pPrice)
+    array.shift(pBar)
+    array.shift(pIsHigh)
+
+// Plot pivot dots
+plotshape(not na(ph), style=shape.diamond, location=location.abovebar,
+     color=C_RED,   size=size.tiny, offset=-pivotLen, title="Pivot High")
+plotshape(not na(pl), style=shape.diamond, location=location.belowbar,
+     color=C_GREEN, size=size.tiny, offset=-pivotLen, title="Pivot Low")
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ HELPERS
+// ───────────────────────────────────────────────────────────────────
+n() => array.size(pPrice)
+
+getP(i)  => array.get(pPrice,  i)
+getB(i)  => array.get(pBar,    i)
+getH(i)  => array.get(pIsHigh, i)
+
+// Size of swing from index i to i+1
+swingSize(i) =>
+    i + 1 < n() ? math.abs(getP(i+1) - getP(i)) : float(na)
+
+// Retrace ratio of wave B relative to wave A
+retraceRatio(aStart, aEnd, bEnd) =>
+    aSize = math.abs(aEnd - aStart)
+    bSize = math.abs(bEnd - aEnd)
+    aSize != 0 ? bSize / aSize : float(na)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ WAVE LABEL HELPER — draws a neat wave label
+// ───────────────────────────────────────────────────────────────────
+waveLabel(bx, px, txt, isH, col) =>
+    label.new(bx, px, txt,
+         style    = isH ? label.style_label_down : label.style_label_up,
+         color    = col,
+         textcolor= C_WHITE,
+         size     = size.small)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ FLAT PATTERN  (a:3 · b:3 · c:5)
+// ──────────────────────────────────────
+//  NEoWave Flat Rules:
+//   • Wave A  = 3-wave structure (zigzag or flat itself)
+//   • Wave B  = 3-wave, retraces 61.8%–138.2% of A
+//   • Wave C  = 5-wave impulse or terminal, extends beyond A's end
+//   • Box drawn from A-start to C-end
+// ───────────────────────────────────────────────────────────────────
+var box      flatBox   = na
+var label    flatLblA  = na
+var label    flatLblB  = na
+var label    flatLblC  = na
+var label    flatTitle = na
+
+if showFlat and n() >= 4
+    // Look for: p0(swing start) → p1(end of A) → p2(end of B) → p3(latest, C ongoing)
+    _s = n() - 4
+    p0 = getP(_s);   b0 = getB(_s);   h0 = getH(_s)
+    p1 = getP(_s+1); b1 = getB(_s+1)
+    p2 = getP(_s+2); b2 = getB(_s+2)
+    p3 = getP(_s+3); b3 = getB(_s+3)
+
+    aSize   = math.abs(p1 - p0)
+    bRetrace= retraceRatio(p0, p1, p2)
+    lo_B    = 0.618 - flatTol
+    hi_B    = 1.382 + flatTol
+
+    // Bullish flat: starts at low
+    bullFlat = not h0 and bRetrace >= lo_B and bRetrace <= hi_B and p3 > p1
+
+    // Bearish flat: starts at high
+    bearFlat = h0 and bRetrace >= lo_B and bRetrace <= hi_B and p3 < p1
+
+    if bullFlat or bearFlat
+        box.delete(flatBox)
+        label.delete(flatLblA); label.delete(flatLblB)
+        label.delete(flatLblC); label.delete(flatTitle)
+
+        boxTop    = math.max(p0, p1, p2, p3)
+        boxBottom = math.min(p0, p1, p2, p3)
+
+        flatBox  := box.new(b0, boxTop, b3, boxBottom,
+             border_color = color.new(C_FLAT, 30),
+             border_width = 1,
+             border_style = line.style_dashed,
+             bgcolor      = color.new(C_FLAT, 92))
+
+        flatTitle:= label.new(b0 + math.round((b3-b0)*0.1), boxTop,
+             "FLAT",
+             style     = label.style_label_down,
+             color     = color.new(C_FLAT, 10),
+             textcolor = C_WHITE,
+             size      = size.normal)
+
+        flatLblA := waveLabel(b1, p1, "a:3", not h0, C_FLAT)
+        flatLblB := waveLabel(b2, p2, "b:3",     h0, C_FLAT)
+        flatLblC := waveLabel(b3, p3, "c:5",  not h0, C_GREEN)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ DIAMETRIC FORMATION  (a · b · c · d · e · f · g)
+// ──────────────────────────────────────────────────
+//  NEoWave Diametric Rules:
+//   • 7 segments, alternating direction
+//   • EXPANDING:   each odd wave > previous odd wave (a<c<e<g)
+//   • CONTRACTING: each odd wave > previous odd wave (a>c>e>g)
+//   • Even waves (b,d,f) are corrective connectors
+// ───────────────────────────────────────────────────────────────────
+var label[] diaLbls = array.new_label()
+var label   diaTitle = na
+var line    diaLine  = na
+
+diaNames = array.from("a","b","c","d","e","f","g")
+
+clearDia() =>
+    for _l in diaLbls
+        label.delete(_l)
+    array.clear(diaLbls)
+    label.delete(diaTitle)
+
+if showDiamet and n() >= 8
+    _s = n() - 8
+    sizes = array.new_float()
+    for i = _s to _s + 6
+        array.push(sizes, swingSize(i))
+
+    w0 = array.get(sizes,0); w2 = array.get(sizes,2)
+    w4 = array.get(sizes,4); w6 = array.get(sizes,6)
+    w1 = array.get(sizes,1); w3 = array.get(sizes,3)
+    w5 = array.get(sizes,5)
+
+    // Odd waves must dominate their neighbors
+    isExpanding   = w2 > w0 and w4 > w2 and w6 > w4 and
+                    w1 < w0 and w3 < w2 and w5 < w4
+    isContracting = w2 < w0 and w4 < w2 and w6 < w4 and
+                    w1 < w0 and w3 < w2 and w5 < w4
+
+    if isExpanding or isContracting
+        clearDia()
+        col  = isExpanding ? C_DIA_EXP : C_DIA_CON
+        lbl  = isExpanding ? "EXPANDING DIAMETRIC ◇" : "CONTRACTING DIAMETRIC ◇"
+
+        for i = 0 to 6
+            idx = _s + i
+            if idx < n()
+                _px  = getP(idx)
+                _bx  = getB(idx)
+                _isH = getH(idx)
+                _name = array.get(diaNames, i)
+                _l   = waveLabel(_bx, _px, _name, _isH, col)
+                array.push(diaLbls, _l)
+
+        // Title label at pattern start
+        diaTitle := label.new(getB(_s), getP(_s),
+             lbl,
+             style     = getH(_s) ? label.style_label_down : label.style_label_up,
+             color     = color.new(col, 10),
+             textcolor = C_WHITE,
+             size      = size.small)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ EXPANDING TRIANGLE  (i · a · b · c · d · e)
+// ──────────────────────────────────────────────
+//  NEoWave Expanding Triangle:
+//   • 5 segments (some count as i, a–e)
+//   • Each swing LARGER than previous same-direction swing
+//   • Trendlines DIVERGE (expanding channel)
+//   • Typically precedes a strong impulsive move
+// ───────────────────────────────────────────────────────────────────
+var label[] triLbls  = array.new_label()
+var line    triHLine = na
+var line    triLLine = na
+var label   triTitle = na
+
+triNames = array.from("i","a","b","c","d","e")
+
+clearTri() =>
+    for _l in triLbls
+        label.delete(_l)
+    array.clear(triLbls)
+    label.delete(triTitle)
+
+if showTriangle and n() >= 7
+    _s = n() - 7
+    sizes2 = array.new_float()
+    for i = _s to _s + 5
+        array.push(sizes2, swingSize(i))
+
+    wa = array.get(sizes2,0); wb = array.get(sizes2,1)
+    wc = array.get(sizes2,2); wd = array.get(sizes2,3)
+    we = array.get(sizes2,4); wf = array.get(sizes2,5)
+
+    // Expanding: each successive swing of same polarity is larger
+    isExpandTri = wc > wa and we > wc
+
+    if isExpandTri
+        clearTri()
+        for i = 0 to 5
+            idx  = _s + i
+            if idx < n()
+                _px  = getP(idx)
+                _bx  = getB(idx)
+                _isH = getH(idx)
+                _name = array.get(triNames, i)
+                _l   = waveLabel(_bx, _px, _name, _isH, C_TRI)
+                array.push(triLbls, _l)
+
+        // Draw diverging channel lines
+        line.delete(triHLine); line.delete(triLLine)
+        _h0 = getH(_s)
+        if _h0  // starts at high
+            triHLine := line.new(getB(_s),   getP(_s),
+                                 getB(_s+2),  getP(_s+2),
+                 color=color.new(C_TRI,30), extend=extend.right, width=1, style=line.style_dashed)
+            triLLine := line.new(getB(_s+1),  getP(_s+1),
+                                 getB(_s+3),  getP(_s+3),
+                 color=color.new(C_TRI,30), extend=extend.right, width=1, style=line.style_dashed)
+        else
+            triLLine := line.new(getB(_s),   getP(_s),
+                                 getB(_s+2),  getP(_s+2),
+                 color=color.new(C_TRI,30), extend=extend.right, width=1, style=line.style_dashed)
+            triHLine := line.new(getB(_s+1),  getP(_s+1),
+                                 getB(_s+3),  getP(_s+3),
+                 color=color.new(C_TRI,30), extend=extend.right, width=1, style=line.style_dashed)
+
+        triTitle := label.new(getB(_s), getP(_s),
+             "EXPANDING △",
+             style     = getH(_s) ? label.style_label_down : label.style_label_up,
+             color     = color.new(C_TRI, 10),
+             textcolor = C_WHITE,
+             size      = size.small)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ TERMINAL IMPULSE  (1:3 · 2:3 · 3:3 · 4:3 · 5:3)
+// ──────────────────────────────────────────────────
+//  NEoWave Terminal Rules:
+//   • All 5 waves are 3-wave structures (corrective)
+//   • Wave 3 < Wave 1 in length
+//   • Wave 5 < Wave 3 in length
+//   • Wave 4 overlaps Wave 1 price territory
+//   • Fits inside converging channel (wedge)
+//   • Signals end of larger pattern → reversal
+// ───────────────────────────────────────────────────────────────────
+var label   termLbl    = na
+var label   termW1     = na
+var label   termW2     = na
+var label   termW3     = na
+var label   termW4     = na
+var label   termW5     = na
+var line    termChanH  = na
+var line    termChanL  = na
+
+if showTerminal and n() >= 6
+    _s = n() - 6
+
+    p0 = getP(_s);   b0 = getB(_s);   h0 = getH(_s)
+    p1 = getP(_s+1); b1 = getB(_s+1)
+    p2 = getP(_s+2); b2 = getB(_s+2)
+    p3 = getP(_s+3); b3 = getB(_s+3)
+    p4 = getP(_s+4); b4 = getB(_s+4)
+    p5 = getP(_s+5); b5 = getB(_s+5)
+
+    w1 = math.abs(p1 - p0)
+    w2 = math.abs(p2 - p1)
+    w3 = math.abs(p3 - p2)
+    w4 = math.abs(p4 - p3)
+    w5 = math.abs(p5 - p4)
+
+    // Core terminal rules
+    shrinkingWaves = w3 < w1 and w5 < w3
+    w4largerThanW2 = w4 > w2
+
+    // Wave 4 must overlap wave 1 in price (key NEoWave terminal rule)
+    bullTerm  = not h0  // bullish terminal
+    w1highPt  = bullTerm ? p1 : p0
+    w4lowPt   = bullTerm ? p4 : p5
+    priceOverlap = bullTerm ? (w4lowPt < w1highPt) : (w4lowPt > w1highPt)
+
+    isTerminal = shrinkingWaves and w4largerThanW2 and priceOverlap
+
+    if isTerminal
+        label.delete(termLbl)
+        label.delete(termW1); label.delete(termW2); label.delete(termW3)
+        label.delete(termW4); label.delete(termW5)
+        line.delete(termChanH); line.delete(termChanL)
+
+        termW1 := waveLabel(b1, p1, "1:3", not h0, C_TERM)
+        termW2 := waveLabel(b2, p2, "2:3",     h0, C_TERM)
+        termW3 := waveLabel(b3, p3, "3:3", not h0, C_TERM)
+        termW4 := waveLabel(b4, p4, "4:3",     h0, C_TERM)
+        termW5 := waveLabel(b5, p5, "5:3", not h0, C_TERM)
+
+        termLbl := label.new(b5, p5,
+             "⚠ TERMINAL IMPULSE\nExpect Reversal",
+             style     = label.style_label_left,
+             color     = color.new(C_TERM, 5),
+             textcolor = C_WHITE,
+             size      = size.normal)
+
+        // Converging channel (wedge shape)
+        if bullTerm
+            termChanH := line.new(b1, p1, b3, p3,
+                 color=color.new(C_TERM,40), extend=extend.right, width=1, style=line.style_dashed)
+            termChanL := line.new(b0, p0, b2, p2,
+                 color=color.new(C_TERM,40), extend=extend.right, width=1, style=line.style_dashed)
+        else
+            termChanH := line.new(b0, p0, b2, p2,
+                 color=color.new(C_TERM,40), extend=extend.right, width=1, style=line.style_dashed)
+            termChanL := line.new(b1, p1, b3, p3,
+                 color=color.new(C_TERM,40), extend=extend.right, width=1, style=line.style_dashed)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ WAVE CHANNEL  (auto-drawn on last 4 pivots)
+// ───────────────────────────────────────────────────────────────────
+var line chanH = na
+var line chanL = na
+
+if showChannel and n() >= 4 and barstate.islast
+    line.delete(chanH); line.delete(chanL)
+    _s = n() - 4
+    p0 = getP(_s); b0 = getB(_s); h0 = getH(_s)
+    p1 = getP(_s+1); b1 = getB(_s+1)
+    p2 = getP(_s+2); b2 = getB(_s+2)
+    p3 = getP(_s+3); b3 = getB(_s+3)
+
+    if h0
+        chanH := line.new(b0, p0, b2, p2, color=C_CHAN, extend=extend.right, width=1)
+        chanL := line.new(b1, p1, b3, p3, color=C_CHAN, extend=extend.right, width=1)
+    else
+        chanL := line.new(b0, p0, b2, p2, color=C_CHAN, extend=extend.right, width=1)
+        chanH := line.new(b1, p1, b3, p3, color=C_CHAN, extend=extend.right, width=1)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ AUTO FIBONACCI  (key NEoWave ratios)
+// ───────────────────────────────────────────────────────────────────
+// NEoWave uses: 0.382, 0.5, 0.618, 1.0, 1.272, 1.618, 2.618
+var line[] fibLns  = array.new_line()
+var label[] fibLbs = array.new_label()
+
+fibRatios = array.from(0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618, 2.618)
+fibColors = array.from(
+     color.new(C_GRAY,  60),
+     color.new(C_BLUE,  50),
+     color.new(C_GREEN, 40),
+     color.new(C_TEAL,  30),
+     color.new(C_BLUE,  50),
+     color.new(C_GRAY,  20),
+     color.new(C_ORANGE,30),
+     color.new(C_RED,   20),
+     color.new(C_RED,    0))
+
+if showFib and n() >= 2 and barstate.islast
+    for _l in fibLns
+        line.delete(_l)
+    for _l in fibLbs
+        label.delete(_l)
+    array.clear(fibLns)
+    array.clear(fibLbs)
+
+    _n   = n()
+    pH   = getH(_n-1) ? getP(_n-1) : getP(_n-2)
+    pL   = getH(_n-1) ? getP(_n-2) : getP(_n-1)
+    bHi  = getH(_n-1) ? getB(_n-1) : getB(_n-2)
+    bLo  = getH(_n-1) ? getB(_n-2) : getB(_n-1)
+
+    swRng = pH - pL
+    endBar = bar_index + 30
+
+    for i = 0 to array.size(fibRatios) - 1
+        ratio  = array.get(fibRatios, i)
+        // Skip extensions if user turned them off
+        if not showFibExt and ratio > 1.0
+            continue
+        price  = pH - swRng * ratio
+        col    = array.get(fibColors, i)
+        lwidth = ratio == 0.618 or ratio == 1.618 ? 2 : 1
+        lstyle = ratio >= 1.0 ? line.style_dashed : line.style_dotted
+
+        _ln = line.new(bLo, price, endBar, price,
+             color = col, style = lstyle, width = lwidth)
+        _lb = label.new(endBar, price,
+             str.tostring(ratio * 100, "#.#") + "%",
+             style     = label.style_label_left,
+             color     = color.new(color.black, 85),
+             textcolor = col,
+             size      = size.tiny)
+        array.push(fibLns, _ln)
+        array.push(fibLbs, _lb)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ KEY INVALIDATION LEVEL  ($66,800 Bearish Below)
+// ───────────────────────────────────────────────────────────────────
+var line keyLine  = na
+var label keyLbl  = na
+
+if useKeyLevel and barstate.islast
+    line.delete(keyLine); label.delete(keyLbl)
+    keyLine := line.new(bar_index - 300, keyLevel, bar_index + 50, keyLevel,
+         color = color.new(C_RED, 0),
+         style = line.style_dashed,
+         width = 2)
+    keyLbl := label.new(bar_index + 50, keyLevel,
+         "$" + str.tostring(keyLevel, "#,###.##") + "  " + keyLabel,
+         style     = label.style_label_left,
+         color     = color.new(C_RED, 10),
+         textcolor = C_WHITE,
+         size      = size.small)
+
+// Color candles near key level
+nearKey = math.abs(close - keyLevel) / keyLevel < 0.015
+barcolor(close < keyLevel ? color.new(C_RED, 60) : na, title="Below Key Level")
+barcolor(nearKey           ? color.new(C_YELLOW, 50) : na, title="Near Key Level")
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ RSI MOMENTUM CONFIRMATION
+// ───────────────────────────────────────────────────────────────────
+rsiLen = input.int(14, "RSI Length", group="── Momentum ──")
+rsiOB  = input.int(70, "Overbought", group="── Momentum ──")
+rsiOS  = input.int(30, "Oversold",   group="── Momentum ──")
+
+rsiVal = ta.rsi(close, rsiLen)
+bgcolor(rsiVal >= rsiOB ? color.new(C_RED,   92) : na, title="RSI OB Zone")
+bgcolor(rsiVal <= rsiOS ? color.new(C_GREEN, 92) : na, title="RSI OS Zone")
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ X-WAVE MARKER  (complex correction connector)
+// ───────────────────────────────────────────────────────────────────
+// X-waves appear between complex corrections in NEoWave.
+// We mark them as small pivot reversals that retrace 50-79% of prior wave
+var label xWaveLbl = na
+
+if n() >= 3
+    _n  = n()
+    p0  = getP(_n-3); p1 = getP(_n-2); p2 = getP(_n-1)
+    b2  = getB(_n-2)
+    h1  = getH(_n-2)
+
+    priorMove = math.abs(p1 - p0)
+    thisMove  = math.abs(p2 - p1)
+    xRatio    = priorMove != 0 ? thisMove / priorMove : float(na)
+
+    // X-wave: retraces 50%–79% of prior wave (shallow connector)
+    isXWave = not na(xRatio) and xRatio >= 0.50 and xRatio <= 0.79
+
+    if isXWave
+        label.delete(xWaveLbl)
+        xWaveLbl := label.new(b2, p1,
+             "x",
+             style     = h1 ? label.style_label_down : label.style_label_up,
+             color     = color.new(C_GRAY, 20),
+             textcolor = C_WHITE,
+             size      = size.small)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ INFO PANEL
+// ───────────────────────────────────────────────────────────────────
+tPos = switch tablePos
+    "Top Right"    => position.top_right
+    "Top Left"     => position.top_left
+    "Bottom Right" => position.bottom_right
+    => position.bottom_left
+
+var table panel = na
+
+if showTable and barstate.islast
+    table.delete(panel)
+    panel := table.new(tPos, 2, 9,
+         bgcolor      = color.new(#0D1117, 75),
+         border_color = color.new(C_TEAL, 40),
+         border_width = 1,
+         frame_color  = color.new(C_TEAL, 20),
+         frame_width  = 2)
+
+    // Header
+    table.cell(panel, 0, 0, "NEoWave Analyzer",
+         text_color=C_TEAL, text_size=size.small,
+         bgcolor=color.new(C_TEAL, 85), text_halign=text.align_center)
+    table.cell(panel, 1, 0, "Trading Heights",
+         text_color=C_WHITE, text_size=size.small,
+         bgcolor=color.new(C_TEAL, 85), text_halign=text.align_center)
+
+    // RSI
+    rC = rsiVal >= rsiOB ? C_RED : rsiVal <= rsiOS ? C_GREEN : C_GRAY
+    table.cell(panel, 0, 1, "RSI(" + str.tostring(rsiLen) + ")",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 1, str.tostring(math.round(rsiVal,1)) +
+         (rsiVal >= rsiOB ? " OB" : rsiVal <= rsiOS ? " OS" : ""),
+         text_color=rC, text_size=size.tiny)
+
+    // Key level
+    kC = close > keyLevel ? C_GREEN : C_RED
+    table.cell(panel, 0, 2, "Key Level",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 2, "$" + str.tostring(keyLevel, "#,###"),
+         text_color=kC, text_size=size.tiny)
+
+    // Position vs key level
+    table.cell(panel, 0, 3, "Bias",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 3, close > keyLevel ? "✓ BULLISH" : "✗ BEARISH",
+         text_color=close > keyLevel ? C_GREEN : C_RED, text_size=size.tiny)
+
+    // Pivots detected
+    table.cell(panel, 0, 4, "Pivots",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 4, str.tostring(n()),
+         text_color=C_WHITE, text_size=size.tiny)
+
+    // Pattern system
+    table.cell(panel, 0, 5, "System",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 5, "NEoWave",
+         text_color=C_YELLOW, text_size=size.tiny)
+
+    // Flat active?
+    table.cell(panel, 0, 6, "Flat",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 6, showFlat ? "Scanning" : "Off",
+         text_color=showFlat ? C_TEAL : C_GRAY, text_size=size.tiny)
+
+    // Terminal
+    table.cell(panel, 0, 7, "Terminal",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 7, showTerminal ? "Scanning" : "Off",
+         text_color=showTerminal ? C_RED : C_GRAY, text_size=size.tiny)
+
+    // Diametric
+    table.cell(panel, 0, 8, "Diametric",
+         text_color=C_GRAY, text_size=size.tiny)
+    table.cell(panel, 1, 8, showDiamet ? "Scanning" : "Off",
+         text_color=showDiamet ? C_ORANGE : C_GRAY, text_size=size.tiny)
+
+// ───────────────────────────────────────────────────────────────────
+// ▌ ALERTS
+// ───────────────────────────────────────────────────────────────────
+alertcondition(close < keyLevel and close[1] >= keyLevel,
+     title   = "NEoWave: Price Broke Below Key Level",
+     message = "⚠ Price broke below ${{plot_0}} — BEARISH signal per NEoWave analysis")
+
+alertcondition(rsiVal >= rsiOB,
+     title   = "NEoWave: RSI Overbought (Terminal Warning)",
+     message = "RSI reached overbought — potential Terminal reversal zone")
+
+alertcondition(rsiVal <= rsiOS,
+     title   = "NEoWave: RSI Oversold (Wave C entry zone)",
+     message = "RSI oversold — potential C-wave impulse launch zone")

@@ -1,0 +1,809 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  STEALTH LIQUIDITY CASCADE ENGINE [SLCE] v2.0
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// CHANGELOG from v1.0
+// ───────────────────
+// [FIX]  grbDir never reset → cascade expired but stale state persisted
+//        FVGs formed long after grab were incorrectly tagged as cascade FVGs
+//
+// [NEW]  HTF Bias Filter — request.security() H4/D1 EMA or swing structure
+//        Only longs when HTF is bullish, shorts when HTF is bearish
+//
+// [NEW]  MSS Confirmation — require market structure shift after grab
+//        SSL grab + close above prior swing high = cascade confirmed
+//        BSL grab + close below prior swing low  = cascade confirmed
+//
+// [NEW]  Session Filter — London / New York open sessions only
+//        ICT setups are highest quality during institutional sessions
+//
+// [NEW]  EQ Level Count Scoring — triple EQH/EQL adds bonus wick score
+//        2 equal levels: +5%, 3+ equal levels: +10% wick ratio bonus
+//
+// [NEW]  Volume Regime Detection — auto-detects forex tick volume
+//        If volume std/mean < 5% → redistributes volume weight to other factors
+//
+// [NEW]  Exit System — SL/TP1/TP2 lines drawn on every signal
+//        SL: grab wick extreme ± ATR buffer
+//        TP1: nearest opposing liquidity pool (minimum 2:1 R)
+//        TP2: configurable R:R multiple (default 3:1)
+//
+// [NEW]  Risk:Reward label on each entry signal
+//
+// © 2024 — For educational purposes only. Not financial advice.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+//@version=5
+indicator("Stealth Liquidity Cascade Engine [SLCE] v2.0",
+     overlay          = true,
+     max_lines_count  = 500,
+     max_boxes_count  = 500,
+     max_labels_count = 500,
+     max_bars_back    = 5000)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                              INPUTS                                        │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+string G1       = "⬡ Liquidity Pool Detection"
+i_swingLen      = input.int(5,      "Pivot Lookback Length",       minval=2,  maxval=20,  group=G1)
+i_maxPools      = input.int(15,     "Max Pools Tracked",           minval=5,  maxval=50,  group=G1)
+i_eqTol         = input.float(0.15, "Equal Level Tolerance %",     minval=0.01, maxval=1.0, step=0.01, group=G1,
+                   tooltip="% threshold for EQH/EQL detection. Lower = stricter.")
+i_showPools     = input.bool(true,  "Show Liquidity Pool Lines",   group=G1)
+
+string G2       = "⬡ Liquidity Grab Detection"
+i_minWick       = input.float(0.30, "Min Wick Ratio",              minval=0.1, maxval=0.9, step=0.05, group=G2)
+i_cascadeWin    = input.int(5,      "Cascade Window (bars)",       minval=1,  maxval=15,  group=G2,
+                   tooltip="Max bars after grab to link FVGs as cascade events")
+i_reqMSS        = input.bool(true,  "Require MSS Confirmation",    group=G2,
+                   tooltip="Require market structure shift (close beyond prior swing) before cascade FVGs can signal")
+
+string G3       = "⬡ Fair Value Gaps"
+i_minFVG        = input.float(0.15, "Min FVG Size (ATR×)",         minval=0.05, maxval=2.0, step=0.05, group=G3)
+i_maxFVG        = input.int(15,     "Max Active FVGs",             minval=1,  maxval=50,  group=G3)
+i_showFVG       = input.bool(true,  "Show FVG Zones",              group=G3)
+i_showMitFVG    = input.bool(false, "Show Mitigated FVGs",         group=G3)
+i_fvgExt        = input.int(80,     "FVG Extension (bars)",        minval=10, maxval=500, group=G3)
+
+string G4       = "⬡ Cascade Score Weights"
+i_wGrab         = input.float(25,   "Weight: Grab Intensity",      minval=0, maxval=100,  group=G4)
+i_wDisp         = input.float(25,   "Weight: Displacement",        minval=0, maxval=100,  group=G4)
+i_wVol          = input.float(25,   "Weight: Volume Anomaly",      minval=0, maxval=100,  group=G4)
+i_wFVG          = input.float(25,   "Weight: FVG Quality",         minval=0, maxval=100,  group=G4)
+i_minScore      = input.float(60,   "Min Score for Signal",        minval=0, maxval=100,  group=G4)
+
+string G5       = "⬡ Volume Intelligence"
+i_volMA         = input.int(20,     "Volume MA Length",            minval=5,  maxval=100, group=G5)
+i_volSpike      = input.float(1.5,  "Spike Threshold ×",           minval=1.0, maxval=5.0, step=0.1, group=G5)
+i_autoVolReg    = input.bool(true,  "Auto-detect Tick Volume",     group=G5,
+                   tooltip="If volume shows near-zero variance (forex tick data), redistributes volume weight to other factors automatically")
+
+string G6       = "⬡ HTF Bias Filter"
+i_htfEnabled    = input.bool(true,  "Enable HTF Bias Filter",      group=G6,
+                   tooltip="Only take longs during HTF bullish bias, shorts during HTF bearish bias")
+i_htfTF         = input.timeframe("240", "HTF Timeframe",          group=G6)
+i_htfLen        = input.int(50,     "HTF EMA Length",              group=G6,
+                   tooltip="EMA period on the higher timeframe. Price above EMA = bullish bias, below = bearish.")
+
+string G7       = "⬡ Session Filter"
+i_sessEnabled   = input.bool(false, "Enable Session Filter",       group=G7,
+                   tooltip="Restrict signals to highest-quality ICT sessions only")
+i_sessLondon    = input.bool(true,  "London Session (02:00–11:00 UTC)", group=G7)
+i_sessNY        = input.bool(true,  "New York Session (13:00–22:00 UTC)", group=G7)
+
+string G8       = "⬡ Exit System"
+i_showExit      = input.bool(true,  "Show SL / TP Levels",         group=G8)
+i_slBuffer      = input.float(0.3,  "SL Buffer (ATR ×)",           minval=0.1, maxval=2.0, step=0.1, group=G8,
+                   tooltip="Extra buffer beyond grab wick extreme for stop loss placement")
+i_tp1RR         = input.float(2.0,  "TP1 Minimum R:R",             minval=1.0, maxval=10.0, step=0.5, group=G8,
+                   tooltip="If the nearest opposing pool doesn't meet this R:R, TP1 uses this multiplier instead")
+i_tp2RR         = input.float(3.0,  "TP2 R:R",                     minval=1.0, maxval=15.0, step=0.5, group=G8)
+i_exitBars      = input.int(30,     "SL/TP Line Length (bars)",    minval=5,  maxval=100, group=G8)
+
+string G9       = "⬡ Visual Settings"
+i_cBullGrab     = input.color(#00E676, "Bullish Signal Color",     group=G9)
+i_cBearGrab     = input.color(#FF1744, "Bearish Signal Color",     group=G9)
+i_cBSL          = input.color(#FF6D00, "Buyside Liquidity",        group=G9)
+i_cSSL          = input.color(#2979FF, "Sellside Liquidity",       group=G9)
+i_cEQ           = input.color(#FFD600, "Equal Levels (EQH/EQL)",   group=G9)
+i_cSL           = input.color(#FF5252, "Stop Loss Line",           group=G9)
+i_cTP1          = input.color(#00BCD4, "TP1 Line",                 group=G9)
+i_cTP2          = input.color(#00E676, "TP2 Line",                 group=G9)
+i_showDash      = input.bool(true,  "Show Dashboard",              group=G9)
+i_showSigs      = input.bool(true,  "Show Entry Signals",          group=G9)
+i_showGrabs     = input.bool(true,  "Show Grab Markers",           group=G9)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                         CORE CALCULATIONS                                  │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+atr14       = nz(ta.atr(14), high - low)
+volSMA      = ta.sma(volume, i_volMA)
+volRatio    = nz(volume / volSMA, 1.0)
+isVolSpike  = volRatio >= i_volSpike
+upperWick   = high - math.max(close, open)
+lowerWick   = math.min(close, open) - low
+barRange    = high - low
+
+// ── Volume Regime Detection ──
+// CV (coefficient of variation) < 5% → likely tick volume (forex), not real volume
+volStd      = ta.stdev(volume, i_volMA)
+volMean     = ta.sma(volume, i_volMA)
+isTickVol   = i_autoVolReg and nz(volStd / math.max(volMean, 1), 0) < 0.05
+
+// ── HTF Bias Filter ──
+htfClose    = request.security(syminfo.tickerid, i_htfTF, close,          lookahead=barmerge.lookahead_off)
+htfEMA      = request.security(syminfo.tickerid, i_htfTF, ta.ema(close, i_htfLen), lookahead=barmerge.lookahead_off)
+htfBullBias = htfClose > htfEMA
+htfBearBias = htfClose < htfEMA
+
+// ── Session Filter ──
+londonSession = time(timeframe.period, "0200-1100:1234567", "UTC")
+nySession     = time(timeframe.period, "1300-2200:1234567", "UTC")
+inLondon      = not na(londonSession)
+inNY          = not na(nySession)
+inSession     = not i_sessEnabled or (i_sessLondon and inLondon) or (i_sessNY and inNY)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                         FUNCTION DEFINITIONS                               │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// ── Cascade Score: normalized 0-100 with volume regime compensation ──
+f_score(_wickR, _dispR, _volR, _fvgR) =>
+    // If tick volume detected, redistribute vol weight to other factors
+    _wV  = isTickVol ? 0.0               : i_wVol
+    _wG  = isTickVol ? i_wGrab + i_wVol * 0.34 : i_wGrab
+    _wD  = isTickVol ? i_wDisp + i_wVol * 0.33 : i_wDisp
+    _wF  = isTickVol ? i_wFVG  + i_wVol * 0.33 : i_wFVG
+    _tw  = math.max(_wG + _wD + _wV + _wF, 1.0)
+    _sG  = math.min(_wickR / 0.75 * 100, 100)          // 0.75 wick ratio = perfect
+    _sD  = math.min(_dispR / 3.0  * 100, 100)          // 3× ATR displacement = perfect
+    _sV  = isTickVol ? 50.0 : math.min(_volR / 3.0 * 100, 100)   // neutral if tick vol
+    _sF  = math.min(_fvgR  / 1.0  * 100, 100)          // 1× ATR FVG = perfect
+    (_sG * _wG + _sD * _wD + _sV * _wV + _sF * _wF) / _tw
+
+f_scoreColor(_s) =>
+    _s >= 80 ? color.new(#00E676, 0) : _s >= 60 ? color.new(#FFD600, 0) : color.new(#FF6D00, 0)
+
+f_scoreLabel(_s) =>
+    _s >= 80 ? "PERFECT STORM" : _s >= 60 ? "STRONG CASCADE" : "CASCADE"
+
+// ── EQ Count Bonus: extra wick ratio credit for clustered equal levels ──
+f_eqBonus(_eqCt) =>
+    _eqCt >= 3 ? 0.10 : _eqCt == 2 ? 0.05 : 0.0
+
+// ── TP1 Long: nearest unswept BSL above entry, or fallback R:R multiple ──
+f_tp1Long(_entry, _sl, _bslArr, _bslSwpt) =>
+    _risk    = math.abs(_entry - _sl)
+    _default = _entry + _risk * i_tp1RR
+    _nearest = _default
+    _found   = false
+    if array.size(_bslArr) > 0
+        for _i = 0 to array.size(_bslArr) - 1
+            _lvl = array.get(_bslArr, _i)
+            if _lvl > _entry and not array.get(_bslSwpt, _i)
+                if not _found or _lvl < _nearest
+                    _nearest := _lvl
+                    _found   := true
+    _nearest
+
+// ── TP1 Short: nearest unswept SSL below entry, or fallback R:R multiple ──
+f_tp1Short(_entry, _sl, _sslArr, _sslSwpt) =>
+    _risk    = math.abs(_sl - _entry)
+    _default = _entry - _risk * i_tp1RR
+    _nearest = _default
+    _found   = false
+    if array.size(_sslArr) > 0
+        for _i = 0 to array.size(_sslArr) - 1
+            _lvl = array.get(_sslArr, _i)
+            if _lvl < _entry and not array.get(_sslSwpt, _i)
+                if not _found or _lvl > _nearest
+                    _nearest := _lvl
+                    _found   := true
+    _nearest
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      LIQUIDITY POOL ARRAYS                                 │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+var float[] poolBSL     = array.new_float(0)
+var int[]   poolBSLBar  = array.new_int(0)
+var bool[]  poolBSLSwpt = array.new_bool(0)
+var line[]  poolBSLLn   = array.new_line(0)
+var bool[]  poolBSLEq   = array.new_bool(0)
+var int[]   poolBSLEqCt = array.new_int(0)     // EQ cluster count
+
+var float[] poolSSL     = array.new_float(0)
+var int[]   poolSSLBar  = array.new_int(0)
+var bool[]  poolSSLSwpt = array.new_bool(0)
+var line[]  poolSSLLn   = array.new_line(0)
+var bool[]  poolSSLEq   = array.new_bool(0)
+var int[]   poolSSLEqCt = array.new_int(0)     // EQ cluster count
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      PIVOT DETECTION & POOL MANAGEMENT                     │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+ph       = ta.pivothigh(high, i_swingLen, i_swingLen)
+pl       = ta.pivotlow(low,  i_swingLen, i_swingLen)
+pivotBar = bar_index - i_swingLen
+
+// ── New Swing High → Buyside Liquidity Pool ──
+if not na(ph)
+    _eqCount = 0
+    _isEq    = false
+    if array.size(poolBSL) > 0
+        for _i = 0 to array.size(poolBSL) - 1
+            if not array.get(poolBSLSwpt, _i)
+                _ex = array.get(poolBSL, _i)
+                if math.abs(ph - _ex) / math.max(ph, 0.0001) * 100 < i_eqTol
+                    _isEq    := true
+                    _eqCount := array.get(poolBSLEqCt, _i) + 1
+                    array.set(poolBSLEqCt, _i, _eqCount)
+                    array.set(poolBSLEq,   _i, true)
+                    _pln = array.get(poolBSLLn, _i)
+                    if not na(_pln)
+                        line.set_width(_pln, math.min(_eqCount + 1, 4))
+                        line.set_color(_pln, i_cEQ)
+                    break
+    _lnCol = _isEq ? i_cEQ : (i_showPools ? i_cBSL : na)
+    _lnW   = _isEq ? 2 : 1
+    _newLn = line.new(pivotBar, ph, bar_index, ph, color=_lnCol, style=line.style_dotted, width=_lnW)
+    array.push(poolBSL,     ph)
+    array.push(poolBSLBar,  pivotBar)
+    array.push(poolBSLSwpt, false)
+    array.push(poolBSLLn,   _newLn)
+    array.push(poolBSLEq,   _isEq)
+    array.push(poolBSLEqCt, _isEq ? _eqCount : 1)
+    if _isEq
+        _lbl = _eqCount >= 3 ? "3EQH ◆◆◆" : "EQH ◆"
+        label.new(pivotBar, ph, _lbl, textcolor=i_cEQ, style=label.style_none, size=size.tiny)
+    if array.size(poolBSL) > i_maxPools
+        array.shift(poolBSL);  array.shift(poolBSLBar);  array.shift(poolBSLSwpt)
+        line.delete(array.shift(poolBSLLn))
+        array.shift(poolBSLEq);  array.shift(poolBSLEqCt)
+
+// ── New Swing Low → Sellside Liquidity Pool ──
+if not na(pl)
+    _eqCount = 0
+    _isEq    = false
+    if array.size(poolSSL) > 0
+        for _i = 0 to array.size(poolSSL) - 1
+            if not array.get(poolSSLSwpt, _i)
+                _ex = array.get(poolSSL, _i)
+                if math.abs(pl - _ex) / math.max(pl, 0.0001) * 100 < i_eqTol
+                    _isEq    := true
+                    _eqCount := array.get(poolSSLEqCt, _i) + 1
+                    array.set(poolSSLEqCt, _i, _eqCount)
+                    array.set(poolSSLEq,   _i, true)
+                    _pln = array.get(poolSSLLn, _i)
+                    if not na(_pln)
+                        line.set_width(_pln, math.min(_eqCount + 1, 4))
+                        line.set_color(_pln, i_cEQ)
+                    break
+    _lnCol = _isEq ? i_cEQ : (i_showPools ? i_cSSL : na)
+    _lnW   = _isEq ? 2 : 1
+    _newLn = line.new(pivotBar, pl, bar_index, pl, color=_lnCol, style=line.style_dotted, width=_lnW)
+    array.push(poolSSL,     pl)
+    array.push(poolSSLBar,  pivotBar)
+    array.push(poolSSLSwpt, false)
+    array.push(poolSSLLn,   _newLn)
+    array.push(poolSSLEq,   _isEq)
+    array.push(poolSSLEqCt, _isEq ? _eqCount : 1)
+    if _isEq
+        _lbl = _eqCount >= 3 ? "3EQL ◆◆◆" : "EQL ◆"
+        label.new(pivotBar, pl, _lbl, textcolor=i_cEQ, style=label.style_none, size=size.tiny)
+    if array.size(poolSSL) > i_maxPools
+        array.shift(poolSSL);  array.shift(poolSSLBar);  array.shift(poolSSLSwpt)
+        line.delete(array.shift(poolSSLLn))
+        array.shift(poolSSLEq);  array.shift(poolSSLEqCt)
+
+// ── Extend active pool lines to current bar ──
+if array.size(poolBSLLn) > 0
+    for _i = 0 to array.size(poolBSLLn) - 1
+        if not array.get(poolBSLSwpt, _i)
+            _ln = array.get(poolBSLLn, _i)
+            if not na(_ln)
+                line.set_x2(_ln, bar_index + 3)
+if array.size(poolSSLLn) > 0
+    for _i = 0 to array.size(poolSSLLn) - 1
+        if not array.get(poolSSLSwpt, _i)
+            _ln = array.get(poolSSLLn, _i)
+            if not na(_ln)
+                line.set_x2(_ln, bar_index + 3)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                MSS STATE — Market Structure Shift Detection                │
+// │                                                                             │
+// │  MSS reference level is snapshotted AT THE MOMENT of the grab.             │
+// │  Bullish cascade (SSL grab): MSS confirmed when close > snap swing high    │
+// │  Bearish cascade (BSL grab): MSS confirmed when close < snap swing low     │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// Track recent local swings (smaller lookback for MSS — we want recent structure)
+localPH = ta.pivothigh(high, 3, 3)
+localPL = ta.pivotlow(low,  3, 3)
+
+var float mssRefHigh  = na    // swing high snapshotted at grab bar
+var float mssRefLow   = na    // swing low  snapshotted at grab bar
+var float runningPH   = na    // tracks the most recent confirmed pivot high
+var float runningPL   = na    // tracks the most recent confirmed pivot low
+
+if not na(localPH)
+    runningPH := localPH
+if not na(localPL)
+    runningPL := localPL
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                       GRAB STATE VARIABLES                                 │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+var float grbLevel    = na
+var float grbExtreme  = na    // wick extreme (used as SL anchor)
+var int   grbDir      = 0     // -1 = SSL (bullish setup), +1 = BSL (bearish setup)
+var int   grbBar      = 0
+var float grbWickR    = 0.0
+var float grbVolR     = 0.0
+var bool  grbIsEq     = false
+var int   grbEqCt     = 1
+var int   grbCount    = 0
+var bool  mssActive   = false
+var int   mssBar      = 0
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │  [BUG FIX] CASCADE EXPIRY RESET                                            │
+// │  Reset grbDir after window closes — prevents stale cascade state           │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+if grbDir != 0 and (bar_index - grbBar) > i_cascadeWin
+    grbDir    := 0
+    mssActive := false
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      LIQUIDITY GRAB DETECTION                              │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+_bslGrab  = false
+_sslGrab  = false
+_gLevel   = 0.0
+_gWick    = 0.0
+_gIsEq    = false
+_gEqCt    = 1
+_gExtreme = 0.0
+
+// ── Buyside Liquidity Grab: wick above swing high, close below ──
+if barRange > 0 and array.size(poolBSL) > 0
+    for _i = array.size(poolBSL) - 1 to 0
+        if array.get(poolBSLSwpt, _i)
+            continue
+        _lvl = array.get(poolBSL, _i)
+        if high > _lvl and close < _lvl
+            _wr = upperWick / barRange
+            if _wr >= i_minWick
+                _bslGrab  := true
+                _gLevel   := _lvl
+                _gWick    := _wr
+                _gIsEq    := array.get(poolBSLEq,   _i)
+                _gEqCt    := array.get(poolBSLEqCt, _i)
+                _gExtreme := high
+                array.set(poolBSLSwpt, _i, true)
+                _ln = array.get(poolBSLLn, _i)
+                if not na(_ln)
+                    line.set_color(_ln, color.new(color.gray, 80))
+                    line.set_style(_ln, line.style_dashed)
+                break
+
+// ── Sellside Liquidity Grab: wick below swing low, close above ──
+if barRange > 0 and array.size(poolSSL) > 0 and not _bslGrab
+    for _i = array.size(poolSSL) - 1 to 0
+        if array.get(poolSSLSwpt, _i)
+            continue
+        _lvl = array.get(poolSSL, _i)
+        if low < _lvl and close > _lvl
+            _wr = lowerWick / barRange
+            if _wr >= i_minWick
+                _sslGrab  := true
+                _gLevel   := _lvl
+                _gWick    := _wr
+                _gIsEq    := array.get(poolSSLEq,   _i)
+                _gEqCt    := array.get(poolSSLEqCt, _i)
+                _gExtreme := low
+                array.set(poolSSLSwpt, _i, true)
+                _ln = array.get(poolSSLLn, _i)
+                if not na(_ln)
+                    line.set_color(_ln, color.new(color.gray, 80))
+                    line.set_style(_ln, line.style_dashed)
+                break
+
+// ── Snapshot MSS reference levels and record grab state ──
+if _bslGrab
+    grbLevel   := _gLevel;   grbDir  := 1;  grbBar := bar_index
+    grbWickR   := _gWick;    grbVolR := volRatio
+    grbIsEq    := _gIsEq;    grbEqCt := _gEqCt
+    grbExtreme := _gExtreme; grbCount += 1
+    mssActive  := false       // reset MSS — must be re-confirmed
+    mssRefLow  := runningPL   // snap current swing low as MSS level for bearish cascade
+
+if _sslGrab
+    grbLevel   := _gLevel;   grbDir  := -1; grbBar := bar_index
+    grbWickR   := _gWick;    grbVolR := volRatio
+    grbIsEq    := _gIsEq;    grbEqCt := _gEqCt
+    grbExtreme := _gExtreme; grbCount += 1
+    mssActive  := false
+    mssRefHigh := runningPH   // snap current swing high as MSS level for bullish cascade
+
+// ── MSS Confirmation ──
+if not mssActive and grbDir != 0
+    if grbDir == -1 and not na(mssRefHigh) and close > mssRefHigh
+        mssActive := true
+        mssBar    := bar_index
+    if grbDir == 1 and not na(mssRefLow) and close < mssRefLow
+        mssActive := true
+        mssBar    := bar_index
+
+// ── Cascade "live" flag — gated by MSS if required ──
+cascadeLive = grbDir != 0 and (not i_reqMSS or mssActive) and (bar_index - grbBar) <= i_cascadeWin
+
+// ── Grab markers ──
+plotshape(_bslGrab and i_showGrabs, "BSL Grab", shape.xcross, location.abovebar, color=i_cBearGrab, size=size.small)
+plotshape(_sslGrab and i_showGrabs, "SSL Grab", shape.xcross, location.belowbar, color=i_cBullGrab, size=size.small)
+
+if _bslGrab and i_showGrabs
+    _eqTag = _gIsEq ? " [" + str.tostring(_gEqCt) + "EQH]" : ""
+    label.new(bar_index, high + atr14 * 0.6,
+         "BSL GRAB" + _eqTag + "\n" + str.tostring(math.round(_gWick * 100)) + "% wick",
+         textcolor=i_cBearGrab, color=color.new(i_cBearGrab, 88),
+         style=label.style_label_down, size=size.tiny)
+
+if _sslGrab and i_showGrabs
+    _eqTag = _gIsEq ? " [" + str.tostring(_gEqCt) + "EQL]" : ""
+    label.new(bar_index, low - atr14 * 0.6,
+         "SSL GRAB" + _eqTag + "\n" + str.tostring(math.round(_gWick * 100)) + "% wick",
+         textcolor=i_cBullGrab, color=color.new(i_cBullGrab, 88),
+         style=label.style_label_up, size=size.tiny)
+
+// ── MSS confirmation marker ──
+if mssActive and mssBar == bar_index
+    _mssDir  = grbDir == -1 ? "MSS ▲" : "MSS ▼"
+    _mssCol  = grbDir == -1 ? i_cBullGrab : i_cBearGrab
+    _mssY    = grbDir == -1 ? high + atr14 * 0.3 : low - atr14 * 0.3
+    _mssSty  = grbDir == -1 ? label.style_label_down : label.style_label_up
+    label.new(bar_index, _mssY, _mssDir, textcolor=_mssCol,
+         color=color.new(_mssCol, 90), style=_mssSty, size=size.tiny)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      FAIR VALUE GAP DETECTION                              │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+var float[] fvgTop    = array.new_float(0)
+var float[] fvgBot    = array.new_float(0)
+var int[]   fvgSBar   = array.new_int(0)
+var int[]   fvgDirn   = array.new_int(0)
+var bool[]  fvgMit    = array.new_bool(0)
+var float[] fvgScr    = array.new_float(0)
+var bool[]  fvgIsCas  = array.new_bool(0)
+var box[]   fvgBx     = array.new_box(0)
+var float[] fvgSLvl   = array.new_float(0)   // precomputed SL per cascade FVG
+
+_bullFVG   = bar_index > 2 and low > high[2] and (low - high[2]) >= atr14 * i_minFVG
+_bearFVG   = bar_index > 2 and high < low[2] and (low[2] - high) >= atr14 * i_minFVG
+
+f_addFVG(_top, _bot, _dir, _isCasc, _scr, _bxCol, _bw, _sl) =>
+    _bx = i_showFVG ? box.new(bar_index - 1, _top, bar_index + i_fvgExt, _bot,
+         border_color=color.new(_bxCol, 40), bgcolor=color.new(_bxCol, 85),
+         border_width=_bw, border_style=line.style_solid) : na
+    if _isCasc and _scr >= i_minScore and i_showFVG
+        label.new(bar_index, _dir == 1 ? _top : _bot,
+             "⚡" + str.tostring(math.round(_scr)),
+             textcolor=f_scoreColor(_scr), style=label.style_none, size=size.tiny)
+    array.push(fvgTop,   _top);  array.push(fvgBot,   _bot)
+    array.push(fvgSBar,  bar_index);  array.push(fvgDirn, _dir)
+    array.push(fvgMit,   false);  array.push(fvgScr,   _scr)
+    array.push(fvgIsCas, _isCasc);  array.push(fvgBx,  _bx)
+    array.push(fvgSLvl,  _sl)
+    if array.size(fvgTop) > i_maxFVG
+        array.shift(fvgTop);  array.shift(fvgBot);  array.shift(fvgSBar)
+        array.shift(fvgDirn); array.shift(fvgMit);  array.shift(fvgScr)
+        array.shift(fvgIsCas)
+        _old = array.shift(fvgBx)
+        if not na(_old)
+            box.delete(_old)
+        array.shift(fvgSLvl)
+    true
+
+// ── Bullish FVG ──
+if _bullFVG
+    _top      = low
+    _bot      = high[2]
+    _sz       = _top - _bot
+    _dispR    = nz(math.abs(close - nz(grbLevel, close)) / atr14, 0)
+    _fvgR     = nz(_sz / atr14, 0)
+    _isCasc   = cascadeLive and grbDir == -1
+    _adjWickR = _isCasc ? math.min(grbWickR + f_eqBonus(grbEqCt), 1.0) : grbWickR
+    _scr      = _isCasc ? f_score(_adjWickR, _dispR, grbVolR, _fvgR) : _fvgR * 15
+    _bxCol    = _isCasc and _scr >= i_minScore ? i_cBullGrab : color.new(i_cBullGrab, 50)
+    _bw       = _isCasc and _scr >= i_minScore ? 2 : 1
+    _sl       = _isCasc ? grbExtreme - atr14 * i_slBuffer : na
+    f_addFVG(_top, _bot, 1, _isCasc, _scr, _bxCol, _bw, _sl)
+
+// ── Bearish FVG ──
+if _bearFVG
+    _top      = low[2]
+    _bot      = high
+    _sz       = _top - _bot
+    _dispR    = nz(math.abs(close - nz(grbLevel, close)) / atr14, 0)
+    _fvgR     = nz(_sz / atr14, 0)
+    _isCasc   = cascadeLive and grbDir == 1
+    _adjWickR = _isCasc ? math.min(grbWickR + f_eqBonus(grbEqCt), 1.0) : grbWickR
+    _scr      = _isCasc ? f_score(_adjWickR, _dispR, grbVolR, _fvgR) : _fvgR * 15
+    _bxCol    = _isCasc and _scr >= i_minScore ? i_cBearGrab : color.new(i_cBearGrab, 50)
+    _bw       = _isCasc and _scr >= i_minScore ? 2 : 1
+    _sl       = _isCasc ? grbExtreme + atr14 * i_slBuffer : na
+    f_addFVG(_top, _bot, -1, _isCasc, _scr, _bxCol, _bw, _sl)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │              FVG MITIGATION & CASCADE ENTRY SIGNALS                        │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+var int   lastSigBar    = 0
+var int   sigLongCount  = 0
+var int   sigShortCount = 0
+
+_longSig   = false
+_shortSig  = false
+_sigScore  = 0.0
+_sigSL     = 0.0
+_sigEntry  = 0.0
+
+if array.size(fvgTop) > 0
+    for _i = array.size(fvgTop) - 1 to 0
+        if array.get(fvgMit, _i)
+            continue
+        _ft  = array.get(fvgTop,   _i)
+        _fb  = array.get(fvgBot,   _i)
+        _fd  = array.get(fvgDirn,  _i)
+        _fs  = array.get(fvgScr,   _i)
+        _fc  = array.get(fvgIsCas, _i)
+        _fsb = array.get(fvgSBar,  _i)
+        _fsl = array.get(fvgSLvl,  _i)
+
+        // HTF bias gate: longs only when HTF bullish, shorts only when HTF bearish
+        _htfOk = not i_htfEnabled or (_fd == 1 and htfBullBias) or (_fd == -1 and htfBearBias)
+
+        if _fd == 1   // Bullish FVG
+            if low <= _fb   // full mitigation
+                array.set(fvgMit, _i, true)
+                _bx = array.get(fvgBx, _i)
+                if not na(_bx)
+                    box.set_right(_bx, bar_index)
+                    if i_showMitFVG
+                        box.set_bgcolor(_bx, color.new(color.gray, 93))
+                        box.set_border_color(_bx, color.new(color.gray, 87))
+                    else
+                        box.delete(_bx)
+            else if low <= _ft and low > _fb   // retest — potential entry
+                if _fc and _fs >= i_minScore and bar_index - lastSigBar > 3 and bar_index - _fsb >= 2 and _htfOk and inSession
+                    _longSig   := true
+                    _sigScore  := _fs
+                    _sigSL     := _fsl
+                    _sigEntry  := (_ft + _fb) / 2
+                    lastSigBar := bar_index
+                    sigLongCount += 1
+        else   // Bearish FVG
+            if high >= _ft   // full mitigation
+                array.set(fvgMit, _i, true)
+                _bx = array.get(fvgBx, _i)
+                if not na(_bx)
+                    box.set_right(_bx, bar_index)
+                    if i_showMitFVG
+                        box.set_bgcolor(_bx, color.new(color.gray, 93))
+                        box.set_border_color(_bx, color.new(color.gray, 87))
+                    else
+                        box.delete(_bx)
+            else if high >= _fb and high < _ft   // retest
+                if _fc and _fs >= i_minScore and bar_index - lastSigBar > 3 and bar_index - _fsb >= 2 and _htfOk and inSession
+                    _shortSig  := true
+                    _sigScore  := _fs
+                    _sigSL     := _fsl
+                    _sigEntry  := (_ft + _fb) / 2
+                    lastSigBar := bar_index
+                    sigShortCount += 1
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      EXIT SYSTEM — SL / TP VISUALIZATION                  │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+if _longSig and i_showExit and not na(_sigSL)
+    _entry = _sigEntry
+    _sl    = _sigSL
+    _risk  = math.abs(_entry - _sl)
+    _tp1   = f_tp1Long(_entry, _sl, poolBSL, poolBSLSwpt)
+    _tp2   = _entry + _risk * i_tp2RR
+    // Enforce minimum R:R on TP1
+    if (_tp1 - _entry) < _risk * i_tp1RR
+        _tp1 := _entry + _risk * i_tp1RR
+    // Draw SL / TP lines
+    line.new(bar_index, _sl,  bar_index + i_exitBars, _sl,  color=i_cSL,  width=1, style=line.style_dashed)
+    line.new(bar_index, _tp1, bar_index + i_exitBars, _tp1, color=i_cTP1, width=1, style=line.style_dotted)
+    line.new(bar_index, _tp2, bar_index + i_exitBars, _tp2, color=i_cTP2, width=1, style=line.style_dotted)
+    // R:R labels at line endpoints
+    _rr1 = _risk > 0 ? str.tostring(math.round((_tp1 - _entry) / _risk, 1)) + "R" : str.tostring(i_tp1RR) + "R"
+    _rr2 = _risk > 0 ? str.tostring(math.round((_tp2 - _entry) / _risk, 1)) + "R" : str.tostring(i_tp2RR) + "R"
+    label.new(bar_index + i_exitBars, _sl,  "SL",       textcolor=i_cSL,  style=label.style_none, size=size.tiny)
+    label.new(bar_index + i_exitBars, _tp1, "TP1 " + _rr1, textcolor=i_cTP1, style=label.style_none, size=size.tiny)
+    label.new(bar_index + i_exitBars, _tp2, "TP2 " + _rr2, textcolor=i_cTP2, style=label.style_none, size=size.tiny)
+
+if _shortSig and i_showExit and not na(_sigSL)
+    _entry = _sigEntry
+    _sl    = _sigSL
+    _risk  = math.abs(_sl - _entry)
+    _tp1   = f_tp1Short(_entry, _sl, poolSSL, poolSSLSwpt)
+    _tp2   = _entry - _risk * i_tp2RR
+    if (_entry - _tp1) < _risk * i_tp1RR
+        _tp1 := _entry - _risk * i_tp1RR
+    line.new(bar_index, _sl,  bar_index + i_exitBars, _sl,  color=i_cSL,  width=1, style=line.style_dashed)
+    line.new(bar_index, _tp1, bar_index + i_exitBars, _tp1, color=i_cTP1, width=1, style=line.style_dotted)
+    line.new(bar_index, _tp2, bar_index + i_exitBars, _tp2, color=i_cTP2, width=1, style=line.style_dotted)
+    _rr1 = _risk > 0 ? str.tostring(math.round((_entry - _tp1) / _risk, 1)) + "R" : str.tostring(i_tp1RR) + "R"
+    _rr2 = _risk > 0 ? str.tostring(math.round((_entry - _tp2) / _risk, 1)) + "R" : str.tostring(i_tp2RR) + "R"
+    label.new(bar_index + i_exitBars, _sl,  "SL",       textcolor=i_cSL,  style=label.style_none, size=size.tiny)
+    label.new(bar_index + i_exitBars, _tp1, "TP1 " + _rr1, textcolor=i_cTP1, style=label.style_none, size=size.tiny)
+    label.new(bar_index + i_exitBars, _tp2, "TP2 " + _rr2, textcolor=i_cTP2, style=label.style_none, size=size.tiny)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                      SIGNAL VISUALIZATION                                  │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+plotshape(_longSig  and i_showSigs, "▲ LONG CASCADE",  shape.diamond, location.belowbar, color=i_cBullGrab, size=size.normal)
+plotshape(_shortSig and i_showSigs, "▼ SHORT CASCADE", shape.diamond, location.abovebar, color=i_cBearGrab, size=size.normal)
+
+if _longSig and i_showSigs
+    _col    = f_scoreColor(_sigScore)
+    _lbl    = f_scoreLabel(_sigScore)
+    _htfTag = i_htfEnabled ? " [HTF✓]" : ""
+    _mssTag = i_reqMSS     ? " [MSS✓]" : ""
+    label.new(bar_index, low - atr14 * 0.8,
+         "▲ " + _lbl + _htfTag + _mssTag + "\nScore: " + str.tostring(math.round(_sigScore)),
+         textcolor=_col, color=color.new(i_cBullGrab, 82),
+         style=label.style_label_up, size=size.small)
+
+if _shortSig and i_showSigs
+    _col    = f_scoreColor(_sigScore)
+    _lbl    = f_scoreLabel(_sigScore)
+    _htfTag = i_htfEnabled ? " [HTF✓]" : ""
+    _mssTag = i_reqMSS     ? " [MSS✓]" : ""
+    label.new(bar_index, high + atr14 * 0.8,
+         "▼ " + _lbl + _htfTag + _mssTag + "\nScore: " + str.tostring(math.round(_sigScore)),
+         textcolor=_col, color=color.new(i_cBearGrab, 82),
+         style=label.style_label_down, size=size.small)
+
+barcolor(_longSig  ? color.new(i_cBullGrab, 20) :
+         _shortSig ? color.new(i_cBearGrab, 20) :
+         _bslGrab  ? color.new(i_cBearGrab, 60) :
+         _sslGrab  ? color.new(i_cBullGrab, 60) : na)
+
+bgcolor(cascadeLive ? color.new(i_cEQ, 96) : na, title="Cascade Active Zone")
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                           DASHBOARD                                        │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+var table dash = table.new(position.top_right, 2, 14,
+     bgcolor=color.new(#0D1117, 5),
+     border_width=1, border_color=color.new(#30363D, 0),
+     frame_width=2, frame_color=color.new(#58A6FF, 50))
+
+if barstate.islast and i_showDash
+    _hdr  = color.new(#161B22, 0)
+    _txtH = color.new(#F0F6FC, 0)
+    _txtN = color.new(#8B949E, 0)
+    _txtV = color.new(#C9D1D9, 0)
+
+    table.cell(dash, 0, 0, " SLCE v2.0", text_color=_txtH, bgcolor=_hdr, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 0, "ENGINE ⚡",  text_color=color.new(#58A6FF, 0), bgcolor=_hdr, text_size=size.small, text_halign=text.align_right)
+
+    // Cascade state
+    _cascStr = not cascadeLive ? "IDLE" : mssActive ? "★ ACTIVE [MSS✓]" : "★ ACTIVE (no MSS)"
+    _cascCol = not cascadeLive ? _txtN  : mssActive ? color.new(#FFD600, 0) : color.new(#FF9800, 0)
+    table.cell(dash, 0, 1, "Cascade",       text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 1, _cascStr,        text_color=_cascCol, text_size=size.tiny)
+
+    // HTF Bias
+    _htfStr = not i_htfEnabled ? "Disabled" : htfBullBias ? "▲ Bullish" : "▼ Bearish"
+    _htfCol = not i_htfEnabled ? _txtN : htfBullBias ? i_cBullGrab : i_cBearGrab
+    table.cell(dash, 0, 2, "HTF Bias",      text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 2, _htfStr,         text_color=_htfCol,  text_size=size.tiny)
+
+    // Session
+    _sessStr = not i_sessEnabled ? "Disabled" : inLondon ? "London" : inNY ? "New York" : "Off-session"
+    _sessCol = not i_sessEnabled ? _txtN : inSession ? color.new(#00E676, 0) : _txtN
+    table.cell(dash, 0, 3, "Session",       text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 3, _sessStr,        text_color=_sessCol, text_size=size.tiny)
+
+    // Volume regime
+    _vrStr  = isTickVol ? "Tick — adj" : "Real vol"
+    _vrCol  = isTickVol ? color.new(#FFD600, 0) : _txtV
+    table.cell(dash, 0, 4, "Vol Regime",    text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 4, _vrStr,          text_color=_vrCol,   text_size=size.tiny)
+
+    // Last grab
+    _grabStr = grbDir == 1 ? "BSL ▼" : grbDir == -1 ? "SSL ▲" : "—"
+    _grabCol = grbDir == 1 ? i_cBearGrab : grbDir == -1 ? i_cBullGrab : _txtN
+    table.cell(dash, 0, 5, "Last Grab",     text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 5, _grabStr,        text_color=_grabCol, text_size=size.tiny)
+
+    // Grab quality (wick + EQ bonus annotation)
+    _gqStr = grbDir != 0 ? str.tostring(math.round(grbWickR * 100)) + "%" + (grbIsEq ? " [" + str.tostring(grbEqCt) + "EQ]" : "") : "—"
+    table.cell(dash, 0, 6, "Grab Quality",  text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 6, _gqStr,          text_color=_txtV,    text_size=size.tiny)
+
+    // Volume
+    _volStr = str.tostring(math.round(volRatio, 1)) + "×"
+    _volCol = isVolSpike ? color.new(#FFD600, 0) : _txtV
+    table.cell(dash, 0, 7, "Volume",        text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 7, _volStr,         text_color=_volCol,  text_size=size.tiny)
+
+    // Active FVGs
+    _actFVG = 0;  _casFVG = 0
+    if array.size(fvgMit) > 0
+        for _i = 0 to array.size(fvgMit) - 1
+            if not array.get(fvgMit, _i)
+                _actFVG += 1
+                if array.get(fvgIsCas, _i)
+                    _casFVG += 1
+    table.cell(dash, 0, 8, "Active Voids",  text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 8, str.tostring(_actFVG) + " (" + str.tostring(_casFVG) + " cas)", text_color=_txtV, text_size=size.tiny)
+
+    // Liquidity pools
+    _bslCt = 0; _sslCt = 0
+    for _i = 0 to array.size(poolBSLSwpt) - 1
+        if not array.get(poolBSLSwpt, _i)
+            _bslCt += 1
+    for _i = 0 to array.size(poolSSLSwpt) - 1
+        if not array.get(poolSSLSwpt, _i)
+            _sslCt += 1
+    table.cell(dash, 0, 9, "Pools (B/S)",   text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 9, str.tostring(_bslCt) + " / " + str.tostring(_sslCt), text_color=_txtV, text_size=size.tiny)
+
+    table.cell(dash, 0, 10, "Total Grabs",  text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 10, str.tostring(grbCount), text_color=_txtV, text_size=size.tiny)
+
+    table.cell(dash, 0, 11, "Long Sigs",    text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 11, str.tostring(sigLongCount), text_color=i_cBullGrab, text_size=size.tiny)
+
+    table.cell(dash, 0, 12, "Short Sigs",   text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 12, str.tostring(sigShortCount), text_color=i_cBearGrab, text_size=size.tiny)
+
+    table.cell(dash, 0, 13, "ATR (14)",     text_color=_txtN,    text_size=size.tiny)
+    table.cell(dash, 1, 13, str.tostring(atr14, format.mintick), text_color=_txtV, text_size=size.tiny)
+
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                             ALERTS                                         │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+alertcondition(_bslGrab,
+     "SLCE ⚠ Buyside Liquidity Grab",
+     "BSL GRAB — Buyside swept. Potential bearish cascade forming.")
+alertcondition(_sslGrab,
+     "SLCE ⚠ Sellside Liquidity Grab",
+     "SSL GRAB — Sellside swept. Potential bullish cascade forming.")
+alertcondition(mssActive and mssBar == bar_index and grbDir == -1,
+     "SLCE ▲ Bullish MSS Confirmed",
+     "Bullish MSS confirmed after SSL grab — cascade now live.")
+alertcondition(mssActive and mssBar == bar_index and grbDir == 1,
+     "SLCE ▼ Bearish MSS Confirmed",
+     "Bearish MSS confirmed after BSL grab — cascade now live.")
+alertcondition(_longSig,
+     "SLCE ▲ Bullish Cascade Entry",
+     "BULLISH CASCADE — FVG retest after SSL grab. HTF + MSS + session confirmed.")
+alertcondition(_shortSig,
+     "SLCE ▼ Bearish Cascade Entry",
+     "BEARISH CASCADE — FVG retest after BSL grab. HTF + MSS + session confirmed.")
+alertcondition(_longSig or _shortSig,
+     "SLCE ⚡ Any Cascade Entry",
+     "CASCADE ENTRY — Full institutional-grade setup detected.")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// END OF SLCE v2.0
+// ═══════════════════════════════════════════════════════════════════════════════
