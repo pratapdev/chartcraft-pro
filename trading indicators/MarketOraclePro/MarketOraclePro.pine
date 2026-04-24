@@ -1,0 +1,576 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
+// © Replica of Market Oracle Pro [ChartPrime] — Educational Recreation
+// Fix log: All ta.* built-ins now receive literal / simple-int lengths only.
+// Variable-length logic moved to user-defined functions (accept series int).
+
+//@version=5
+indicator("Market Oracle Pro [Replica]", shorttitle="MO Pro", overlay=true,
+     max_bars_back=500, max_lines_count=200, max_boxes_count=100, max_labels_count=200)
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║                        INPUTS                            ║
+// ╚══════════════════════════════════════════════════════════╝
+
+grp_sig       = "══ Signal Settings ══"
+signal_mode   = input.string("Trend","Signal Mode", options=["Trend","Reversal"], group=grp_sig)
+tuning        = input.int(14,"Tuning", minval=5, maxval=50,
+     tooltip="Used when Auto Maximizer is OFF", group=grp_sig)
+auto_max      = input.bool(true,"Auto Maximizer", group=grp_sig,
+     tooltip="Picks the best of 4 candidate tuning lengths automatically")
+auto_max_type = input.string("PnL","Optimize For", options=["PnL","WinRate"], group=grp_sig)
+
+grp_candle  = "══ Candle Coloring ══"
+candle_mode = input.string("Gradient","Mode",
+     options=["Gradient","Classic","Volume","None"], group=grp_candle)
+
+grp_dash  = "══ Dashboard ══"
+show_dash = input.bool(true,"Show Dashboard", group=grp_dash)
+dash_size = input.string("Normal","Size", options=["Tiny","Small","Normal","Large"], group=grp_dash)
+dash_pos  = input.string("Top Right","Position",
+     options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp_dash)
+
+grp_feat        = "══ Additional Features ══"
+show_reactor    = input.bool(true,"Dynamic Reactor",         group=grp_feat)
+reactor_type    = input.string("Standard","Reactor Type", options=["Standard","Volume Flex"], group=grp_feat)
+reactor_tf      = input.timeframe("","Reactor Timeframe (blank = current)", group=grp_feat)
+show_ranges     = input.bool(true,"Prime Ranges (VWAP)",     group=grp_feat)
+show_candle_str = input.bool(true,"Candlestick Structures",  group=grp_feat)
+show_momentum   = input.bool(true,"Momentum Wave Bands",     group=grp_feat)
+show_pta        = input.bool(true,"Prime Trend Assistant",   group=grp_feat)
+show_prophecy   = input.bool(true,"Market Prophecy",         group=grp_feat)
+show_max_profit = input.bool(true,"Max Profit Signals",      group=grp_feat)
+
+grp_col          = "══ Colors ══"
+bull_col         = input.color(color.new(#00e5ff,  0),"Bull Color",        group=grp_col)
+bear_col         = input.color(color.new(#ff1744,  0),"Bear Color",        group=grp_col)
+reactor_bull_col = input.color(color.new(#00e5ff,75),"Reactor Bull Fill",  group=grp_col)
+reactor_bear_col = input.color(color.new(#ff1744,75),"Reactor Bear Fill",  group=grp_col)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   EHLERS SUPER SMOOTHER  (2-pole low-pass DSP filter)   ║
+// ║   User-defined functions accept series int — no error.  ║
+// ╚══════════════════════════════════════════════════════════╝
+
+super_smoother(src, len) =>
+    l   = math.max(2, len)
+    rad = 2.0 * math.pi / l
+    a1  = math.exp(-1.414 * rad)
+    b1  = 2.0 * a1 * math.cos(1.414 * rad)
+    c2  = b1
+    c3  = -(a1 * a1)
+    c1  = 1.0 - c2 - c3
+    var float ss = na
+    ss  := na(ss[1]) or na(ss[2]) ?
+         src :
+         c1 * (src + nz(src[1])) * 0.5 + c2 * nz(ss[1]) + c3 * nz(ss[2])
+    ss
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   PRE-COMPUTE AT ALL 4 CANDIDATE LENGTHS                 ║
+// ║                                                          ║
+// ║   ROOT FIX: eff_tuning would be a series int (because    ║
+// ║   it is derived from series booleans from the auto-max   ║
+// ║   scoring). Pine's ta.* built-ins require simple int.    ║
+// ║   Solution: compute everything at the 4 fixed candidate  ║
+// ║   lengths (10,14,20,28) using literal ints, then select  ║
+// ║   the winner with a series float selector function.      ║
+// ╚══════════════════════════════════════════════════════════╝
+
+// ── Super Smoother pairs on close (fast + slow) ──
+ss_f10 = super_smoother(close, 10)  ;  ss_s10 = super_smoother(close, 20)
+ss_f14 = super_smoother(close, 14)  ;  ss_s14 = super_smoother(close, 28)
+ss_f20 = super_smoother(close, 20)  ;  ss_s20 = super_smoother(close, 40)
+ss_f28 = super_smoother(close, 28)  ;  ss_s28 = super_smoother(close, 56)
+
+// ── Manual mode (input.int is simple int → *2 also simple int) ✓ ──
+ss_fast_m = super_smoother(close, tuning)
+ss_slow_m = super_smoother(close, tuning * 2)
+
+// ── RSI at each candidate (literal simple int) ✓ ──
+rsi10_s = ta.rsi(close, 10) ;  rsi14_s = ta.rsi(close, 14)
+rsi20_s = ta.rsi(close, 20) ;  rsi28_s = ta.rsi(close, 28)
+rsi_m   = ta.rsi(close, tuning)
+
+// ── Stochastic at each candidate ✓ ──
+stch10 = ta.stoch(close, high, low, 10) ;  stch14 = ta.stoch(close, high, low, 14)
+stch20 = ta.stoch(close, high, low, 20) ;  stch28 = ta.stoch(close, high, low, 28)
+stch_m = ta.stoch(close, high, low, tuning)
+
+// ── ATR at 2× lengths (for Prime Trend Assistant band) ✓ ──
+atr20_s = ta.atr(20) ;  atr28_s = ta.atr(28)
+atr40_s = ta.atr(40) ;  atr56_s = ta.atr(56)
+atr_m   = ta.atr(tuning * 2)
+
+// ── EMA + StdDev at 2× lengths (for Momentum Wave Bands) ✓ ──
+ema20_s = ta.ema(close, 20) ;  ema28_s = ta.ema(close, 28)
+ema40_s = ta.ema(close, 40) ;  ema56_s = ta.ema(close, 56)
+ema_m   = ta.ema(close, tuning * 2)
+
+std20_s = ta.stdev(close, 20) ;  std28_s = ta.stdev(close, 28)
+std40_s = ta.stdev(close, 40) ;  std56_s = ta.stdev(close, 56)
+std_m   = ta.stdev(close, tuning * 2)
+
+// ── Super Smoother on hlc3 for Reactor ──
+rss10 = super_smoother(hlc3, 10) ;  rss14 = super_smoother(hlc3, 14)
+rss20 = super_smoother(hlc3, 20) ;  rss28 = super_smoother(hlc3, 28)
+rss_m = super_smoother(hlc3, tuning)
+
+// Fixed reference ATR (used globally for label offsets) ✓
+atr14 = ta.atr(14)
+vol20 = ta.sma(volume, 20)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   AUTO MAXIMIZER                                         ║
+// ╚══════════════════════════════════════════════════════════╝
+
+f_score(ss_f, ss_s) =>
+    bx   = ta.crossover(ss_f, ss_s)
+    sx   = ta.crossunder(ss_f, ss_s)
+    move = (close - close[1]) / math.max(close[1], 0.0001) * 100.0
+    ret  = bx ? move : sx ? -move : 0.0
+    win  = (bx and close > close[1]) or (sx and close < close[1]) ? 1 : 0
+    sig  = (bx or sx) ? 1 : 0
+    pnl  = math.sum(ret, 50)
+    wr   = math.sum(sig, 50) > 0 ?
+         math.sum(win, 50) / math.sum(sig, 50) * 100.0 : 0.0
+    [pnl, wr]
+
+[pnl10, wr10] = f_score(ss_f10, ss_s10)
+[pnl14, wr14] = f_score(ss_f14, ss_s14)
+[pnl20, wr20] = f_score(ss_f20, ss_s20)
+[pnl28, wr28] = f_score(ss_f28, ss_s28)
+
+use_pnl = auto_max_type == "PnL"
+
+// Winner booleans — series bool, used ONLY for value selection, never as lengths
+b10 = use_pnl ?
+     (pnl10 >= pnl14 and pnl10 >= pnl20 and pnl10 >= pnl28) :
+     (wr10  >= wr14  and wr10  >= wr20  and wr10  >= wr28)
+
+b14 = use_pnl ?
+     (not b10 and pnl14 >= pnl20 and pnl14 >= pnl28) :
+     (not b10 and wr14  >= wr20  and wr14  >= wr28)
+
+b20 = use_pnl ?
+     (not b10 and not b14 and pnl20 >= pnl28) :
+     (not b10 and not b14 and wr20  >= wr28)
+// b28: implicit fallthrough
+
+// Display only — never used as a ta.* length argument
+opt_len_disp = b10 ? 10 : b14 ? 14 : b20 ? 20 : 28
+
+// Selector: picks correct pre-computed series float ✓
+sel(v10, v14, v20, v28, vm) =>
+    not auto_max ? vm : b10 ? v10 : b14 ? v14 : b20 ? v20 : v28
+
+// Active series values (adapt between auto and manual)
+ss_fast   = sel(ss_f10, ss_f14, ss_f20, ss_f28, ss_fast_m)
+ss_slow   = sel(ss_s10, ss_s14, ss_s20, ss_s28, ss_slow_m)
+rsi_v     = sel(rsi10_s, rsi14_s, rsi20_s, rsi28_s, rsi_m)
+stoch_v   = sel(stch10,  stch14,  stch20,  stch28,  stch_m)
+pta_atr   = sel(atr20_s, atr28_s, atr40_s, atr56_s, atr_m)
+mwb_basis = sel(ema20_s, ema28_s, ema40_s, ema56_s, ema_m)
+mwb_dev   = sel(std20_s, std28_s, std40_s, std56_s, std_m)
+rct_basis = sel(rss10,   rss14,   rss20,   rss28,   rss_m)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   PRIME TREND ASSISTANT                                  ║
+// ║   Adaptive Supertrend-style dynamic S/R                  ║
+// ╚══════════════════════════════════════════════════════════╝
+
+pta_mult = 2.0
+pta_src  = ss_slow
+
+var float pta_upper = na
+var float pta_lower = na
+var int   pta_dir   = 1
+
+pta_u_raw = pta_src + pta_mult * pta_atr
+pta_l_raw = pta_src - pta_mult * pta_atr
+
+pta_upper := close[1] > nz(pta_upper[1]) ?
+     math.min(pta_u_raw, nz(pta_upper[1])) : pta_u_raw
+
+pta_lower := close[1] < nz(pta_lower[1]) ?
+     math.max(pta_l_raw, nz(pta_lower[1])) : pta_l_raw
+
+if close > nz(pta_upper[1])
+    pta_dir := 1
+if close < nz(pta_lower[1])
+    pta_dir := -1
+
+pta_line = pta_dir == 1 ? pta_lower : pta_upper
+pta_bull = pta_dir == 1
+
+plot(show_pta ? pta_line : na, "Prime Trend Assistant",
+     color=pta_bull ? bull_col : bear_col, linewidth=2)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   DYNAMIC REACTOR                                        ║
+// ║   Volume-scaled adaptive band — green/red trend fill     ║
+// ╚══════════════════════════════════════════════════════════╝
+
+vol_ratio    = reactor_type == "Volume Flex" ?
+     math.max(0.4, math.min(2.0, nz(volume) / math.max(1.0, vol20))) : 1.0
+rct_band     = atr14 * 0.6 * vol_ratio
+
+// MTF: must pass literal inside security ✓
+rct_mtf = request.security(syminfo.tickerid,
+     reactor_tf == "" ? timeframe.period : reactor_tf,
+     super_smoother(hlc3, 14),
+     lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+
+rct_raw  = reactor_tf == "" ? rct_basis : rct_mtf
+rct_bull = close > rct_raw
+
+p_rct_u = plot(show_reactor ? rct_raw + rct_band : na,
+     "Reactor Upper", color=na, editable=false)
+p_rct_l = plot(show_reactor ? rct_raw - rct_band : na,
+     "Reactor Lower", color=na, editable=false)
+fill(p_rct_u, p_rct_l,
+     color=rct_bull ? reactor_bull_col : reactor_bear_col, title="Reactor Fill")
+plot(show_reactor ? rct_raw : na, "Reactor Mid",
+     color=rct_bull ? bull_col : bear_col, linewidth=1)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   PRIME RANGES — Session VWAP + StdDev Bands            ║
+// ╚══════════════════════════════════════════════════════════╝
+
+var float cum_vol = 0.0
+var float cum_pv  = 0.0
+var float cum_pv2 = 0.0
+
+is_new_day = nz(ta.change(time("D")), 0) != 0
+if is_new_day
+    cum_vol := 0.0
+    cum_pv  := 0.0
+    cum_pv2 := 0.0
+
+cum_vol  += nz(volume)
+cum_pv   += hlc3 * nz(volume)
+cum_pv2  += hlc3 * hlc3 * nz(volume)
+
+vwap_val  = cum_vol > 0 ? cum_pv  / cum_vol : hlc3
+vwap_var  = cum_vol > 0 ? math.max(0.0, cum_pv2 / cum_vol - vwap_val * vwap_val) : 0.0
+vwap_std  = math.sqrt(vwap_var)
+
+range_u2   = vwap_val + 2.0 * vwap_std
+range_u1   = vwap_val + 1.0 * vwap_std
+range_l1   = vwap_val - 1.0 * vwap_std
+range_l2   = vwap_val - 2.0 * vwap_std
+range_bull = close > vwap_val
+
+p_ru2 = plot(show_ranges ? range_u2 : na, "Range +2σ", color=color.new(bull_col,50), linewidth=1)
+p_ru1 = plot(show_ranges ? range_u1 : na, "Range +1σ", color=color.new(bull_col,30), linewidth=1)
+p_vwp = plot(show_ranges ? vwap_val : na, "VWAP",
+     color=range_bull ? bull_col : bear_col, linewidth=2)
+p_rl1 = plot(show_ranges ? range_l1 : na, "Range -1σ", color=color.new(bear_col,30), linewidth=1)
+p_rl2 = plot(show_ranges ? range_l2 : na, "Range -2σ", color=color.new(bear_col,50), linewidth=1)
+
+fill(p_ru1, p_ru2, color=range_bull ? color.new(bull_col,88) : color.new(bear_col,95))
+fill(p_rl1, p_rl2, color=range_bull ? color.new(bull_col,95) : color.new(bear_col,88))
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   MOMENTUM WAVE BANDS                                    ║
+// ║   High-deviation envelope, trend + volatility context    ║
+// ╚══════════════════════════════════════════════════════════╝
+
+mwb_mult  = 2.5
+mwb_upper = mwb_basis + mwb_mult * mwb_dev
+mwb_lower = mwb_basis - mwb_mult * mwb_dev
+mwb_bull  = close > mwb_basis
+
+p_mwb_u = plot(show_momentum ? mwb_upper : na, "MWB Upper",
+     color=color.new(bull_col,55), linewidth=1)
+p_mwb_l = plot(show_momentum ? mwb_lower : na, "MWB Lower",
+     color=color.new(bear_col,55), linewidth=1)
+plot(show_momentum ? mwb_basis : na, "MWB Mid",
+     color=mwb_bull ? color.new(bull_col,40) : color.new(bear_col,40), linewidth=1)
+fill(p_mwb_u, p_mwb_l,
+     color=mwb_bull ? color.new(bull_col,92) : color.new(bear_col,92))
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   CANDLESTICK STRUCTURES                                 ║
+// ║   Engulfing (E) · Pin Bar (P) · Star (S)                ║
+// ║   All filtered by volume activity + range size           ║
+// ╚══════════════════════════════════════════════════════════╝
+
+cs_body    = math.abs(close - open)
+cs_up_wick = high - math.max(close, open)
+cs_lo_wick = math.min(close, open) - low
+cs_range   = high - low
+avg_body   = ta.sma(cs_body,  10)   // literal ✓
+avg_range  = ta.sma(cs_range, 10)   // literal ✓
+
+vol_filt = volume  > vol20    * 0.8
+rng_filt = cs_range > avg_range * 0.75
+
+bull_engulf = close > open[1] and open < close[1]
+             and close > open and close[1] < open[1]
+             and cs_body > avg_body * 1.1
+             and vol_filt and rng_filt
+
+bear_engulf = close < open[1] and open > close[1]
+             and close < open and close[1] > open[1]
+             and cs_body > avg_body * 1.1
+             and vol_filt and rng_filt
+
+bull_pin = cs_lo_wick > cs_body  * 2.5
+          and cs_lo_wick > cs_up_wick * 2.5
+          and cs_range > avg_range * 0.8 and vol_filt
+
+bear_pin = cs_up_wick > cs_body  * 2.5
+          and cs_up_wick > cs_lo_wick * 2.5
+          and cs_range > avg_range * 0.8 and vol_filt
+
+bull_star = close[2] < open[2]
+           and cs_body[1] < avg_body[1] * 0.45
+           and close > open
+           and close > (open[2] + close[2]) * 0.5 and rng_filt
+
+bear_star = close[2] > open[2]
+           and cs_body[1] < avg_body[1] * 0.45
+           and close < open
+           and close < (open[2] + close[2]) * 0.5 and rng_filt
+
+bull_struct = bull_engulf or bull_pin or bull_star
+bear_struct = bear_engulf or bear_pin or bear_star
+
+cs_tag(eng, pin, star) => eng ? "E" : pin ? "P" : star ? "S" : "?"
+
+if show_candle_str and bull_struct
+    label.new(bar_index, low - atr14 * 0.35,
+         "▲ " + cs_tag(bull_engulf, bull_pin, bull_star),
+         color=color.new(bull_col,25), style=label.style_label_up,
+         textcolor=color.white, size=size.small)
+
+if show_candle_str and bear_struct
+    label.new(bar_index, high + atr14 * 0.35,
+         "▼ " + cs_tag(bear_engulf, bear_pin, bear_star),
+         color=color.new(bear_col,25), style=label.style_label_down,
+         textcolor=color.white, size=size.small)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   MAIN SIGNALS                                           ║
+// ║   Trend: SS crossover   Reversal: RSI/Stoch confluence   ║
+// ╚══════════════════════════════════════════════════════════╝
+
+trend_bull_x = ta.crossover(ss_fast,  ss_slow)
+trend_bear_x = ta.crossunder(ss_fast, ss_slow)
+
+rev_bull = ta.crossover(stoch_v,  20) and rsi_v < 48
+rev_bear = ta.crossunder(stoch_v, 80) and rsi_v > 52
+
+buy_signal  = signal_mode == "Trend" ? trend_bull_x : rev_bull
+sell_signal = signal_mode == "Trend" ? trend_bear_x : rev_bear
+
+var int sig_dir = 0
+if buy_signal
+    sig_dir := 1
+if sell_signal
+    sig_dir := -1
+
+plotshape(buy_signal,  "Buy Signal",  shape.labelup,   location.belowbar,
+     color=bull_col, text="◆", textcolor=color.white, size=size.normal)
+plotshape(sell_signal, "Sell Signal", shape.labeldown, location.abovebar,
+     color=bear_col, text="◆", textcolor=color.white, size=size.normal)
+
+alertcondition(buy_signal,  "MO Pro Buy",  "Market Oracle Pro: BUY signal")
+alertcondition(sell_signal, "MO Pro Sell", "Market Oracle Pro: SELL signal")
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   MAX PROFIT SIGNALS                                     ║
+// ║   Pivot divergence — catches potential tops & bottoms    ║
+// ╚══════════════════════════════════════════════════════════╝
+
+rsi14   = ta.rsi(close, 14)              // literal ✓
+ph      = ta.pivothigh(high, 5, 5)       // literals ✓
+pl      = ta.pivotlow(low,   5, 5)       // literals ✓
+hi20    = ta.highest(high, 20)
+lo20    = ta.lowest(low,   20)
+
+top_sig = not na(ph) and high[5] > hi20[1] and rsi14[5] < rsi14[10]
+bot_sig = not na(pl)  and low[5]  < lo20[1] and rsi14[5] > rsi14[10]
+
+if show_max_profit and top_sig
+    label.new(bar_index[5], high[5] + atr14 * 1.1, "★",
+         color=color.new(bear_col,10), style=label.style_label_down,
+         textcolor=color.white, size=size.large)
+
+if show_max_profit and bot_sig
+    label.new(bar_index[5], low[5] - atr14 * 1.1, "★",
+         color=color.new(bull_col,10), style=label.style_label_up,
+         textcolor=color.white, size=size.large)
+
+alertcondition(top_sig, "MO Pro: Max Profit Top",    "Market Oracle Pro: Potential TOP")
+alertcondition(bot_sig, "MO Pro: Max Profit Bottom", "Market Oracle Pro: Potential BOTTOM")
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   CANDLE COLORING                                        ║
+// ╚══════════════════════════════════════════════════════════╝
+
+trend_bull_c = sig_dir >= 0
+mom_str      = math.abs(ss_fast - ss_slow) / math.max(0.0001, atr14)
+grad_alpha   = math.max(10, math.min(75, math.round(75.0 - mom_str * 15.0)))
+
+final_bar_col = switch candle_mode
+    "Gradient" => trend_bull_c ?
+         color.new(bull_col, grad_alpha) :
+         color.new(bear_col, grad_alpha)
+    "Classic"  => close >= open ?
+         color.new(#26a69a, 0) : color.new(#ef5350, 0)
+    "Volume"   => nz(volume) > vol20 * 1.5 ?
+         (close >= open ? color.new(bull_col,0) : color.new(bear_col,0)) :
+         color.new(color.gray, 60)
+    => na
+
+barcolor(candle_mode != "None" ? final_bar_col : na)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   MARKET PROPHECY                                        ║
+// ║   LinReg projected 12 bars forward + deviation channels  ║
+// ╚══════════════════════════════════════════════════════════╝
+
+lr_val   = ta.linreg(close, 50, 0)          // literal ✓
+lr_slope = lr_val - ta.linreg(close, 50, 1)
+lr_dev   = ta.stdev(close, 50) * 1.618      // literal ✓
+
+proph_bull = lr_slope > 0
+proph_col  = proph_bull ? color.new(bull_col,50) : color.new(bear_col,50)
+
+if show_prophecy and barstate.islast
+    for i = 0 to 11
+        x1  = bar_index + i
+        x2  = bar_index + i + 1
+        y1m = lr_val + lr_slope * i
+        y2m = lr_val + lr_slope * (i + 1)
+        line.new(x1, y1m,          x2, y2m,
+             color=proph_col, width=2, style=line.style_dashed, extend=extend.none)
+        line.new(x1, y1m + lr_dev, x2, y2m + lr_dev,
+             color=color.new(proph_col,35), width=1, style=line.style_dotted, extend=extend.none)
+        line.new(x1, y1m - lr_dev, x2, y2m - lr_dev,
+             color=color.new(proph_col,35), width=1, style=line.style_dotted, extend=extend.none)
+        if i == 11
+            label.new(x2, y2m,
+                 (proph_bull ? "▲ " : "▼ ") + str.tostring(math.round(y2m, 2)),
+                 color=proph_col, style=label.style_label_left,
+                 textcolor=color.white, size=size.small)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   PRIME SCORE + CONSOLIDATION SCORE                      ║
+// ╚══════════════════════════════════════════════════════════╝
+
+[macd_l, _macd_s, _macd_h] = ta.macd(close, 12, 26, 9)   // literals ✓
+[_dip, _dim, adx_val]       = ta.dmi(14, 14)               // literals ✓
+
+sc_ss    = ss_fast > ss_slow           ? 1 : 0
+sc_rsi   = rsi14   > 50                ? 1 : 0
+sc_pta   = close   > pta_line          ? 1 : 0
+sc_vwap  = close   > vwap_val          ? 1 : 0
+sc_rct   = close   > rct_raw           ? 1 : 0
+sc_mwb   = close   > mwb_basis         ? 1 : 0
+sc_dir   = sig_dir > 0                 ? 1 : 0
+sc_ema20 = close   > ta.ema(close, 20) ? 1 : 0   // literal ✓
+sc_stch  = stoch_v > 50                ? 1 : 0
+sc_macd  = macd_l  > 0                 ? 1 : 0
+
+prime_score  = sc_ss + sc_rsi + sc_pta + sc_vwap + sc_rct +
+               sc_mwb + sc_dir + sc_ema20 + sc_stch + sc_macd
+
+consol_score = math.round((1.0 - math.min(1.0, adx_val / 50.0)) * 10)
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║   DASHBOARD                                              ║
+// ╚══════════════════════════════════════════════════════════╝
+
+f_bar(val, mx) =>
+    s = ""
+    filled = math.round(float(val))
+    for i = 1 to mx
+        s += i <= filled ? "█" : "░"
+    s
+
+txt_sz  = switch dash_size
+    "Tiny"  => size.tiny
+    "Small" => size.small
+    "Large" => size.large
+    =>         size.normal
+
+tbl_pos = switch dash_pos
+    "Top Left"     => position.top_left
+    "Bottom Right" => position.bottom_right
+    "Bottom Left"  => position.bottom_left
+    =>               position.top_right
+
+c_dark = color.new(#0d1117, 10)
+c_mid  = color.new(#111827, 20)
+c_dim  = color.new(color.white, 40)
+c_cyan = color.new(#00e5ff,  0)
+c_gold = color.new(#ffd700,  0)
+
+var table dash = table.new(tbl_pos, 2, 7,
+     bgcolor=color.new(#090d13, 5),
+     border_color=color.new(#1e2a3a, 0), border_width=1,
+     frame_color=color.new(#00e5ff, 55), frame_width=1)
+
+if show_dash and barstate.islast
+
+    table.cell(dash, 0, 0, "◈  MARKET ORACLE PRO",
+         bgcolor=color.new(#0b1120,0), text_color=c_cyan,
+         text_size=txt_sz, colspan=2)
+
+    // Signal Mode
+    table.cell(dash, 0, 1, "Mode", bgcolor=c_dark, text_color=c_dim, text_size=txt_sz)
+    table.cell(dash, 1, 1, signal_mode == "Trend" ? "▶ Trend" : "↺ Reversal",
+         bgcolor=c_dark,
+         text_color=signal_mode == "Trend" ? c_cyan : c_gold,
+         text_size=txt_sz)
+
+    // Optimal Tuning
+    tun_str = str.tostring(auto_max ? opt_len_disp : tuning) + (auto_max ? "  ✦ auto" : "")
+    table.cell(dash, 0, 2, "Optimal Tuning", bgcolor=c_mid, text_color=c_dim, text_size=txt_sz)
+    table.cell(dash, 1, 2, tun_str, bgcolor=c_mid, text_color=c_cyan, text_size=txt_sz)
+
+    // Prime Score
+    ps_col = prime_score >= 7 ? bull_col : prime_score <= 3 ? bear_col : c_gold
+    table.cell(dash, 0, 3, "Prime Score", bgcolor=c_dark, text_color=c_dim, text_size=txt_sz)
+    table.cell(dash, 1, 3,
+         str.tostring(prime_score) + "/10  " + f_bar(prime_score, 10),
+         bgcolor=c_dark, text_color=ps_col, text_size=txt_sz)
+
+    // Consolidation Score
+    cs_col = consol_score >= 7 ? c_gold : consol_score <= 3 ? color.new(bull_col,20) : c_dim
+    table.cell(dash, 0, 4, "Consolidation", bgcolor=c_mid, text_color=c_dim, text_size=txt_sz)
+    table.cell(dash, 1, 4,
+         str.tostring(consol_score) + "/10  " + f_bar(consol_score, 10),
+         bgcolor=c_mid, text_color=cs_col, text_size=txt_sz)
+
+    // Market Bias
+    bias_txt = prime_score >= 7 ? "▲  BULLISH" :
+               prime_score <= 3 ? "▼  BEARISH" : "◆  RANGING"
+    bias_col = prime_score >= 7 ? bull_col :
+               prime_score <= 3 ? bear_col : c_gold
+    table.cell(dash, 0, 5, "Market Bias", bgcolor=c_dark, text_color=c_dim, text_size=txt_sz)
+    table.cell(dash, 1, 5, bias_txt, bgcolor=c_dark, text_color=bias_col, text_size=txt_sz)
+
+    // ADX Trend Strength
+    adx_lbl = adx_val > 40 ? "Strong" : adx_val > 25 ? "Moderate" : "Weak"
+    adx_col = adx_val > 40 ? bull_col : adx_val > 25 ? c_gold : c_dim
+    table.cell(dash, 0, 6, "Trend Strength", bgcolor=c_mid, text_color=c_dim, text_size=txt_sz)
+    table.cell(dash, 1, 6,
+         adx_lbl + "  ADX:" + str.tostring(math.round(adx_val)),
+         bgcolor=c_mid, text_color=adx_col, text_size=txt_sz)

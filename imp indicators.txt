@@ -1,0 +1,59 @@
+Institutional Flow Momentum (IFM) (20, 20, 5) imp
+
+NMC ⚡ (close, 14, 5, 0.7, 0.01, 20, 20, 2, 20, 1.5, 5, 8, 0.25) imp
+
+Stealth Liquidity Cascade Engine [SLCE] (5, 15, 0.15, 0.3, 5, 0.15, 15, 80, 25, 25, 25, 25, 60, 20, 1.5)
+
+Volume Deviation Donchian (20, 10, 20)
+
+ILG (20, 5, 14, 1.5, 20, 1.5, 100, 3, 1.2)
+
+PEP 🔮 (hl2, 0.5, 0.05, 5, 20, 1.5, 20, 10, 0.35, 20, 3, 5, 0.25)
+
+NEoWave Pattern Analyzer [Trading Heights] (5, close, 0.15, 66,800, Bearish BELOW, Top Right, 14, 70, 30)
+
+Enhanced Pct Diff + Dual Donchian Strategy (close, 20, 10, 5, 20, 0, 20, 80, 50, 200, Dual EMA, 14, 20, Both, 20, 1, 5, 2) imp
+
+IVFT (Proportional (Close Position), 50,000, 50, 0.7, 20, 30, 2, 0.35, 14) imp
+
+Institutional Scalper Proprietary [Overlay] (1, 2, 3, 6, 50, 40, 0.02, 50, 0.3, 10, 0.3, 14, 4, 14, 2, 80, 80, 10)
+
+Connors RSI2 + VWAP Scalper [Research-Backed] (2, 5, 95, EMA, 200, 20, 14, 25, 1.5, 14, 1.5, 2, 5)
+
+VWAP·EMA·Scalp (1, 2, 9, 21, 50, 14, 65, 35, 20, 0.12, 14, 1, 1.5)
+
+MTE v2 (7, 3, 20, 3) (NMC-lite version)
+
+EMD 1m - LuxAlgo (100, 2, 14, 2, 50, 1.5)
+
+ICT SMC Pro (Breaker Block, 5, 10, 15, 0.5, 3, Top Right)
+
+Scalp Pro (VWAP Bounce, 30, 20, 1.5, 14, 40, 60, 0.5, 2, Top Right)
+
+ICT Pro (All Strategies, 5, 25, 0.05, 40, 20, 20, 5, 50, 80, Top Right)
+
+ICT AMD Masterclass (2000-0000, 0200-0500, 0830-1100)
+
+Percentage Diff with Donchian Channels and Table and Histogram V2 (close, 20, 10, 5, 20, 0, UTC) important
+
+percentage diff, take 2 indicators. chart tf is 15min, 1 diff indicator keep as it is, 2nd diff indicator change tf to 5min or 3min and see for trade oppurtunities
+
+
+looks great indicators
+-------------------
+
+Steath Liquidity
+
+percentage diff(my old 2channel indicator)
+
+SMC ELite
+
+Institutional Scalper Proprietary [Overlay] (1, 2, 3, 6, 50, 40, 0.02, 50, 0.3, 10, 0.3, 14, 4, 14, 2, 80, 80, 10)(main line looks good)
+
+MO Pro (Trend, 14, PnL, Gradient, Normal, Top Right, Standard, ) 
+//////////////////
+
+check 
+
+institutionalEdge
+emperor

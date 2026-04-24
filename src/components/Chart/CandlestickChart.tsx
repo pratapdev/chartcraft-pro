@@ -20,6 +20,8 @@ import { TPOOverlay } from './TPOOverlay';
 import { RiskRewardToolbar } from './RiskRewardToolbar';
 import { ImbalanceOverlay } from './ImbalanceOverlay';
 import { HTFOverlay } from './HTFOverlay';
+import { VCFOverlay } from './VCFOverlay';
+import { LiquidityHeatmapOverlay } from './LiquidityHeatmapOverlay';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export const CandlestickChart: React.FC = () => {
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
       layout: {
-        background: { color: '#0d1117' },
+        background: { type: 'solid', color: 'transparent' },
         textColor: '#6b7280',
         fontSize: chartFontSize,
         fontFamily: "'JetBrains Mono', monospace",
@@ -318,13 +320,15 @@ export const CandlestickChart: React.FC = () => {
 
 
   return (
-    <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
-      <div ref={containerRef} className="w-full h-full" />
+    <div className="relative w-full h-full bg-[#0d1117]" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
+      <LiquidityHeatmapOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <div ref={containerRef} className="absolute inset-0 w-full h-full pointer-events-auto" />
       <CrosshairLegend />
       <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TPOOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <HTFOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <VCFOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
       <RiskRewardToolbar />

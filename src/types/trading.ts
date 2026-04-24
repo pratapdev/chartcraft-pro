@@ -143,7 +143,7 @@ export interface AlertLog {
   price: number;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'TPO';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'TPO' | 'VOLUME_CHANNEL_FLOW' | 'LIQUIDITY_HEATMAP';
 
 export interface IndicatorConfig {
   id: string;
@@ -181,4 +181,20 @@ export interface IndicatorConfig {
   threshold?: number;
   /** IMBALANCE: minimum consecutive levels for stacked zone */
   minStack?: number;
+  /** VOLUME_CHANNEL_FLOW: Channel width multiplier for ATR */
+  channelWidth?: number;
+  /** VOLUME_CHANNEL_FLOW: Show breakouts */
+  breakouts?: boolean;
+  /** VOLUME_CHANNEL_FLOW: Show Volume Profile */
+  profile?: boolean;
+  /** VOLUME_CHANNEL_FLOW: Min line length for profile */
+  minLength?: number;
+  /** VOLUME_CHANNEL_FLOW: Color transparency for profile box (0-100) */
+  transparency?: number;
+  /** VOLUME_CHANNEL_FLOW: Show POC Line */
+  profPOC?: boolean;
+  /** LIQUIDITY_HEATMAP: Intensity multiplier */
+  heatmapIntensity?: number;
+  /** LIQUIDITY_HEATMAP: Color Scheme index */
+  heatmapColorScheme?: 'thermal' | 'ocean' | 'fire';
 }

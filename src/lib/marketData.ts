@@ -924,3 +924,218 @@ export function computeMsbOb(candles: Candle[], zigzagLen: number, fibFactor: nu
   result.zones = zones.filter(z => !z.broken);
   return result;
 }
+
+// ============= Volume Channel Flow (VCF) =============
+
+export interface VCFProfileBin {
+  price: number;
+  volume: number;
+}
+
+export interface VCFProfile {
+  startTime: number;
+  endTime: number;
+  startIndex: number;
+  endIndex: number;
+  top: number;
+  bot: number;
+  isBear: boolean;
+  pocPrice: number;
+  pocStartIndex: number;
+  bins: VCFProfileBin[];
+}
+
+export interface VolumeChannelFlowResult {
+  avgLine: { time: number; value: number; color: string }[];
+  topLine: { time: number; value: number; color: string }[];
+  botLine: { time: number; value: number; color: string }[];
+  breakouts: { time: number; price: number; direction: 'up' | 'down' }[];
+  profiles: VCFProfile[];
+}
+
+export function computeVolumeChannelFlow(
+  candles: Candle[],
+  channelWidth: number = 3,
+  minLength: number = 10
+): VolumeChannelFlowResult {
+  const result: VolumeChannelFlowResult = {
+    avgLine: [],
+    topLine: [],
+    botLine: [],
+    breakouts: [],
+    profiles: []
+  };
+
+  if (candles.length < 2) return result;
+
+  // Compute ATR 200
+  const tr: number[] = new Array(candles.length).fill(0);
+  for (let i = 1; i < candles.length; i++) {
+    tr[i] = Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close)
+    );
+  }
+
+  const atr: number[] = new Array(candles.length).fill(0);
+  let atrSum = 0;
+  for (let i = 1; i < candles.length; i++) {
+    if (i <= 200) {
+      atrSum += tr[i];
+      atr[i] = atrSum / i;
+    } else {
+      atr[i] = (atr[i - 1] * 199 + tr[i]) / 200;
+    }
+  }
+
+  let top = NaN;
+  let bot = NaN;
+  let trend = true;
+  let count = 0;
+  let startIdx = 1;
+
+  const topArr: number[] = new Array(candles.length).fill(NaN);
+  const botArr: number[] = new Array(candles.length).fill(NaN);
+  const avgArr: number[] = new Array(candles.length).fill(NaN);
+
+  for (let i = 1; i < candles.length; i++) {
+    const hl2 = (candles[i].high + candles[i].low) / 2;
+    const currentAtr = atr[i] * channelWidth;
+
+    if (i === 1) {
+      top = hl2 + currentAtr;
+      bot = hl2 - currentAtr;
+    } else {
+      if (candles[i].close > top) {
+        top = hl2 + currentAtr;
+        bot = hl2 - currentAtr;
+        trend = true;
+      } else if (candles[i].close < bot) {
+        top = hl2 + currentAtr;
+        bot = hl2 - currentAtr;
+        trend = false;
+      }
+    }
+
+    topArr[i] = top;
+    botArr[i] = bot;
+    const avg = (top + bot) / 2;
+    avgArr[i] = avg;
+
+    const prevAvg = avgArr[i - 1];
+
+    if (i > 1) {
+      if (avg === prevAvg) {
+        count++;
+      } else {
+        // Breakout!
+        const isUpBreakout = avg > prevAvg;
+        result.breakouts.push({
+          time: candles[i].time,
+          price: isUpBreakout ? botArr[i - 1] : topArr[i - 1],
+          direction: isUpBreakout ? 'up' : 'down'
+        });
+
+        // Check if we need to build a Volume Profile for the ended segment
+        if (count > minLength) {
+          buildProfile(candles, startIdx, i - 1, topArr[i - 1], botArr[i - 1], result.profiles);
+        }
+
+        // Reset
+        startIdx = i;
+        count = 0;
+      }
+    }
+
+    const color = trend ? '#22c55e' : '#ef4444'; // lime/red
+    result.avgLine.push({
+      time: candles[i].time,
+      value: Math.round(avg * 100) / 100,
+      color
+    });
+    result.topLine.push({
+      time: candles[i].time,
+      value: Math.round(top * 100) / 100,
+      color
+    });
+    result.botLine.push({
+      time: candles[i].time,
+      value: Math.round(bot * 100) / 100,
+      color
+    });
+  }
+
+  // Handle the active (unfinished) profile at the end
+  if (count > minLength) {
+    buildProfile(candles, startIdx, candles.length - 1, top, bot, result.profiles);
+  }
+
+  return result;
+}
+
+function buildProfile(
+  candles: Candle[],
+  startIdx: number,
+  endIdx: number,
+  top: number,
+  bot: number,
+  profiles: VCFProfile[]
+) {
+  const BINS = 30;
+  const step = (top - bot) / BINS;
+  if (step <= 0) return;
+
+  const vols = new Array(BINS).fill(0);
+  const deltas = new Array(BINS).fill(0);
+
+  for (let k = startIdx; k <= endIdx; k++) {
+    const c = candles[k];
+    for (let i = 0; i < BINS; i++) {
+      const mid = bot + step * i + step / 2;
+      if (Math.abs(c.close - mid) <= step) {
+        vols[i] += c.volume;
+        deltas[i] += c.close > c.open ? c.volume : -c.volume;
+      }
+    }
+  }
+
+  let totalDelta = 0;
+  let maxVol = 0;
+  let pocIdx = -1;
+
+  for (let i = 0; i < BINS; i++) {
+    totalDelta += deltas[i];
+    if (vols[i] > maxVol) {
+      maxVol = vols[i];
+      pocIdx = i;
+    }
+  }
+
+  const isBear = totalDelta <= 0;
+  const pocPrice = pocIdx >= 0 ? bot + step * pocIdx + step / 2 : NaN;
+
+  const maxVisualLength = Math.floor((endIdx - startIdx) / 2);
+  const pocStartIndex = maxVol > 0 ? startIdx + Math.floor((vols[pocIdx] / maxVol) * maxVisualLength) + 1 : startIdx;
+
+  const bins: VCFProfileBin[] = [];
+  for (let i = 0; i < BINS; i++) {
+    bins.push({
+      price: bot + step * i + step / 2,
+      volume: vols[i]
+    });
+  }
+
+  profiles.push({
+    startTime: candles[startIdx].time,
+    endTime: candles[endIdx].time,
+    startIndex: startIdx,
+    endIndex: endIdx,
+    top,
+    bot,
+    isBear,
+    pocPrice,
+    pocStartIndex,
+    bins
+  });
+}

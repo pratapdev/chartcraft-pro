@@ -26,6 +26,8 @@ const INDICATOR_PRESETS: { type: IndicatorType; label: string; defaults: Partial
   { type: 'MSB_OB', label: 'MSB & Order Blocks', defaults: { period: 9, color: '#22c55e', color2: '#ef4444', zigzagLength: 9, fibFactor: 0.33 } },
   { type: 'VPVR', label: 'Volume Profile (VPVR)', defaults: { period: 1, color: '#26a69a' } },
   { type: 'IMBALANCE', label: 'Imbalance Detection', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
+  { type: 'VOLUME_CHANNEL_FLOW', label: 'Volume Channel Flow', defaults: { period: 1, channelWidth: 3, breakouts: true, profile: true, minLength: 10, transparency: 65, profPOC: true } },
+  { type: 'LIQUIDITY_HEATMAP', label: 'Forward-Looking Heatmap', defaults: { period: 1, color: '#000000', heatmapIntensity: 1, heatmapColorScheme: 'thermal', transparency: 60 } },
 ];
 
 const IndicatorRow: React.FC<{
@@ -182,28 +184,98 @@ const IndicatorRow: React.FC<{
               />
             </div>
           )}
-          {ind.type === 'IMBALANCE' && (
+
+          {ind.type === 'VOLUME_CHANNEL_FLOW' && (
             <>
               <div className="flex items-center justify-between">
-                <label className="text-muted-foreground">Threshold (x)</label>
+                <label className="text-muted-foreground">Channel Width</label>
                 <input
                   type="number"
-                  min={1.5}
+                  min={1}
                   max={10}
                   step={0.5}
-                  value={ind.threshold ?? 3}
-                  onChange={(e) => handleUpdate(ind.id, { threshold: Math.max(1.5, parseFloat(e.target.value) || 3) })}
+                  value={ind.channelWidth ?? 3}
+                  onChange={(e) => handleUpdate(ind.id, { channelWidth: Math.max(1, parseFloat(e.target.value) || 3) })}
                   className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
                 />
               </div>
               <div className="flex items-center justify-between">
-                <label className="text-muted-foreground">Min Stack</label>
+                <label className="text-muted-foreground">Min Profile Length</label>
                 <input
                   type="number"
                   min={2}
+                  max={100}
+                  step={1}
+                  value={ind.minLength ?? 10}
+                  onChange={(e) => handleUpdate(ind.id, { minLength: Math.max(2, parseInt(e.target.value) || 10) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Breakouts</label>
+                <button
+                  onClick={() => handleUpdate(ind.id, { breakouts: !(ind.breakouts ?? true) })}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${(ind.breakouts ?? true) ? 'bg-primary' : 'bg-accent'}`}
+                >
+                  <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.breakouts ?? true) ? 'left-4' : 'left-0.5'}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Volume Profile</label>
+                <button
+                  onClick={() => handleUpdate(ind.id, { profile: !(ind.profile ?? true) })}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${(ind.profile ?? true) ? 'bg-primary' : 'bg-accent'}`}
+                >
+                  <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.profile ?? true) ? 'left-4' : 'left-0.5'}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Profile POC</label>
+                <button
+                  onClick={() => handleUpdate(ind.id, { profPOC: !(ind.profPOC ?? true) })}
+                  className={`w-8 h-4 rounded-full transition-colors relative ${(ind.profPOC ?? true) ? 'bg-primary' : 'bg-accent'}`}
+                >
+                  <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.profPOC ?? true) ? 'left-4' : 'left-0.5'}`} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {ind.type === 'LIQUIDITY_HEATMAP' && (
+            <>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Intensity Multiplier</label>
+                <input
+                  type="number"
+                  min={0.1}
                   max={10}
-                  value={ind.minStack ?? 3}
-                  onChange={(e) => handleUpdate(ind.id, { minStack: Math.max(2, parseInt(e.target.value) || 3) })}
+                  step={0.1}
+                  value={ind.heatmapIntensity ?? 1}
+                  onChange={(e) => handleUpdate(ind.id, { heatmapIntensity: Math.max(0.1, parseFloat(e.target.value) || 1) })}
+                  className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Color Scheme</label>
+                <select
+                  value={ind.heatmapColorScheme ?? 'thermal'}
+                  onChange={(e) => handleUpdate(ind.id, { heatmapColorScheme: e.target.value as any })}
+                  className="w-16 bg-accent text-foreground text-xs px-1 rounded outline-none text-right"
+                >
+                  <option value="thermal">Thermal</option>
+                  <option value="ocean">Ocean</option>
+                  <option value="fire">Fire</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-muted-foreground">Base Transparency %</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={ind.transparency ?? 60}
+                  onChange={(e) => handleUpdate(ind.id, { transparency: Math.max(0, parseInt(e.target.value) || 60) })}
                   className="w-16 bg-accent text-foreground text-xs px-2 py-1 rounded outline-none text-right"
                 />
               </div>
@@ -1001,6 +1073,12 @@ export const RightSidebar: React.FC = () => {
       donLineDiff: (preset.defaults as any).donLineDiff,
       zigzagLength: (preset.defaults as any).zigzagLength,
       fibFactor: (preset.defaults as any).fibFactor,
+      channelWidth: (preset.defaults as any).channelWidth,
+      breakouts: (preset.defaults as any).breakouts,
+      profile: (preset.defaults as any).profile,
+      minLength: (preset.defaults as any).minLength,
+      transparency: (preset.defaults as any).transparency,
+      profPOC: (preset.defaults as any).profPOC,
     };
     if (multiTfMode) {
       addPanelIndicator(activePanelIndex, config);

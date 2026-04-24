@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Market Oracle Pro — Indicator Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #050810;
+  --bg2:      #080d18;
+  --bg3:      #0d1525;
+  --border:   #1a2540;
+  --cyan:     #00e5ff;
+  --cyan2:    #00b4cc;
+  --red:      #ff1744;
+  --gold:     #ffd700;
+  --white:    #e8edf5;
+  --dim:      #5a6a88;
+  --dim2:     #8a9ab8;
+  --green:    #00e676;
+  --font-mono: 'Space Mono', monospace;
+  --font-sans: 'Syne', sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Scanline overlay ── */
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,229,255,0.015) 2px, rgba(0,229,255,0.015) 4px
+  );
+  pointer-events:none;
+  z-index:1000;
+}
+
+/* ── Grid bg ── */
+body::after {
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none;
+  z-index:0;
+}
+
+.wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:0 24px 80px; }
+
+/* ── HERO ── */
+.hero {
+  padding: 60px 0 40px;
+  text-align: center;
+}
+.hero-badge {
+  display:inline-block;
+  font-family: var(--font-mono);
+  font-size:10px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,255,0.3);
+  padding: 5px 14px;
+  border-radius: 2px;
+  margin-bottom: 20px;
+  background: rgba(0,229,255,0.05);
+}
+.hero h1 {
+  font-size: clamp(28px,6vw,62px);
+  font-weight:800;
+  line-height:1.05;
+  letter-spacing:-1px;
+  background: linear-gradient(135deg, var(--white) 30%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 14px;
+}
+.hero-sub {
+  color: var(--dim2);
+  font-size: 15px;
+  max-width: 560px;
+  margin: 0 auto 32px;
+  line-height:1.7;
+  font-family: var(--font-mono);
+}
+.hero-tags {
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+}
+.tag {
+  font-family: var(--font-mono);
+  font-size:11px;
+  padding:4px 12px;
+  border-radius:2px;
+  letter-spacing:1px;
+}
+.tag-cyan { background:rgba(0,229,255,0.1); color:var(--cyan); border:1px solid rgba(0,229,255,0.2); }
+.tag-red  { background:rgba(255,23,68,0.1);  color:var(--red);  border:1px solid rgba(255,23,68,0.2); }
+.tag-gold { background:rgba(255,215,0,0.1);  color:var(--gold); border:1px solid rgba(255,215,0,0.2); }
+.tag-dim  { background:rgba(255,255,255,0.04); color:var(--dim2); border:1px solid var(--border); }
+
+/* ── NAV tabs ── */
+.nav-tabs {
+  display:flex; gap:2px; margin:40px 0 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x:auto;
+}
+.nav-tab {
+  font-family:var(--font-mono); font-size:11px; letter-spacing:1.5px;
+  text-transform:uppercase; padding:10px 18px; cursor:pointer;
+  background:none; border:none; color:var(--dim2);
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition: all .2s; white-space:nowrap;
+}
+.nav-tab:hover { color:var(--cyan); }
+.nav-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); background:rgba(0,229,255,0.04); }
+
+/* ── Panels ── */
+.panel { display:none; padding: 36px 0; animation: fadeUp .3s ease; }
+.panel.active { display:block; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Section title ── */
+.sec-title {
+  font-size:11px; font-family:var(--font-mono); letter-spacing:3px;
+  text-transform:uppercase; color:var(--cyan); margin-bottom:24px;
+  display:flex; align-items:center; gap:12px;
+}
+.sec-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── Grid layouts ── */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+@media(max-width:700px){ .grid-2,.grid-3{ grid-template-columns:1fr; } }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius:4px;
+  padding:20px;
+  transition: border-color .2s, background .2s;
+  position:relative; overflow:hidden;
+}
+.card::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg, rgba(0,229,255,0.03) 0%, transparent 60%);
+  pointer-events:none;
+}
+.card:hover { border-color: rgba(0,229,255,0.3); background:var(--bg3); }
+.card-icon { font-size:22px; margin-bottom:10px; }
+.card-title {
+  font-size:13px; font-weight:600; color:var(--white);
+  margin-bottom:6px; letter-spacing:.5px;
+}
+.card-body { font-size:12px; color:var(--dim2); line-height:1.7; font-family:var(--font-mono); }
+.card-badge {
+  display:inline-block; font-size:9px; font-family:var(--font-mono);
+  letter-spacing:1.5px; text-transform:uppercase;
+  padding:2px 8px; border-radius:2px; margin-bottom:10px;
+}
+.cb-cyan { background:rgba(0,229,255,0.1); color:var(--cyan); }
+.cb-red  { background:rgba(255,23,68,0.1);  color:var(--red);  }
+.cb-gold { background:rgba(255,215,0,0.1);  color:var(--gold); }
+
+/* ── Signal card ── */
+.signal-row {
+  display:flex; align-items:flex-start; gap:14px;
+  padding:14px; border:1px solid var(--border);
+  border-radius:4px; background:var(--bg2); margin-bottom:12px;
+  transition: border-color .2s;
+}
+.signal-row:hover { border-color:rgba(0,229,255,0.25); }
+.signal-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px;
+}
+.sd-buy  { background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+.sd-sell { background:var(--red);  box-shadow:0 0 8px var(--red); }
+.sd-star { background:var(--gold); box-shadow:0 0 8px var(--gold); }
+.signal-title { font-size:13px; font-weight:600; color:var(--white); margin-bottom:4px; }
+.signal-desc  { font-size:12px; color:var(--dim2); font-family:var(--font-mono); line-height:1.6; }
+
+/* ── Settings table ── */
+.settings-block { margin-bottom:32px; }
+.settings-block h3 {
+  font-size:12px; font-family:var(--font-mono); letter-spacing:2px;
+  text-transform:uppercase; color:var(--cyan); margin-bottom:12px;
+  padding-bottom:8px; border-bottom:1px solid var(--border);
+}
+.setting-row {
+  display:grid; grid-template-columns:200px 1fr 160px;
+  gap:12px; padding:10px 0; border-bottom:1px solid rgba(26,37,64,0.5);
+  align-items:start;
+}
+@media(max-width:700px){ .setting-row{ grid-template-columns:1fr; } }
+.setting-name {
+  font-family:var(--font-mono); font-size:12px; color:var(--cyan2);
+}
+.setting-desc { font-family:var(--font-mono); font-size:11px; color:var(--dim2); line-height:1.6; }
+.setting-default {
+  font-family:var(--font-mono); font-size:11px;
+  color:var(--gold); text-align:right;
+}
+@media(max-width:700px){ .setting-default{ text-align:left; } }
+
+/* ── Setup cards ── */
+.setup-card {
+  border:1px solid var(--border); border-radius:4px;
+  background:var(--bg2); overflow:hidden; margin-bottom:16px;
+}
+.setup-header {
+  padding:14px 18px; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between;
+  transition: background .2s;
+}
+.setup-header:hover { background:var(--bg3); }
+.setup-header-left { display:flex; align-items:center; gap:12px; }
+.setup-num {
+  font-family:var(--font-mono); font-size:10px;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--cyan); color:var(--cyan);
+}
+.setup-title { font-size:14px; font-weight:600; }
+.setup-tag   { font-size:11px; font-family:var(--font-mono); color:var(--dim2); }
+.setup-arrow { color:var(--dim2); transition:transform .2s; font-size:14px; }
+.setup-card.open .setup-arrow { transform:rotate(180deg); }
+.setup-body {
+  display:none; padding:18px; border-top:1px solid var(--border);
+  background:var(--bg);
+}
+.setup-card.open .setup-body { display:block; }
+.setup-steps { list-style:none; }
+.setup-steps li {
+  padding:8px 0; padding-left:22px; position:relative;
+  font-family:var(--font-mono); font-size:12px; color:var(--dim2);
+  line-height:1.7; border-bottom:1px solid rgba(26,37,64,0.4);
+}
+.setup-steps li:last-child { border:none; }
+.setup-steps li::before {
+  content:attr(data-n); position:absolute; left:0; top:9px;
+  font-size:10px; color:var(--cyan); font-weight:700;
+}
+.highlight { color:var(--white); }
+.hl-cyan   { color:var(--cyan); }
+.hl-red    { color:var(--red);  }
+.hl-gold   { color:var(--gold); }
+
+/* ── Dashboard preview ── */
+.dash-preview {
+  background: #090d13;
+  border: 1px solid rgba(0,229,255,0.55);
+  border-radius:4px; padding:0; overflow:hidden;
+  max-width:340px; font-family:var(--font-mono);
+}
+.dash-header {
+  background:#0b1120; padding:8px 14px;
+  color:var(--cyan); font-size:12px; letter-spacing:1px;
+  border-bottom:1px solid rgba(0,229,255,0.2);
+}
+.dash-row {
+  display:flex; border-bottom:1px solid rgba(26,37,64,0.6);
+}
+.dash-row:last-child { border:none; }
+.dash-key, .dash-val {
+  padding:7px 12px; font-size:11px;
+}
+.dash-key { flex:0 0 130px; color:rgba(255,255,255,0.4); background:#0d1117; }
+.dash-val { flex:1; }
+.dv-cyan { color:var(--cyan); }
+.dv-bull { color:#00e5ff; }
+.dv-bear { color:#ff1744; }
+.dv-gold { color:var(--gold); }
+.dv-dim  { color:var(--dim2); }
+.score-bar { letter-spacing:-1px; }
+
+/* ── Score meter ── */
+.score-meter {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:4px; padding:20px; margin-bottom:16px;
+}
+.score-label {
+  font-family:var(--font-mono); font-size:11px; color:var(--dim2);
+  margin-bottom:8px; display:flex; justify-content:space-between;
+}
+.score-track {
+  height:6px; background:rgba(255,255,255,0.06); border-radius:3px;
+  overflow:hidden; margin-bottom:6px;
+}
+.score-fill {
+  height:100%; border-radius:3px; transition: width 1s ease;
+}
+.sf-bull { background: linear-gradient(90deg,var(--cyan2),var(--cyan)); }
+.sf-bear { background: linear-gradient(90deg,#cc0033,var(--red)); }
+.sf-gold { background: linear-gradient(90deg,#cc9900,var(--gold)); }
+.score-hint { font-family:var(--font-mono); font-size:10px; color:var(--dim2); }
+
+/* ── Simulation slider ── */
+.sim-block {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:4px; padding:22px;
+}
+.sim-label { font-family:var(--font-mono); font-size:11px; color:var(--dim2); margin-bottom:6px; }
+.sim-slider {
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:4px; border-radius:2px;
+  background:linear-gradient(90deg, var(--cyan) 0%, rgba(255,255,255,0.1) 0%);
+  outline:none; margin-bottom:14px; cursor:pointer;
+}
+.sim-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; width:14px; height:14px;
+  background:var(--cyan); border-radius:50%; cursor:pointer;
+  box-shadow:0 0 6px var(--cyan);
+}
+.sim-output {
+  font-family:var(--font-mono); font-size:12px;
+  color:var(--white); line-height:1.8;
+}
+.sim-row { display:flex; justify-content:space-between; border-bottom:1px solid rgba(26,37,64,0.5); padding:4px 0; }
+.sim-row:last-child { border:none; }
+
+/* ── Fix log ── */
+.fix-log {
+  background:var(--bg2); border:1px solid var(--border);
+  border-left:3px solid var(--cyan); border-radius:4px;
+  padding:18px; margin-bottom:14px;
+}
+.fix-log h4 { font-size:12px; color:var(--cyan); font-family:var(--font-mono); margin-bottom:8px; }
+.fix-log p  { font-size:11px; font-family:var(--font-mono); color:var(--dim2); line-height:1.7; }
+.fix-err { color:var(--red); }
+.fix-ok  { color:var(--green); }
+
+/* ── Code block ── */
+.code-block {
+  background:#030508; border:1px solid var(--border);
+  border-radius:4px; padding:16px; overflow-x:auto;
+  font-family:var(--font-mono); font-size:11px;
+  line-height:1.8; margin-bottom:14px;
+}
+.c-comment { color:#3d5080; }
+.c-kw      { color:#ff79c6; }
+.c-fn      { color:var(--cyan); }
+.c-str     { color:#f1fa8c; }
+.c-num     { color:var(--gold); }
+.c-var     { color:#bd93f9; }
+
+/* ── Inline code ── */
+code {
+  background:rgba(0,229,255,0.08); color:var(--cyan);
+  font-family:var(--font-mono); font-size:11px;
+  padding:2px 6px; border-radius:2px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+::-webkit-scrollbar-thumb:hover { background:var(--dim); }
+
+/* ── Responsive ── */
+@media(max-width:500px){
+  .nav-tab { font-size:9px; padding:8px 10px; }
+  .hero h1 { font-size:28px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ══ HERO ══ -->
+  <div class="hero">
+    <div class="hero-badge">Pine Script v5 · Educational Replica</div>
+    <h1>Market Oracle Pro</h1>
+    <p class="hero-sub">
+      A full-featured multi-system trading indicator using DSP-grade filtering,
+      adaptive scoring, and confluence-based signals.
+    </p>
+    <div class="hero-tags">
+      <span class="tag tag-cyan">Overlay</span>
+      <span class="tag tag-cyan">Auto Maximizer</span>
+      <span class="tag tag-red">Trend + Reversal</span>
+      <span class="tag tag-gold">10-Point Scoring</span>
+      <span class="tag tag-dim">Multi-Timeframe</span>
+      <span class="tag tag-dim">VWAP + DSP</span>
+    </div>
+  </div>
+
+  <!-- ══ NAV ══ -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('overview',this)">Overview</button>
+    <button class="nav-tab" onclick="switchTab('components',this)">Components</button>
+    <button class="nav-tab" onclick="switchTab('signals',this)">Signals</button>
+    <button class="nav-tab" onclick="switchTab('settings',this)">Settings</button>
+    <button class="nav-tab" onclick="switchTab('setups',this)">Trade Setups</button>
+    <button class="nav-tab" onclick="switchTab('dashboard',this)">Dashboard</button>
+    <button class="nav-tab" onclick="switchTab('fixes',this)">Fix Log</button>
+  </div>
+
+  <!-- ══════════════════════════ PANEL: OVERVIEW ══════════════════════════ -->
+  <div id="panel-overview" class="panel active">
+    <div class="sec-title">What is Market Oracle Pro?</div>
+
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-icon">🧠</div>
+        <div class="card-title">Intelligence Layer</div>
+        <div class="card-body">
+          Combines 10 sub-systems — each measuring a different aspect of market structure —
+          into a single Prime Score (0–10) and a live Market Bias readout.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔊</div>
+        <div class="card-title">Audio-DSP Filtering</div>
+        <div class="card-body">
+          Built around Ehlers' 2-pole Super Smoother, a low-pass filter borrowed from
+          signal processing. Removes market noise with far less lag than EMA or SMA.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <div class="card-title">Auto Maximizer</div>
+        <div class="card-body">
+          Evaluates 4 candidate tuning lengths (10, 14, 20, 28) every bar over a
+          50-bar window. Automatically applies whichever maximises PnL or Win Rate.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📡</div>
+        <div class="card-title">Market Prophecy</div>
+        <div class="card-body">
+          Projects a linear regression channel 12 bars into the future with
+          1.618-scaled deviation bands, giving a statistical view of next likely price range.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-title" style="margin-top:32px;">Architecture</div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:22px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--dim2);line-height:2.2;">
+        <span class="hl-cyan">INPUT</span> → Tuning length (manual) or <span class="hl-gold">Auto Maximizer</span> (4-candidate PnL/WinRate scorer)
+        <br>↓
+        <br><span class="hl-cyan">DSP CORE</span> → Ehlers Super Smoother at each candidate length → fast/slow crossover pairs
+        <br>↓
+        <br><span class="hl-cyan">SIGNAL ENGINE</span> → Trend mode (SS crossover) OR Reversal mode (RSI × Stochastic confluence)
+        <br>↓
+        <br><span class="hl-cyan">OVERLAY LAYERS</span> → Prime Trend Assistant · Dynamic Reactor · VWAP Ranges · Momentum Bands
+        <br>↓
+        <br><span class="hl-cyan">STRUCTURE LAYER</span> → Candlestick patterns (E/P/S) + Max Profit pivot divergence (★)
+        <br>↓
+        <br><span class="hl-cyan">SCORING</span> → 10-point Prime Score + Consolidation Score (ADX-based) → Market Bias
+        <br>↓
+        <br><span class="hl-cyan">OUTPUT</span> → Dashboard table · Candle coloring · Prophecy projection · Alerts
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ PANEL: COMPONENTS ══════════════════════════ -->
+  <div id="panel-components" class="panel">
+    <div class="sec-title">All 9 Sub-Systems</div>
+    <div class="grid-2">
+
+      <div class="card">
+        <div class="card-badge cb-cyan">DSP FILTER</div>
+        <div class="card-title">Ehlers Super Smoother</div>
+        <div class="card-body">
+          2-pole IIR (infinite impulse response) low-pass filter. Coefficients derived
+          from pole angle and decay rate at the chosen cutoff period.
+          Eliminates high-frequency noise while preserving trend inflections.
+          Used as the primary oscillator backbone for all signals.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-cyan">TREND LINE</div>
+        <div class="card-title">Prime Trend Assistant</div>
+        <div class="card-body">
+          Supertrend-style adaptive S/R built on the slow Super Smoother + ATR envelope.
+          Direction locks like a ratchet — only flips when price closes beyond the band.
+          Acts as a dynamic trailing stop and bias filter. Green = bullish, Red = bearish.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-cyan">BAND</div>
+        <div class="card-title">Dynamic Reactor</div>
+        <div class="card-body">
+          An adaptive band built around the active Super Smoother baseline.
+          In <code>Volume Flex</code> mode the band width scales with relative volume — 
+          widens on high volume, contracts on low. Supports MTF via timeframe input.
+          Fill turns cyan/red to show trend direction at a glance.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-gold">S/R ZONES</div>
+        <div class="card-title">Prime Ranges (VWAP)</div>
+        <div class="card-body">
+          Session-resetting VWAP with live ±1σ and ±2σ standard deviation bands.
+          Computed from cumulative volume-weighted price variance — the true statistical
+          distribution of price around fair value. ±2σ zones = high-probability reversal areas.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-cyan">VOLATILITY</div>
+        <div class="card-title">Momentum Wave Bands</div>
+        <div class="card-body">
+          Wide Bollinger-style envelope (EMA basis + 2.5σ) at the active tuning length.
+          Touching the outer bands signals potential exhaustion. Band fill tracks trend direction.
+          Basis line = dynamic mean-reversion reference.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-gold">PATTERN</div>
+        <div class="card-title">Candlestick Structures</div>
+        <div class="card-body">
+          Three filtered patterns — <strong class="hl-cyan">E</strong>ngulfing,
+          <strong class="hl-cyan">P</strong>in Bar, <strong class="hl-cyan">S</strong>tar (3-candle).
+          Each requires body size, range size, and volume to exceed moving averages.
+          Labels appear below/above bar with pattern type code.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-red">EXTREMES</div>
+        <div class="card-title">Max Profit Signals ★</div>
+        <div class="card-body">
+          Pivot high/low detection (5-bar) validated by RSI divergence.
+          Bearish divergence at HH → ★ top. Bullish divergence at LL → ★ bottom.
+          Fires 5 bars after the pivot, once confirmation exists.
+          Ideal for partial profit-taking or reversal entries.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-cyan">PROJECTION</div>
+        <div class="card-title">Market Prophecy</div>
+        <div class="card-body">
+          50-bar linear regression projected 12 bars forward. Slope determines direction.
+          Deviation channels scaled by 1.618 (golden ratio) provide confidence range.
+          Redraws on every bar — look at the current projection only, not historical ones.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-badge cb-gold">CANDLES</div>
+        <div class="card-title">Candle Coloring</div>
+        <div class="card-body">
+          <strong>Gradient</strong>: cyan/red with alpha tied to momentum strength — 
+          vivid = strong trend, faded = weak.<br>
+          <strong>Classic</strong>: green/red OHLC.<br>
+          <strong>Volume</strong>: vivid on above-avg volume bars, gray on low-vol bars.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ PANEL: SIGNALS ══════════════════════════ -->
+  <div id="panel-signals" class="panel">
+    <div class="sec-title">Signal Types</div>
+
+    <div class="signal-row">
+      <div class="signal-dot sd-buy"></div>
+      <div>
+        <div class="signal-title">◆ Buy (Trend Mode)</div>
+        <div class="signal-desc">
+          Fires when the <span class="hl-cyan">fast Super Smoother crosses above the slow</span>.
+          Fast = tuning length. Slow = 2× tuning. The crossover is a low-lag proxy for
+          momentum direction change, equivalent to a zero-lag MACD crossover but smoother.
+          Works best on trending instruments.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row">
+      <div class="signal-dot sd-sell"></div>
+      <div>
+        <div class="signal-title">◆ Sell (Trend Mode)</div>
+        <div class="signal-desc">
+          Fires when the <span class="hl-red">fast Super Smoother crosses below the slow</span>.
+          Use this to enter short or exit long positions. In trending markets, signals
+          are clean and infrequent. Higher tuning = fewer, stronger signals.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row">
+      <div class="signal-dot sd-buy"></div>
+      <div>
+        <div class="signal-title">◆ Buy (Reversal Mode)</div>
+        <div class="signal-desc">
+          Stochastic crosses above 20 <span class="hl-cyan">AND</span> RSI is below 48.
+          Both conditions must be true simultaneously — this confluence prevents firing
+          in mid-trend dips and focuses on true oversold reversals.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row">
+      <div class="signal-dot sd-sell"></div>
+      <div>
+        <div class="signal-title">◆ Sell (Reversal Mode)</div>
+        <div class="signal-desc">
+          Stochastic crosses below 80 <span class="hl-red">AND</span> RSI is above 52.
+          Best used at VWAP ±2σ band touches or Momentum Wave Band extremes for
+          maximum-probability reversal confluence.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row">
+      <div class="signal-dot sd-star"></div>
+      <div>
+        <div class="signal-title">★ Max Profit Top / Bottom</div>
+        <div class="signal-desc">
+          Gold star labels mark pivot divergence points.
+          <span class="hl-red">Top ★</span>: price made new high but RSI didn't → trend exhaustion.
+          <span class="hl-cyan">Bottom ★</span>: price made new low but RSI recovered → selling exhaustion.
+          These are profit-taking zones or reversal entry zones, not primary signals.
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px;">
+      <div class="sec-title">Candlestick Structure Labels</div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-badge cb-cyan">E — ENGULFING</div>
+          <div class="card-body">
+            Current candle completely engulfs previous body. Body must exceed 10-bar average.
+            Volume and range filters applied.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-badge cb-gold">P — PIN BAR</div>
+          <div class="card-body">
+            Shadow is 2.5× the body and 2.5× the opposite shadow.
+            Signals strong rejection of a price level. Volume filter required.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-badge cb-red">S — STAR</div>
+          <div class="card-body">
+            3-candle structure: strong candle → tiny indecision candle → reversal candle.
+            Middle candle must be &lt;45% of average body size.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ PANEL: SETTINGS ══════════════════════════ -->
+  <div id="panel-settings" class="panel">
+
+    <div class="settings-block">
+      <h3>Signal Settings</h3>
+      <div class="setting-row">
+        <div class="setting-name">Signal Mode</div>
+        <div class="setting-desc">
+          <strong class="highlight">Trend</strong>: Super Smoother crossover — follow directional moves.<br>
+          <strong class="highlight">Reversal</strong>: RSI × Stochastic confluence — catch turning points.
+        </div>
+        <div class="setting-default">Default: Trend</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Tuning</div>
+        <div class="setting-desc">
+          Base period for the fast Super Smoother. Slow = 2×.
+          Lower = more signals, higher noise. Higher = fewer, cleaner signals.
+          Only used when Auto Maximizer is OFF.
+        </div>
+        <div class="setting-default">Default: 14</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Auto Maximizer</div>
+        <div class="setting-desc">
+          When ON, tests lengths 10, 14, 20, 28 every bar over 50-bar window.
+          Picks the winner by PnL sum or Win Rate. Updates dynamically as market regime changes.
+        </div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Optimize For</div>
+        <div class="setting-desc">
+          <strong class="highlight">PnL</strong>: maximise total return from signals over window.<br>
+          <strong class="highlight">WinRate</strong>: maximise hit rate (% of profitable signals).
+          Use PnL for trending markets, WinRate for ranging/choppy markets.
+        </div>
+        <div class="setting-default">Default: PnL</div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Candle Coloring</h3>
+      <div class="setting-row">
+        <div class="setting-name">Mode</div>
+        <div class="setting-desc">
+          <strong class="highlight">Gradient</strong>: alpha-scaled by momentum strength — best visual read on trend conviction.<br>
+          <strong class="highlight">Classic</strong>: standard green/red OHLC bars.<br>
+          <strong class="highlight">Volume</strong>: vivid color on high-volume bars only, gray on low-vol.<br>
+          <strong class="highlight">None</strong>: disable to keep your chart's default candle color.
+        </div>
+        <div class="setting-default">Default: Gradient</div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Dynamic Reactor</h3>
+      <div class="setting-row">
+        <div class="setting-name">Dynamic Reactor</div>
+        <div class="setting-desc">Show/hide the adaptive reactor band.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Reactor Type</div>
+        <div class="setting-desc">
+          <strong class="highlight">Standard</strong>: fixed ATR-based band width.<br>
+          <strong class="highlight">Volume Flex</strong>: band width scales with relative volume ratio.
+          High volume → wider band (acknowledges noise). Low volume → tighter band.
+        </div>
+        <div class="setting-default">Default: Standard</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Reactor Timeframe</div>
+        <div class="setting-desc">
+          Leave blank to use the chart's timeframe. Enter a higher timeframe (e.g. <code>60</code> for 1H)
+          to show the reactor from a higher context. Useful for intraday traders who want
+          the daily or 4H reactor drawn on a 15m chart.
+        </div>
+        <div class="setting-default">Default: (blank)</div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Additional Features (Toggles)</h3>
+      <div class="setting-row">
+        <div class="setting-name">Prime Ranges (VWAP)</div>
+        <div class="setting-desc">Session VWAP + ±1σ/±2σ standard deviation bands. Resets at midnight UTC.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Candlestick Structures</div>
+        <div class="setting-desc">Labels above/below candles: ▲E ▲P ▲S for bulls, ▼E ▼P ▼S for bears.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Momentum Wave Bands</div>
+        <div class="setting-desc">Wide deviation envelope. Touching outer bands = potential exhaustion.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Prime Trend Assistant</div>
+        <div class="setting-desc">Adaptive Supertrend S/R line. Best used as trailing stop reference.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Market Prophecy</div>
+        <div class="setting-desc">Forward regression projection. Shows probable price path for next ~12 bars.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Max Profit Signals</div>
+        <div class="setting-desc">Gold ★ labels at divergence pivots — tops and bottoms with RSI confirmation.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h3>Dashboard</h3>
+      <div class="setting-row">
+        <div class="setting-name">Show Dashboard</div>
+        <div class="setting-desc">Toggle the on-chart info table.</div>
+        <div class="setting-default">Default: ON</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Size</div>
+        <div class="setting-desc">Text size of the dashboard. Tiny on small screens, Large on wide monitors.</div>
+        <div class="setting-default">Default: Normal</div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-name">Position</div>
+        <div class="setting-desc">Corner placement of the dashboard table. Avoid overlapping price action.</div>
+        <div class="setting-default">Default: Top Right</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════ PANEL: SETUPS ══════════════════════════ -->
+  <div id="panel-setups" class="panel">
+    <div class="sec-title">Trade Setups</div>
+
+    <!-- Setup 1 -->
+    <div class="setup-card" id="sc1">
+      <div class="setup-header" onclick="toggleSetup('sc1')">
+        <div class="setup-header-left">
+          <div class="setup-num">01</div>
+          <div>
+            <div class="setup-title">Trend Continuation</div>
+            <div class="setup-tag">Trend Mode · All Timeframes · Best on 1H+</div>
+          </div>
+        </div>
+        <div class="setup-arrow">▼</div>
+      </div>
+      <div class="setup-body">
+        <ul class="setup-steps">
+          <li data-n="1">Confirm <span class="highlight">Market Bias = BULLISH</span> on dashboard (Prime Score ≥ 7)</li>
+          <li data-n="2">Wait for <span class="hl-cyan">Prime Trend Assistant line to be below price</span> (green = bullish bias)</li>
+          <li data-n="3">Price pulls back and touches the <span class="hl-cyan">Dynamic Reactor mid line</span> or <span class="hl-cyan">VWAP</span></li>
+          <li data-n="4">A <span class="hl-cyan">◆ Buy signal fires</span> (Super Smoother crossover) on the retest</li>
+          <li data-n="5">Optional confirmation: <span class="hl-cyan">▲E or ▲P candlestick structure</span> at the same bar</li>
+          <li data-n="6"><strong class="highlight">Entry:</strong> open of next bar after signal</li>
+          <li data-n="7"><strong class="highlight">Stop:</strong> below the Prime Trend Assistant line</li>
+          <li data-n="8"><strong class="highlight">Target:</strong> VWAP +2σ or momentum wave band upper / or ★ Max Profit signal</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Setup 2 -->
+    <div class="setup-card" id="sc2">
+      <div class="setup-header" onclick="toggleSetup('sc2')">
+        <div class="setup-header-left">
+          <div class="setup-num">02</div>
+          <div>
+            <div class="setup-title">VWAP Band Reversal</div>
+            <div class="setup-tag">Reversal Mode · Intraday · Best on 5m–15m</div>
+          </div>
+        </div>
+        <div class="setup-arrow">▼</div>
+      </div>
+      <div class="setup-body">
+        <ul class="setup-steps">
+          <li data-n="1">Price reaches <span class="hl-gold">VWAP ±2σ band</span> (outer Prime Range)</li>
+          <li data-n="2">Switch Signal Mode to <span class="highlight">Reversal</span></li>
+          <li data-n="3">Watch for a <span class="hl-red">◆ Sell</span> at +2σ or <span class="hl-cyan">◆ Buy</span> at -2σ (Stoch/RSI confluence)</li>
+          <li data-n="4">Confirm with a <span class="hl-gold">▼S or ▼E pattern label</span> (star or engulfing) at the band</li>
+          <li data-n="5">Consolidation Score ≥ 6 on dashboard (ranging condition — best for reversals)</li>
+          <li data-n="6"><strong class="highlight">Entry:</strong> next bar open</li>
+          <li data-n="7"><strong class="highlight">Stop:</strong> 1 ATR beyond the ±2σ band</li>
+          <li data-n="8"><strong class="highlight">Target 1:</strong> VWAP (mean reversion) · <strong class="highlight">Target 2:</strong> opposite ±1σ band</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Setup 3 -->
+    <div class="setup-card" id="sc3">
+      <div class="setup-header" onclick="toggleSetup('sc3')">
+        <div class="setup-header-left">
+          <div class="setup-num">03</div>
+          <div>
+            <div class="setup-title">Max Profit Divergence Exit / Entry</div>
+            <div class="setup-tag">All Modes · Swing · Best on 4H–Daily</div>
+          </div>
+        </div>
+        <div class="setup-arrow">▼</div>
+      </div>
+      <div class="setup-body">
+        <ul class="setup-steps">
+          <li data-n="1">A <span class="hl-gold">★ top signal</span> appears (price HH + RSI LH divergence) on daily or 4H</li>
+          <li data-n="2">Use as <strong class="highlight">partial profit target</strong> for existing longs — scale out 50% position</li>
+          <li data-n="3">If Reversal Mode: use the ★ as a <span class="hl-red">short entry trigger</span> combined with a ◆ Sell</li>
+          <li data-n="4">Confirm: Momentum Wave Band upper touched or Prophecy pointing down</li>
+          <li data-n="5"><strong class="highlight">Stop:</strong> above pivot high (the bar where ★ appeared)</li>
+          <li data-n="6"><strong class="highlight">Target:</strong> VWAP or Prime Trend Assistant support</li>
+          <li data-n="7">Reverse logic for <span class="hl-cyan">★ bottom signals</span> on longs</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Setup 4 -->
+    <div class="setup-card" id="sc4">
+      <div class="setup-header" onclick="toggleSetup('sc4')">
+        <div class="setup-header-left">
+          <div class="setup-num">04</div>
+          <div>
+            <div class="setup-title">MTF Reactor Confluence</div>
+            <div class="setup-tag">Trend Mode · Multi-Timeframe · Best on 15m–1H</div>
+          </div>
+        </div>
+        <div class="setup-arrow">▼</div>
+      </div>
+      <div class="setup-body">
+        <ul class="setup-steps">
+          <li data-n="1">Set <span class="hl-cyan">Reactor Timeframe</span> to one level higher (e.g. chart=15m → reactor=60)</li>
+          <li data-n="2">HTF Reactor fill is <span class="hl-cyan">cyan (bullish)</span> — confirms macro trend is up</li>
+          <li data-n="3">On chart timeframe, wait for price to dip into the reactor band</li>
+          <li data-n="4">A <span class="hl-cyan">◆ Buy signal</span> fires while price is inside or just bounced off reactor band</li>
+          <li data-n="5">Volume Flex mode: confirm volume was above average at signal bar</li>
+          <li data-n="6"><strong class="highlight">Entry:</strong> next bar open · <strong class="highlight">Stop:</strong> below reactor lower band</li>
+          <li data-n="7"><strong class="highlight">Target:</strong> Momentum Wave Band upper or Market Prophecy upper channel</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Setup 5 -->
+    <div class="setup-card" id="sc5">
+      <div class="setup-header" onclick="toggleSetup('sc5')">
+        <div class="setup-header-left">
+          <div class="setup-num">05</div>
+          <div>
+            <div class="setup-title">Prophecy + Signal Confluence</div>
+            <div class="setup-tag">Trend Mode · Any TF · Scalp / Intraday</div>
+          </div>
+        </div>
+        <div class="setup-arrow">▼</div>
+      </div>
+      <div class="setup-body">
+        <ul class="setup-steps">
+          <li data-n="1">Market Prophecy is pointing <span class="hl-cyan">upward (▲ label, dashed cyan line)</span></li>
+          <li data-n="2">Price is below the Prophecy projection mid-line (room to run)</li>
+          <li data-n="3">A <span class="hl-cyan">◆ Buy signal</span> fires in the same direction as the prophecy</li>
+          <li data-n="4">Prime Score ≥ 6 on dashboard</li>
+          <li data-n="5"><strong class="highlight">Entry:</strong> immediately (Prophecy is a leading indicator, don't wait)</li>
+          <li data-n="7"><strong class="highlight">Stop:</strong> below Prime Trend Assistant line</li>
+          <li data-n="8"><strong class="highlight">Target:</strong> the Prophecy projected end price (shown in label)</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════ PANEL: DASHBOARD ══════════════════════════ -->
+  <div id="panel-dashboard" class="panel">
+    <div class="sec-title">Dashboard Reference</div>
+
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+
+      <div class="dash-preview">
+        <div class="dash-header">◈  MARKET ORACLE PRO</div>
+        <div class="dash-row">
+          <div class="dash-key">Mode</div>
+          <div class="dash-val dv-cyan">▶ Trend</div>
+        </div>
+        <div class="dash-row">
+          <div class="dash-key">Optimal Tuning</div>
+          <div class="dash-val dv-cyan" id="dp-tuning">14  ✦ auto</div>
+        </div>
+        <div class="dash-row">
+          <div class="dash-key">Prime Score</div>
+          <div class="dash-val" id="dp-prime"><span style="color:var(--cyan)">8/10  ████████░░</span></div>
+        </div>
+        <div class="dash-row">
+          <div class="dash-key">Consolidation</div>
+          <div class="dash-val" id="dp-consol"><span style="color:var(--dim2)">3/10  ███░░░░░░░</span></div>
+        </div>
+        <div class="dash-row">
+          <div class="dash-key">Market Bias</div>
+          <div class="dash-val dv-bull" id="dp-bias">▲  BULLISH</div>
+        </div>
+        <div class="dash-row">
+          <div class="dash-key">Trend Strength</div>
+          <div class="dash-val dv-bull" id="dp-adx">Strong  ADX:38</div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:260px;">
+
+        <div style="margin-bottom:22px;">
+          <div class="sec-title" style="margin-bottom:12px;">Simulate Prime Score</div>
+          <div class="sim-block">
+            <div class="sim-label">Drag to change Prime Score</div>
+            <input type="range" class="sim-slider" id="prime-slider" min="0" max="10" value="8" oninput="updateSim()">
+            <div class="sim-output" id="sim-out"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec-title" style="margin-bottom:12px;">Score Breakdown (10 factors)</div>
+          <div class="score-meter">
+            <div class="score-label"><span>SS Fast &gt; SS Slow</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>RSI14 &gt; 50</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:80%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Price &gt; PTA Line</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Price &gt; VWAP</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Price &gt; Reactor Mid</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Price &gt; MWB Basis</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:60%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Signal Dir = Bull</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Price &gt; EMA20</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>Stoch &gt; 50</span><span class="hl-gold">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-gold" style="width:55%"></div></div>
+          </div>
+          <div class="score-meter">
+            <div class="score-label"><span>MACD Line &gt; 0</span><span class="hl-cyan">+1</span></div>
+            <div class="score-track"><div class="score-fill sf-bull" style="width:100%"></div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ PANEL: FIX LOG ══════════════════════════ -->
+  <div id="panel-fixes" class="panel">
+    <div class="sec-title">Bug Fix Log</div>
+
+    <div class="fix-log">
+      <h4>ROOT CAUSE — <code class="fix-err">series int</code> passed to <code>ta.*</code> built-ins</h4>
+      <p>
+        Pine Script's built-in functions like <code>ta.atr()</code>, <code>ta.ema()</code>,
+        <code>ta.rsi()</code>, <code>ta.stoch()</code>, <code>ta.linreg()</code>, <code>ta.stdev()</code>
+        all require a <strong class="fix-ok">simple int</strong> for the <code>length</code> argument.
+        <br><br>
+        The original code computed <code>eff_tuning</code> as:
+        <code>auto_max ? optimal_tuning : tuning</code> where <code>optimal_tuning</code>
+        was derived from series booleans (pnl comparisons). This made the result a
+        <strong class="fix-err">series int</strong> — a value that can change every bar.
+        Pine cannot precompile the internal ring-buffer size for a series-length function call.
+      </p>
+    </div>
+
+    <div class="fix-log">
+      <h4>FIX 1 — Pre-compute at all 4 literal lengths</h4>
+      <p>
+        Instead of computing <code>ta.atr(eff_tuning * 2)</code> dynamically, we now compute
+        <span class="fix-ok">all 4 candidate outputs up front</span> using literal integers:
+        <code>ta.atr(20)</code>, <code>ta.atr(28)</code>, <code>ta.atr(40)</code>, <code>ta.atr(56)</code>.
+        The auto-maximizer only selects among these pre-computed series at runtime using a
+        <code>sel(v10, v14, v20, v28, vm)</code> helper — no ternary with series int as a length.
+      </p>
+    </div>
+
+    <div class="fix-log">
+      <h4>FIX 2 — Manual tuning path preserved</h4>
+      <p>
+        When Auto Maximizer is OFF, <code>tuning</code> is used directly. Since <code>tuning</code>
+        comes from <code>input.int()</code>, it is a <span class="fix-ok">simple int</span> and is
+        safe to use as a ta.* length argument. <code>tuning * 2</code> is also simple int.
+        All manual-mode calls use this path without wrapping in conditional logic.
+      </p>
+    </div>
+
+    <div class="fix-log">
+      <h4>FIX 3 — MTF request.security literal length</h4>
+      <p>
+        Inside <code>request.security()</code> the expression
+        <code>super_smoother(hlc3, rct_adj_len)</code> used a series int.
+        Fixed by using the literal <code>14</code> inside the security call, and applying
+        volume-flex scaling only to the band width (ATR multiplier), not the smoother length.
+      </p>
+    </div>
+
+    <div class="fix-log">
+      <h4>FIX 4 — <code>ta.change(time("D"))</code> wrapped in <code>nz()</code></h4>
+      <p>
+        On bar 0, <code>ta.change()</code> returns <code>na</code>. Comparing <code>na != 0</code>
+        evaluates to <code>false</code> in Pine which is correct, but wrapping in
+        <code>nz(..., 0)</code> makes intent explicit and avoids potential edge cases on
+        first bar session detection.
+      </p>
+    </div>
+
+    <div class="fix-log">
+      <h4>FIX 5 — Removed <code>adaptive_len()</code> function</h4>
+      <p>
+        The original <code>adaptive_len(base)</code> called <code>ta.atr(base)</code> with a
+        series int <code>base</code> argument. This function was removed entirely. Its purpose
+        (adapting length to volatility) is now handled implicitly by the Auto Maximizer's
+        dynamic candidate selection across market regimes.
+      </p>
+    </div>
+
+    <div class="fix-log">
+      <h4>FIX 6 — <code>color.new()</code> in gradient mode</h4>
+      <p>
+        <code>color.new(bull_col, grad_alpha)</code> where <code>grad_alpha</code> is
+        <code>series int</code> — this is valid since <code>color.new()</code>
+        accepts series values. No change needed here, just confirmed it's safe.
+        The <code>switch</code> on <code>candle_mode</code> correctly returns <code>na</code>
+        for the <code>"None"</code> case which <code>barcolor()</code> accepts.
+      </p>
+    </div>
+
+    <div style="margin-top:28px;">
+      <div class="sec-title">Quick Reference: Pine Type Rules</div>
+      <div class="code-block">
+<span class="c-comment">// ✅ SAFE — literal int</span>
+<span class="c-fn">ta.atr</span>(<span class="c-num">14</span>)
+<span class="c-fn">ta.ema</span>(close, <span class="c-num">20</span>)
+<span class="c-fn">ta.rsi</span>(close, <span class="c-num">14</span>)
+
+<span class="c-comment">// ✅ SAFE — input.int() is simple int</span>
+<span class="c-var">tuning</span> = input.int(<span class="c-num">14</span>, ...)
+<span class="c-fn">ta.atr</span>(<span class="c-var">tuning</span>)           <span class="c-comment">// ok</span>
+<span class="c-fn">ta.atr</span>(<span class="c-var">tuning</span> * <span class="c-num">2</span>)       <span class="c-comment">// ok — simple * const = simple</span>
+
+<span class="c-comment">// ❌ FAILS — series int derived from conditionals</span>
+<span class="c-var">eff_tuning</span> = <span class="c-var">cond</span> ? <span class="c-num">14</span> : <span class="c-num">20</span>   <span class="c-comment">// series int if cond is series</span>
+<span class="c-fn">ta.atr</span>(<span class="c-var">eff_tuning</span>)            <span class="c-comment">// ❌ ERROR</span>
+
+<span class="c-comment">// ✅ FIX — pre-compute, then select</span>
+<span class="c-var">a14</span> = <span class="c-fn">ta.atr</span>(<span class="c-num">14</span>)
+<span class="c-var">a20</span> = <span class="c-fn">ta.atr</span>(<span class="c-num">20</span>)
+<span class="c-var">result</span> = <span class="c-var">cond</span> ? <span class="c-var">a14</span> : <span class="c-var">a20</span>   <span class="c-comment">// ✅ series float — ok</span>
+
+<span class="c-comment">// ✅ User-defined functions accept series int</span>
+<span class="c-fn">super_smoother</span>(src, <span class="c-var">len</span>)    <span class="c-comment">// ok — UDF has no ring-buffer constraint</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<script>
+function switchTab(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+function toggleSetup(id) {
+  const card = document.getElementById(id);
+  card.classList.toggle('open');
+}
+
+// Open first setup by default
+toggleSetup('sc1');
+
+// Simulate dashboard
+function updateSim() {
+  const ps = parseInt(document.getElementById('prime-slider').value);
+  const pct = (ps / 10 * 100).toFixed(0);
+  const sl = document.getElementById('sim-slider') || document.getElementById('prime-slider');
+  sl.style.background = `linear-gradient(90deg, var(--cyan) ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
+
+  const bias = ps >= 7 ? '▲  BULLISH' : ps <= 3 ? '▼  BEARISH' : '◆  RANGING';
+  const biasCol = ps >= 7 ? 'var(--cyan)' : ps <= 3 ? 'var(--red)' : 'var(--gold)';
+  const psCol = ps >= 7 ? 'var(--cyan)' : ps <= 3 ? 'var(--red)' : 'var(--gold)';
+
+  let bar = '';
+  for (let i = 1; i <= 10; i++) bar += i <= ps ? '█' : '░';
+
+  document.getElementById('dp-prime').innerHTML = `<span style="color:${psCol}">${ps}/10  ${bar}</span>`;
+  document.getElementById('dp-bias').style.color = biasCol;
+  document.getElementById('dp-bias').textContent = bias;
+
+  const out = document.getElementById('sim-out');
+  out.innerHTML = `
+    <div class="sim-row"><span>Prime Score</span><span style="color:${psCol}">${ps} / 10</span></div>
+    <div class="sim-row"><span>Market Bias</span><span style="color:${biasCol}">${bias}</span></div>
+    <div class="sim-row"><span>Score Bar</span><span style="color:${psCol};letter-spacing:-1px">${bar}</span></div>
+    <div class="sim-row"><span>Interpretation</span><span style="color:var(--dim2)">${
+      ps >= 8 ? 'Strong trend — ride signals confidently' :
+      ps >= 6 ? 'Moderate bias — standard signal quality' :
+      ps >= 4 ? 'Weak bias — reduce position size' :
+      'Bearish / no-trade zone — wait or flip'
+    }</span></div>
+  `;
+}
+
+// Animate score bars on dashboard tab open
+function animateBars() {
+  document.querySelectorAll('.score-fill').forEach(el => {
+    const w = el.style.width;
+    el.style.width = '0%';
+    setTimeout(() => { el.style.width = w; }, 100);
+  });
+}
+
+// Trigger on tab switch
+const origSwitch = window.switchTab;
+window.switchTab = function(id, el) {
+  origSwitch(id, el);
+  if (id === 'dashboard') setTimeout(animateBars, 200);
+};
+
+// Init sim
+updateSim();
+
+// Range slider gradient update
+document.getElementById('prime-slider').addEventListener('input', function() {
+  const pct = (this.value / 10 * 100);
+  this.style.background = `linear-gradient(90deg, var(--cyan) ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
+});
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, MutableRefObject, useCallback } from 'react';
 import { IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts';
-import { computeEMA, computeSMA, computeBollingerBands, computeVWAP, computeSupertrend, computePivotHighLow, computeMsbOb } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeBollingerBands, computeVWAP, computeSupertrend, computePivotHighLow, computeMsbOb, computeVolumeChannelFlow } from '@/lib/marketData';
 import { LineStyleType } from '@/types/trading';
 
 const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
@@ -280,6 +280,74 @@ export function useIndicatorRenderer(
           // Set the last value label to show zone type
           midSeries.applyOptions({ title: zone.type });
           lineSeriesRefs.current.set(ind.id + `-zone-mid-${zi}`, midSeries);
+        }
+      }
+
+      if (ind.type === 'VOLUME_CHANNEL_FLOW') {
+        const vcf = computeVolumeChannelFlow(candles, ind.channelWidth ?? 3, ind.minLength ?? 10);
+        if (vcf.avgLine.length === 0) continue;
+
+        const plotColoredLine = (
+          lineData: { time: number; value: number; color: string }[],
+          lineWidth: number,
+          lineStyle: number,
+          idSuffix: string
+        ) => {
+          const greenPts: (LineData | { time: Time; value: number })[] = [];
+          const redPts: (LineData | { time: Time; value: number })[] = [];
+
+          for (let i = 0; i < lineData.length; i++) {
+            const pt = { time: lineData[i].time as Time, value: lineData[i].value };
+            if (lineData[i].color === '#22c55e') {
+              greenPts.push(pt);
+              if (i > 0 && lineData[i - 1].color === '#ef4444') {
+                greenPts.splice(greenPts.length - 1, 0, { time: lineData[i - 1].time as Time, value: lineData[i - 1].value });
+              }
+            } else {
+              redPts.push(pt);
+              if (i > 0 && lineData[i - 1].color === '#22c55e') {
+                redPts.splice(redPts.length - 1, 0, { time: lineData[i - 1].time as Time, value: lineData[i - 1].value });
+              }
+            }
+          }
+
+          if (greenPts.length > 0) {
+            const series = chartRef.current.addLineSeries({
+              color: ind.color || '#22c55e',
+              lineWidth: lineWidth as 1 | 2 | 3 | 4,
+              lineStyle: lineStyle,
+              priceLineVisible: false,
+              lastValueVisible: false,
+              crosshairMarkerVisible: false,
+            });
+            series.setData(greenPts as LineData[]);
+            lineSeriesRefs.current.set(`${ind.id}-vcf-${idSuffix}-g`, series);
+          }
+
+          if (redPts.length > 0) {
+            const series = chartRef.current.addLineSeries({
+              color: ind.color2 || '#ef4444',
+              lineWidth: lineWidth as 1 | 2 | 3 | 4,
+              lineStyle: lineStyle,
+              priceLineVisible: false,
+              lastValueVisible: false,
+              crosshairMarkerVisible: false,
+            });
+            series.setData(redPts as LineData[]);
+            lineSeriesRefs.current.set(`${ind.id}-vcf-${idSuffix}-r`, series);
+          }
+        };
+
+        plotColoredLine(vcf.avgLine, ind.lineWidth ?? 3, toLWLineStyle(ind.lineStyle), 'avg');
+
+        if (ind.breakouts !== false && vcf.breakouts.length > 0) {
+          allMarkers.push(...vcf.breakouts.map((b: any) => ({
+            time: b.time,
+            position: b.direction === 'down' ? 'aboveBar' : 'belowBar',
+            color: b.direction === 'down' ? (ind.color2 || '#ef4444') : (ind.color || '#22c55e'),
+            shape: b.direction === 'down' ? 'arrowDown' : 'arrowUp',
+            size: 1
+          })));
         }
       }
     }

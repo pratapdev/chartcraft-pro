@@ -16,6 +16,7 @@ import { PanelDrawingOverlay } from './PanelDrawingOverlay';
 import { PanelIndicatorPane } from './PanelIndicatorPane';
 import { PanelVPVROverlay } from './PanelVPVROverlay';
 import { PanelTPOOverlay } from './PanelTPOOverlay';
+import { PanelVCFOverlay } from './PanelVCFOverlay';
 import { PanelTrendlineToolbar } from './PanelTrendlineToolbar';
 import { PanelRiskRewardToolbar } from './PanelRiskRewardToolbar';
 import { PanelDOM } from './PanelDOM';
@@ -411,6 +412,7 @@ export const PanelChart: React.FC = () => {
             <PanelDrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
             <PanelVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
             <PanelTPOOverlay chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
+            <PanelVCFOverlay panelIndex={panelIndex} chartRef={chartRef} seriesRef={candleSeriesRef} />
             <PanelTrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
             <PanelRiskRewardToolbar chartRef={chartRef} seriesRef={candleSeriesRef} panelIndex={panelIndex} />
           </div>
