@@ -217,10 +217,15 @@ router.put("/sync/state", async (req: Request<object, object, SyncBody>, res: Re
         await tx.delete(chartIndicatorsTable);
         for (const i of indicators) {
           await tx.insert(chartIndicatorsTable).values({
-            id: i.id, type: i.type, period: toNum(i.period as unknown, 20),
-            color: toStr(i.color as unknown, '#2962FF'), visible: toBool(i.visible as unknown, true),
-            lineWidth: toNum(i.lineWidth as unknown, 1), lineStyle: toStr(i.lineStyle as unknown, 'solid'),
-            kPeriod: toOptNum(i.kPeriod as unknown), dPeriod: toOptNum(i.dPeriod as unknown),
+            id: toStr(i.id as unknown),
+            type: toStr(i.type as unknown),
+            period: toNum(i.period as unknown, 20),
+            color: toStr(i.color as unknown, '#2962FF'),
+            visible: toBool(i.visible as unknown, true),
+            lineWidth: toNum(i.lineWidth as unknown, 1),
+            lineStyle: toStr(i.lineStyle as unknown, 'solid'),
+            kPeriod: toOptNum(i.kPeriod as unknown),
+            dPeriod: toOptNum(i.dPeriod as unknown),
             color2: i.color2 ? toStr(i.color2 as unknown) : null,
             stdDev: i.stdDev !== null && i.stdDev !== undefined ? String(toNum(i.stdDev as unknown)) : null,
             multiplier: i.multiplier !== null && i.multiplier !== undefined ? String(toNum(i.multiplier as unknown)) : null,
@@ -244,7 +249,7 @@ router.put("/sync/state", async (req: Request<object, object, SyncBody>, res: Re
             htfTimeframe: i.timeframe ? toStr(i.timeframe as unknown) : null,
             htfDisplayMode: i.displayMode ? toStr(i.displayMode as unknown) : null,
             htfShowWicks: i.showWicks !== undefined ? toBool(i.showWicks as unknown) : null,
-          });
+          } as any);
         }
       }
 
