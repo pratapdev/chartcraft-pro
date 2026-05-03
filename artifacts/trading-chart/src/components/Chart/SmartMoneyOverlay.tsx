@@ -64,8 +64,8 @@ export const SmartMoneyOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
     // ---- Fair Value Gaps ----
     if (fvgInd) {
-      const showMitigated = (fvgInd as any).showMitigated ?? false;
-      const fvgs = computeFVG(candles, (fvgInd as any).threshold ?? 0.1);
+      const showMitigated = fvgInd.showMitigated ?? false;
+      const fvgs = computeFVG(candles, fvgInd.threshold ?? 0.1);
 
       for (const fvg of fvgs) {
         if (fvg.mitigated && !showMitigated) continue;
@@ -114,28 +114,32 @@ export const SmartMoneyOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     // ---- Market Structure: BOS / CHOCH / Sweeps ----
     if (msInd) {
       const swingLen = msInd.period ?? 5;
+      const showSweeps = msInd.showSweeps ?? true;
+      const showSwingDots = msInd.showSwingDots ?? true;
       const ms = computeMarketStructure(candles, swingLen);
 
       // Swing highs and lows as dots
-      for (const sh of ms.swingHighs) {
-        if (sh.time < fromT || sh.time > toT) continue;
-        const x = timeToX(sh.time);
-        const y = priceToY(sh.price);
-        if (x === null || y === null) continue;
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(239,68,68,0.5)';
-        ctx.fill();
-      }
-      for (const sl of ms.swingLows) {
-        if (sl.time < fromT || sl.time > toT) continue;
-        const x = timeToX(sl.time);
-        const y = priceToY(sl.price);
-        if (x === null || y === null) continue;
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(34,197,94,0.5)';
-        ctx.fill();
+      if (showSwingDots) {
+        for (const sh of ms.swingHighs) {
+          if (sh.time < fromT || sh.time > toT) continue;
+          const x = timeToX(sh.time);
+          const y = priceToY(sh.price);
+          if (x === null || y === null) continue;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(239,68,68,0.5)';
+          ctx.fill();
+        }
+        for (const sl of ms.swingLows) {
+          if (sl.time < fromT || sl.time > toT) continue;
+          const x = timeToX(sl.time);
+          const y = priceToY(sl.price);
+          if (x === null || y === null) continue;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(34,197,94,0.5)';
+          ctx.fill();
+        }
       }
 
       // BOS / CHOCH labels + horizontal dashed line to break point
@@ -174,28 +178,28 @@ export const SmartMoneyOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
       }
 
       // Liquidity sweeps
-      for (const sw of ms.sweeps) {
-        if (sw.sweepCandleTime < fromT || sw.sweepCandleTime > toT) continue;
-        const isBull = sw.direction === 'bull_sweep';
-        const x = timeToX(sw.sweepCandleTime);
-        const y = priceToY(sw.sweptPrice);
-        if (x === null || y === null) continue;
+      if (showSweeps) {
+        for (const sw of ms.sweeps) {
+          if (sw.sweepCandleTime < fromT || sw.sweepCandleTime > toT) continue;
+          const isBull = sw.direction === 'bull_sweep';
+          const x = timeToX(sw.sweepCandleTime);
+          const y = priceToY(sw.sweptPrice);
+          if (x === null || y === null) continue;
 
-        // Zigzag marker at swept level
-        const col = isBull ? 'rgba(249,115,22,0.9)' : 'rgba(249,115,22,0.9)';
-        ctx.beginPath();
-        ctx.setLineDash([2, 2]);
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 1.5;
-        ctx.moveTo(x - 20, y);
-        ctx.lineTo(x + 20, y);
-        ctx.stroke();
-        ctx.setLineDash([]);
+          const col = 'rgba(249,115,22,0.9)';
+          ctx.beginPath();
+          ctx.setLineDash([2, 2]);
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.5;
+          ctx.moveTo(x - 20, y);
+          ctx.lineTo(x + 20, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
 
-        // Lightning bolt indicator
-        ctx.font = '11px sans-serif';
-        ctx.fillStyle = col;
-        ctx.fillText(isBull ? '⚡▲' : '⚡▼', x - 10, isBull ? y - 4 : y + 12);
+          ctx.font = '11px sans-serif';
+          ctx.fillStyle = col;
+          ctx.fillText(isBull ? '⚡▲' : '⚡▼', x - 10, isBull ? y - 4 : y + 12);
+        }
       }
     }
   }, [chartRef, seriesRef, candles, fvgInd, msInd]);

@@ -497,6 +497,7 @@ export const RightSidebar: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [expandedSettingsId, setExpandedSettingsId] = useState<string | null>(null);
 
   if (!rightPanelOpen) return null;
 
@@ -584,6 +585,15 @@ export const RightSidebar: React.FC = () => {
                     {ind.period > 1 && <span className="text-muted-foreground shrink-0">({ind.period})</span>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE') && (
+                      <button
+                        onClick={() => setExpandedSettingsId(expandedSettingsId === ind.id ? null : ind.id)}
+                        className={`p-0.5 transition-colors ${expandedSettingsId === ind.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                        title="Settings"
+                      >
+                        <Settings size={11} />
+                      </button>
+                    )}
                     <button onClick={() => toggleIndicator(ind.id)} className="text-muted-foreground hover:text-foreground p-0.5" title={ind.visible ? 'Hide' : 'Show'}>
                       {ind.visible ? <Eye size={11} /> : <EyeOff size={11} />}
                     </button>
@@ -606,7 +616,7 @@ export const RightSidebar: React.FC = () => {
                       <>
                         <span className="bg-bull/10 text-bull text-[9px] px-1.5 py-0.5 rounded">BOS</span>
                         <span className="bg-[rgba(168,85,247,0.12)] text-purple-400 text-[9px] px-1.5 py-0.5 rounded">CHOCH</span>
-                        <span className="bg-orange-500/10 text-orange-400 text-[9px] px-1.5 py-0.5 rounded">⚡ Sweeps</span>
+                        {(ind.showSweeps ?? true) && <span className="bg-orange-500/10 text-orange-400 text-[9px] px-1.5 py-0.5 rounded">⚡ Sweeps</span>}
                         <span className="text-[9px] text-muted-foreground">swing len {ind.period}</span>
                       </>
                     )}
@@ -617,6 +627,71 @@ export const RightSidebar: React.FC = () => {
                         <span className="text-[9px] text-muted-foreground">zz {ind.zigzagLength}</span>
                       </>
                     )}
+                  </div>
+                )}
+                {/* Inline settings panel for FVG */}
+                {ind.type === 'FVG' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Min Gap (ATR×)</label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateIndicator(ind.id, { threshold: Math.max(0.01, Number(((ind.threshold ?? 0.1) - 0.05).toFixed(2))) })}
+                          className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center"
+                        >−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{(ind.threshold ?? 0.1).toFixed(2)}</span>
+                        <button
+                          onClick={() => updateIndicator(ind.id, { threshold: Number(((ind.threshold ?? 0.1) + 0.05).toFixed(2)) })}
+                          className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center"
+                        >+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Show Mitigated Zones</label>
+                      <button
+                        onClick={() => updateIndicator(ind.id, { showMitigated: !(ind.showMitigated ?? false) })}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showMitigated ?? false) ? 'bg-primary' : 'bg-accent'}`}
+                      >
+                        <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showMitigated ?? false) ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Inline settings panel for MARKET_STRUCTURE */}
+                {ind.type === 'MARKET_STRUCTURE' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Swing Length</label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateIndicator(ind.id, { period: Math.max(2, (ind.period ?? 5) - 1) })}
+                          className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center"
+                        >−</button>
+                        <span className="w-6 text-center text-[11px] tabular-nums">{ind.period ?? 5}</span>
+                        <button
+                          onClick={() => updateIndicator(ind.id, { period: (ind.period ?? 5) + 1 })}
+                          className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center"
+                        >+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Show Sweeps</label>
+                      <button
+                        onClick={() => updateIndicator(ind.id, { showSweeps: !(ind.showSweeps ?? true) })}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showSweeps ?? true) ? 'bg-primary' : 'bg-accent'}`}
+                      >
+                        <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showSweeps ?? true) ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Show Swing Dots</label>
+                      <button
+                        onClick={() => updateIndicator(ind.id, { showSwingDots: !(ind.showSwingDots ?? true) })}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showSwingDots ?? true) ? 'bg-primary' : 'bg-accent'}`}
+                      >
+                        <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showSwingDots ?? true) ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

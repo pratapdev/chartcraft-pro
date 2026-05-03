@@ -208,6 +208,10 @@ export interface IndicatorConfig {
   displayMode?: 'candles' | 'zones' | 'highlow';
   /** HTF overlay: show candle wicks */
   showWicks?: boolean;
-  /** Smart money: show mitigated FVGs */
+  /** FVG: show mitigated (filled) zones */
   showMitigated?: boolean;
+  /** MARKET_STRUCTURE: show liquidity sweeps */
+  showSweeps?: boolean;
+  /** MARKET_STRUCTURE: show swing high/low dots */
+  showSwingDots?: boolean;
 }
