@@ -172,6 +172,7 @@ export interface IndicatorConfig {
   period: number;
   color: string;
   visible: boolean;
+  paneMode?: 'mirror' | 'independent';
   /** Line width for the indicator */
   lineWidth?: number;
   /** Line style for the indicator */

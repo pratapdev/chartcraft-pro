@@ -12,7 +12,7 @@ import {
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig, LineStyleType } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
-import { useChartSync, TimeRange } from './ChartSyncContext';
+import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
 const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
@@ -29,18 +29,13 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
+  const paneMode = indicator.paneMode ?? 'mirror';
 
   // Forward pointer/wheel events from pane overlay → main chart container
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay || !chartSync) return;
-
-    const forward = (e: Event) => {
-      const mainEl = chartSync.getMainContainer();
-      if (!mainEl) return;
-      const cloned = new (e.constructor as typeof Event)(e.type, e as EventInit);
-      mainEl.dispatchEvent(cloned);
-    };
+    if (paneMode === 'independent') return;
 
     const forwardWheel = (e: WheelEvent) => {
       const mainEl = chartSync.getMainContainer();
@@ -63,65 +58,12 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       mainEl.dispatchEvent(cloned);
     };
 
-    // Track pointer state for drag forwarding
-    let dragging = false;
-    let lastX = 0;
-
-    const onPointerDown = (e: PointerEvent) => {
-      dragging = true;
-      lastX = e.clientX;
-      overlay.setPointerCapture(e.pointerId);
-      const mainEl = chartSync.getMainContainer();
-      if (!mainEl) return;
-      mainEl.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true,
-        clientX: e.clientX, clientY: e.clientY,
-        pointerId: e.pointerId, pointerType: e.pointerType,
-        button: e.button, buttons: e.buttons,
-        ctrlKey: e.ctrlKey, shiftKey: e.shiftKey,
-      }));
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (!dragging) return;
-      const mainEl = chartSync.getMainContainer();
-      if (!mainEl) return;
-      mainEl.dispatchEvent(new PointerEvent('pointermove', {
-        bubbles: true, cancelable: true,
-        clientX: e.clientX, clientY: e.clientY,
-        movementX: e.clientX - lastX, movementY: 0,
-        pointerId: e.pointerId, pointerType: e.pointerType,
-        button: e.button, buttons: e.buttons,
-      }));
-      lastX = e.clientX;
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      dragging = false;
-      const mainEl = chartSync.getMainContainer();
-      if (!mainEl) return;
-      mainEl.dispatchEvent(new PointerEvent('pointerup', {
-        bubbles: true, cancelable: true,
-        clientX: e.clientX, clientY: e.clientY,
-        pointerId: e.pointerId, pointerType: e.pointerType,
-        button: e.button, buttons: e.buttons,
-      }));
-    };
-
     overlay.addEventListener('wheel', forwardWheel, { passive: false });
-    overlay.addEventListener('pointerdown', onPointerDown);
-    overlay.addEventListener('pointermove', onPointerMove);
-    overlay.addEventListener('pointerup', onPointerUp);
-    overlay.addEventListener('pointercancel', onPointerUp);
 
     return () => {
       overlay.removeEventListener('wheel', forwardWheel);
-      overlay.removeEventListener('pointerdown', onPointerDown);
-      overlay.removeEventListener('pointermove', onPointerMove);
-      overlay.removeEventListener('pointerup', onPointerUp);
-      overlay.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [chartSync]);
+  }, [chartSync, paneMode]);
 
   // Chart creation
   useEffect(() => {
@@ -164,9 +106,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         rightOffset: 50,
         shiftVisibleRangeOnNewBar: false,
       },
-      // CRITICAL: disable all user interaction so pane cannot be dragged independently
-      handleScroll: false,
-      handleScale: false,
+      handleScroll: paneMode === 'independent' ? { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false } : false,
+      handleScale: paneMode === 'independent' ? { axisPressedMouseMove: true, mouseWheel: true, pinch: true } : false,
     });
 
     chartRef.current = chart;
@@ -231,7 +172,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     });
     ro.observe(containerRef.current);
 
-    if (chartSync) {
+    if (chartSync && paneMode === 'mirror') {
       chartSync.registerChart(chartId, chart);
 
       return () => {
@@ -249,7 +190,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       chartRef.current = null;
       seriesRefs.current = [];
     };
-  }, [indicator.type, indicator.id, indicator.color, indicator.color2, indicator.lineWidth, indicator.lineStyle, chartFontSize]);
+  }, [indicator.type, indicator.id, indicator.color, indicator.color2, indicator.lineWidth, indicator.lineStyle, chartFontSize, paneMode]);
 
   useEffect(() => {
     if (!chartRef.current || seriesRefs.current.length === 0 || candles.length === 0) return;
