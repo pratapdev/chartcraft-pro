@@ -12,6 +12,7 @@ export function useIndicatorRenderer(
   indicators: any[]
 ) {
   const lineSeriesRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  const lastIndicatorIdsRef = useRef<string[]>([]);
 
   const clearLineSeries = useCallback(() => {
     lineSeriesRefs.current.clear();
@@ -20,10 +21,14 @@ export function useIndicatorRenderer(
   useEffect(() => {
     if (!chartRef.current || candles.length === 0) return;
 
+    const nextIndicatorIds = indicators.filter((ind) => ind.visible).map((ind) => ind.id);
+    const removedIds = lastIndicatorIdsRef.current.filter((id) => !nextIndicatorIds.includes(id));
+
     lineSeriesRefs.current.forEach((series) => {
       try { chartRef.current?.removeSeries(series); } catch {}
     });
     lineSeriesRefs.current.clear();
+    lastIndicatorIdsRef.current = nextIndicatorIds;
 
     let allMarkers: { time: Time; position: 'aboveBar' | 'belowBar'; color: string; shape: 'arrowUp' | 'arrowDown' | 'circle'; text: string }[] = [];
 
