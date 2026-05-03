@@ -174,6 +174,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         secondsVisible: false,
         visible: false,
         rightOffset: 50,
+        minBarSpacing: 0.5,
         shiftVisibleRangeOnNewBar: false,
       },
       // CRITICAL: disable all user interaction so pane cannot be dragged independently
