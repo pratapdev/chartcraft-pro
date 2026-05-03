@@ -17,9 +17,6 @@ import { HeatmapView } from '@/components/Heatmap/HeatmapView';
 import { FeatureGuide } from '@/components/Guide/FeatureGuide';
 import { HelpCircle } from 'lucide-react';
 
-// ============================================================
-// Indicator presets — including new Smart Money indicators
-// ============================================================
 const INDICATOR_PRESETS: {
   type: IndicatorType;
   label: string;
