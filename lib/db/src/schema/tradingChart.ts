@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, jsonb, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, jsonb, numeric, bigint } from "drizzle-orm/pg-core";
 
 export const chartStateTable = pgTable("chart_state", {
   id: text("id").primaryKey().default("default"),
@@ -13,14 +13,14 @@ export const trendlinesTable = pgTable("trendlines", {
   id: text("id").primaryKey(),
   symbol: text("symbol").notNull(),
   timeframe: text("timeframe").notNull(),
-  startTime: integer("start_time").notNull(),
+  startTime: bigint("start_time", { mode: "number" }).notNull(),
   startPrice: numeric("start_price").notNull(),
-  endTime: integer("end_time").notNull(),
+  endTime: bigint("end_time", { mode: "number" }).notNull(),
   endPrice: numeric("end_price").notNull(),
   color: text("color").notNull().default("#2962FF"),
   thickness: integer("thickness").notNull().default(1),
   lineStyle: text("line_style").notNull().default("solid"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 
 export const chartAlertsTable = pgTable("chart_alerts", {
@@ -31,9 +31,9 @@ export const chartAlertsTable = pgTable("chart_alerts", {
   condition: text("condition").notNull(),
   active: boolean("active").notNull().default(true),
   triggered: boolean("triggered").notNull().default(false),
-  triggeredAt: integer("triggered_at"),
+  triggeredAt: bigint("triggered_at", { mode: "number" }),
   message: text("message"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
   telegramEnabled: boolean("telegram_enabled").notNull().default(true),
 });
 
@@ -42,7 +42,7 @@ export const chartAlertLogsTable = pgTable("chart_alert_logs", {
   alertId: text("alert_id"),
   symbol: text("symbol").notNull(),
   message: text("message").notNull(),
-  timestamp: integer("timestamp").notNull(),
+  timestamp: bigint("timestamp", { mode: "number" }).notNull(),
   price: numeric("price").notNull(),
 });
 
@@ -65,11 +65,11 @@ export const fibonacciDrawingsTable = pgTable("fibonacci_drawings", {
   id: text("id").primaryKey(),
   symbol: text("symbol").notNull(),
   timeframe: text("timeframe").notNull(),
-  startTime: integer("start_time").notNull(),
+  startTime: bigint("start_time", { mode: "number" }).notNull(),
   startPrice: numeric("start_price").notNull(),
-  endTime: integer("end_time").notNull(),
+  endTime: bigint("end_time", { mode: "number" }).notNull(),
   endPrice: numeric("end_price").notNull(),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
 
 export const indicatorCrossAlertsTable = pgTable("indicator_cross_alerts", {
@@ -81,9 +81,9 @@ export const indicatorCrossAlertsTable = pgTable("indicator_cross_alerts", {
   condition: text("condition").notNull(),
   active: boolean("active").notNull().default(true),
   triggered: boolean("triggered").notNull().default(false),
-  triggeredAt: integer("triggered_at"),
+  triggeredAt: bigint("triggered_at", { mode: "number" }),
   message: text("message"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
   telegramEnabled: boolean("telegram_enabled").notNull().default(true),
 });
 
@@ -96,9 +96,9 @@ export const indicatorThresholdAlertsTable = pgTable("indicator_threshold_alerts
   threshold: numeric("threshold").notNull(),
   active: boolean("active").notNull().default(true),
   triggered: boolean("triggered").notNull().default(false),
-  triggeredAt: integer("triggered_at"),
+  triggeredAt: bigint("triggered_at", { mode: "number" }),
   message: text("message"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
   telegramEnabled: boolean("telegram_enabled").notNull().default(true),
 });
 
@@ -110,8 +110,8 @@ export const stochRSICrossAlertsTable = pgTable("stoch_rsi_cross_alerts", {
   condition: text("condition").notNull(),
   active: boolean("active").notNull().default(true),
   triggered: boolean("triggered").notNull().default(false),
-  triggeredAt: integer("triggered_at"),
+  triggeredAt: bigint("triggered_at", { mode: "number" }),
   message: text("message"),
-  createdAt: integer("created_at").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
   telegramEnabled: boolean("telegram_enabled").notNull().default(true),
 });
