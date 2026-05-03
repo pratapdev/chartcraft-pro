@@ -177,6 +177,9 @@ export function useIndicatorRenderer(
         })));
       }
 
+      // FVG and MARKET_STRUCTURE are rendered by SmartMoneyOverlay (canvas), skip here
+      if (ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE') continue;
+
       if (ind.type === 'MSB_OB') {
         const msbResult = computeMsbOb(candles, ind.zigzagLength ?? 9, ind.fibFactor ?? 0.33);
 

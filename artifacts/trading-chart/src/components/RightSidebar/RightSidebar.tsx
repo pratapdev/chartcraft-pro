@@ -1,12 +1,164 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
-import { X, Trash2, Eye, EyeOff, Plus, ChevronDown, Bell, Send, ArrowRightLeft, RefreshCw, CloudOff, Cloud, List, Grid3X3 } from 'lucide-react';
-import { IndicatorType, IndicatorConfig, AlertCondition, LineStyleType, ThresholdCondition, PctDiffDonLine, MarketType, Timeframe } from '@/types/trading';
+import {
+  X, Trash2, Eye, EyeOff, Plus, Bell, Send, ArrowRightLeft,
+  RefreshCw, CloudOff, Cloud, TrendingUp, BarChart2, Settings,
+} from 'lucide-react';
+import {
+  IndicatorType, IndicatorConfig, AlertCondition, LineStyleType,
+  ThresholdCondition, PctDiffDonLine, MarketType, Timeframe,
+} from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 import { pushState, pullState, checkSyncHealth, extractSyncPayload } from '@/lib/syncService';
 import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/components/Alerts/CompoundAlerts';
 import { WatchlistPanel } from '@/components/Watchlist/WatchlistPanel';
 import { HeatmapView } from '@/components/Heatmap/HeatmapView';
+
+// ============================================================
+// Indicator presets — including new Smart Money indicators
+// ============================================================
+const INDICATOR_PRESETS: {
+  type: IndicatorType;
+  label: string;
+  description: string;
+  group: string;
+  defaults: {
+    period?: number;
+    color?: string;
+    color2?: string;
+    kPeriod?: number;
+    dPeriod?: number;
+    stdDev?: number;
+    multiplier?: number;
+    lookbackWindow?: number;
+    emaSmoothing?: number;
+    donchianLength?: number;
+    donLineDiff?: number;
+    zigzagLength?: number;
+    fibFactor?: number;
+    threshold?: number;
+    minStack?: number;
+  };
+}[] = [
+  // Trend
+  { type: 'EMA', label: 'EMA', description: 'Exponential Moving Average', group: 'Trend', defaults: { period: 20, color: '#2962FF' } },
+  { type: 'SMA', label: 'SMA', description: 'Simple Moving Average', group: 'Trend', defaults: { period: 20, color: '#FF6D00' } },
+  { type: 'VWAP', label: 'VWAP', description: 'Volume Weighted Average Price', group: 'Trend', defaults: { period: 1, color: '#9C27B0' } },
+  { type: 'SUPERTREND', label: 'Supertrend', description: 'ATR-based trend follower', group: 'Trend', defaults: { period: 10, color: '#22c55e', color2: '#ef4444', multiplier: 3 } },
+  { type: 'BBANDS', label: 'Bollinger Bands', description: 'Volatility bands', group: 'Trend', defaults: { period: 20, color: '#2962FF', stdDev: 2 } },
+  // Momentum
+  { type: 'RSI', label: 'RSI', description: 'Relative Strength Index', group: 'Momentum', defaults: { period: 14, color: '#9C27B0' } },
+  { type: 'STOCH_RSI', label: 'Stoch RSI', description: 'Stochastic RSI', group: 'Momentum', defaults: { period: 14, color: '#2962FF', color2: '#FF6D00', kPeriod: 3, dPeriod: 3 } },
+  { type: 'MACD', label: 'MACD', description: 'Moving Average Convergence Divergence', group: 'Momentum', defaults: { period: 12, color: '#2962FF' } },
+  { type: 'ADX', label: 'ADX', description: 'Average Directional Index', group: 'Momentum', defaults: { period: 14, color: '#FF6D00' } },
+  // Volatility / Other
+  { type: 'ATR', label: 'ATR', description: 'Average True Range', group: 'Volatility', defaults: { period: 14, color: '#6b7280' } },
+  { type: 'OBV', label: 'OBV', description: 'On-Balance Volume', group: 'Volatility', defaults: { period: 1, color: '#06b6d4' } },
+  { type: 'PIVOT_HL', label: 'Pivot H/L', description: 'Pivot highs and lows', group: 'Volatility', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
+  { type: 'PCT_DIFF_DON', label: 'PctDiff Don', description: 'Pct diff with Donchian', group: 'Volatility', defaults: { period: 20, color: '#06b6d4', lookbackWindow: 50, emaSmoothing: 9, donchianLength: 20, donLineDiff: 0.1 } },
+  { type: 'VPVR', label: 'VPVR', description: 'Volume Profile Visible Range', group: 'Volatility', defaults: { period: 1, color: '#6b7280' } },
+  { type: 'IMBALANCE', label: 'Volume Imbalance', description: 'Stacked volume imbalance zones', group: 'Volatility', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
+  // Smart Money
+  { type: 'MSB_OB', label: 'MSB + Order Blocks', description: 'Market Structure Break & Order Blocks (ZigZag)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', zigzagLength: 9, fibFactor: 0.33 } },
+  { type: 'FVG', label: 'Fair Value Gap', description: 'Bullish & bearish FVG / imbalance zones (3-candle)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', threshold: 0.1 } },
+  { type: 'MARKET_STRUCTURE', label: 'Market Structure', description: 'BOS, CHOCH & liquidity sweeps', group: 'Smart Money', defaults: { period: 5, color: '#22c55e' } },
+];
+
+// Group presets
+const PRESET_GROUPS = ['Smart Money', 'Trend', 'Momentum', 'Volatility'];
+
+// ============================================================
+// Stub alert form components (shown as collapsed sections)
+// ============================================================
+
+const QuickPriceAlert: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5"><Bell size={10} className="text-primary" /> Price Alert</span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 text-muted-foreground text-[10px]">
+          Draw a horizontal line on the chart, then right-click it to set a price alert.
+        </div>
+      )}
+    </div>
+  );
+};
+
+const IndicatorCrossAlertForm: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5"><ArrowRightLeft size={10} className="text-primary" /> Indicator Cross Alert</span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 text-muted-foreground text-[10px]">
+          Add two EMA or SMA indicators, then configure a cross alert here. (Cross alerting requires at least 2 overlay indicators.)
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StochRSICrossAlertForm: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5"><ArrowRightLeft size={10} className="text-accent-foreground" /> StochRSI K/D Cross</span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 text-muted-foreground text-[10px]">
+          Add a StochRSI indicator first, then trigger an alert when K crosses D.
+        </div>
+      )}
+    </div>
+  );
+};
+
+const IndicatorThresholdAlertForm: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5"><Bell size={10} className="text-accent-foreground" /> Threshold Alert</span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 text-muted-foreground text-[10px]">
+          Alert when an indicator (RSI, ADX, etc.) crosses above or below a threshold value.
+        </div>
+      )}
+    </div>
+  );
+};
+
+const PctDiffDonCrossAlertForm: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5"><ArrowRightLeft size={10} className="text-accent-foreground" /> %Diff Donchian Cross</span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 text-muted-foreground text-[10px]">
+          Alert when the %Diff line crosses the Donchian upper/lower/basis bands.
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// Sync controls
+// ============================================================
 
 const SyncControls: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
@@ -129,17 +281,83 @@ const SyncControls: React.FC = () => {
   );
 };
 
+// ============================================================
+// Telegram settings panel
+// ============================================================
+const TelegramSettings: React.FC = () => {
+  const [botToken, setBotToken] = useState('');
+  const [chatId, setChatId] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    const creds = getTelegramCredentials();
+    if (creds) { setBotToken(creds.botToken); setChatId(creds.chatId); }
+  }, []);
+
+  const handleSave = () => {
+    saveTelegramCredentials({ botToken, chatId, enabled: true });
+    setResult('Saved ✓');
+    setTimeout(() => setResult(null), 2000);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setResult(null);
+    saveTelegramCredentials({ botToken, chatId, enabled: true });
+    const ok = await testTelegramNotification();
+    setResult(ok ? 'Test sent ✓' : 'Failed ✗');
+    setTesting(false);
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <p className="text-muted-foreground text-[10px]">Configure Telegram for alert notifications.</p>
+      <input
+        type="text"
+        placeholder="Bot Token"
+        value={botToken}
+        onChange={(e) => setBotToken(e.target.value)}
+        className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+      />
+      <input
+        type="text"
+        placeholder="Chat ID"
+        value={chatId}
+        onChange={(e) => setChatId(e.target.value)}
+        className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+      />
+      <div className="flex gap-2">
+        <button onClick={handleSave} className="flex-1 py-1.5 rounded bg-primary text-primary-foreground text-xs hover:opacity-90">
+          Save
+        </button>
+        <button onClick={handleTest} disabled={testing} className="flex-1 py-1.5 rounded bg-accent text-foreground text-xs hover:opacity-90 disabled:opacity-50">
+          {testing ? '...' : 'Test'}
+        </button>
+      </div>
+      {result && <p className={`text-[10px] ${result.includes('✓') ? 'text-bull' : 'text-bear'}`}>{result}</p>}
+    </div>
+  );
+};
+
+// ============================================================
+// Main RightSidebar
+// ============================================================
 export const RightSidebar: React.FC = () => {
   const {
     rightPanelOpen,
     rightPanelTab,
     setRightPanelOpen,
+    setRightPanelTab,
     alerts,
     alertLogs,
     removeAlert,
     clearAllAlerts,
     indicators,
     addIndicator,
+    removeIndicator,
+    toggleIndicator,
+    updateIndicator,
     clearAllIndicators,
     trendlines,
     fibonacciDrawings,
@@ -152,9 +370,15 @@ export const RightSidebar: React.FC = () => {
     removeStochRSICrossAlert,
     pctDiffDonCrossAlerts,
     removePctDiffDonCrossAlert,
+    chartFontSize,
+    setChartFontSize,
+    timezone,
+    setTimezone,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
   if (!rightPanelOpen) return null;
 
@@ -177,22 +401,188 @@ export const RightSidebar: React.FC = () => {
       donLineDiff: preset.defaults.donLineDiff,
       zigzagLength: preset.defaults.zigzagLength,
       fibFactor: preset.defaults.fibFactor,
+      threshold: preset.defaults.threshold,
+      minStack: preset.defaults.minStack,
     });
     setShowAdd(false);
+    setSearchQuery('');
   };
+
+  const filteredPresets = INDICATOR_PRESETS.filter((p) => {
+    const matchesSearch = !searchQuery || p.label.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesGroup = !selectedGroup || p.group === selectedGroup;
+    return matchesSearch && matchesGroup;
+  });
+
+  const tabs = [
+    { id: 'indicators', icon: <TrendingUp size={12} /> },
+    { id: 'alerts', icon: <Bell size={12} /> },
+    { id: 'settings', icon: <Settings size={12} /> },
+  ];
 
   return (
     <div className="bg-card border-l border-border flex flex-col h-full w-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-panel-header">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {rightPanelTab}
-        </span>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-panel-header shrink-0">
+        <div className="flex items-center gap-1">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setRightPanelTab(t.id as any)}
+              className={`p-1.5 rounded transition-colors ${rightPanelTab === t.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              title={t.id.charAt(0).toUpperCase() + t.id.slice(1)}
+            >
+              {t.icon}
+            </button>
+          ))}
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">
+            {rightPanelTab}
+          </span>
+        </div>
         <button onClick={() => setRightPanelOpen(false)} className="text-muted-foreground hover:text-foreground">
           <X size={14} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+
+        {/* ---- INDICATORS TAB ---- */}
+        {rightPanelTab === 'indicators' && (
+          <div className="space-y-2">
+            {/* Active indicators list */}
+            {indicators.length === 0 && !showAdd && (
+              <p className="text-xs text-muted-foreground text-center py-4">No indicators added yet.</p>
+            )}
+            {indicators.map((ind) => (
+              <div key={ind.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: ind.color }}
+                    />
+                    <span className="text-foreground font-medium truncate">{INDICATOR_PRESETS.find(p => p.type === ind.type)?.label ?? ind.type}</span>
+                    {ind.period > 1 && <span className="text-muted-foreground shrink-0">({ind.period})</span>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => toggleIndicator(ind.id)} className="text-muted-foreground hover:text-foreground p-0.5" title={ind.visible ? 'Hide' : 'Show'}>
+                      {ind.visible ? <Eye size={11} /> : <EyeOff size={11} />}
+                    </button>
+                    <button onClick={() => removeIndicator(ind.id)} className="text-muted-foreground hover:text-destructive p-0.5">
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                </div>
+                {/* Smart Money indicator badges */}
+                {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE' || ind.type === 'MSB_OB') && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {ind.type === 'FVG' && (
+                      <>
+                        <span className="bg-bull/10 text-bull text-[9px] px-1.5 py-0.5 rounded">Bullish FVG</span>
+                        <span className="bg-bear/10 text-bear text-[9px] px-1.5 py-0.5 rounded">Bearish FVG</span>
+                        <span className="text-[9px] text-muted-foreground">min gap {ind.threshold ?? 0.1}×ATR</span>
+                      </>
+                    )}
+                    {ind.type === 'MARKET_STRUCTURE' && (
+                      <>
+                        <span className="bg-bull/10 text-bull text-[9px] px-1.5 py-0.5 rounded">BOS</span>
+                        <span className="bg-[rgba(168,85,247,0.12)] text-purple-400 text-[9px] px-1.5 py-0.5 rounded">CHOCH</span>
+                        <span className="bg-orange-500/10 text-orange-400 text-[9px] px-1.5 py-0.5 rounded">⚡ Sweeps</span>
+                        <span className="text-[9px] text-muted-foreground">swing len {ind.period}</span>
+                      </>
+                    )}
+                    {ind.type === 'MSB_OB' && (
+                      <>
+                        <span className="bg-bull/10 text-bull text-[9px] px-1.5 py-0.5 rounded">Bu-OB</span>
+                        <span className="bg-bear/10 text-bear text-[9px] px-1.5 py-0.5 rounded">Be-OB</span>
+                        <span className="text-[9px] text-muted-foreground">zz {ind.zigzagLength}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Add indicator panel */}
+            {!showAdd ? (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-primary hover:opacity-80 border border-dashed border-primary/30 rounded transition-opacity"
+              >
+                <Plus size={12} /> Add Indicator
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search indicators..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+                    autoFocus
+                  />
+                  <button onClick={() => { setShowAdd(false); setSearchQuery(''); setSelectedGroup(null); }} className="text-muted-foreground hover:text-foreground">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Group filter chips */}
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setSelectedGroup(null)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${selectedGroup === null ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                  >All</button>
+                  {PRESET_GROUPS.map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setSelectedGroup(g === selectedGroup ? null : g)}
+                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${selectedGroup === g ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                    >{g}</button>
+                  ))}
+                </div>
+
+                {/* Grouped preset list */}
+                {PRESET_GROUPS.filter(g => !selectedGroup || g === selectedGroup).map((group) => {
+                  const groupPresets = filteredPresets.filter((p) => p.group === group);
+                  if (groupPresets.length === 0) return null;
+                  return (
+                    <div key={group}>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1">{group}</p>
+                      <div className="space-y-1">
+                        {groupPresets.map((preset) => (
+                          <button
+                            key={preset.type}
+                            onClick={() => handleAddIndicator(preset)}
+                            className="w-full text-left px-2 py-1.5 rounded hover:bg-accent transition-colors text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: preset.defaults.color ?? '#6b7280' }} />
+                              <span className="font-medium text-foreground">{preset.label}</span>
+                              {group === 'Smart Money' && (
+                                <span className="text-[9px] bg-primary/15 text-primary px-1.5 py-0.5 rounded-full shrink-0">SMC</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-0.5 ml-4">{preset.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {indicators.length > 0 && !showAdd && (
+              <button onClick={clearAllIndicators} className="w-full text-[10px] text-destructive hover:text-destructive/80 transition-colors py-1">
+                Clear All Indicators
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ---- ALERTS TAB ---- */}
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
@@ -307,6 +697,74 @@ export const RightSidebar: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* ---- SETTINGS TAB ---- */}
+        {rightPanelTab === 'settings' && (
+          <div className="space-y-4">
+            {/* Chart settings */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Chart</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <label className="text-muted-foreground">Font Size</label>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setChartFontSize(Math.max(8, chartFontSize - 1))} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs">−</button>
+                    <span className="w-5 text-center">{chartFontSize}</span>
+                    <button onClick={() => setChartFontSize(Math.min(16, chartFontSize + 1))} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs">+</button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <label className="text-muted-foreground">Timezone</label>
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="bg-input border border-border rounded px-2 py-1 text-xs text-foreground"
+                  >
+                    <option value="Exchange">Exchange</option>
+                    <option value="UTC">UTC</option>
+                    <option value="America/New_York">New York</option>
+                    <option value="Europe/London">London</option>
+                    <option value="Asia/Kolkata">India (IST)</option>
+                    <option value="Asia/Tokyo">Tokyo</option>
+                    <option value="Asia/Singapore">Singapore</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Drawings */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Drawings</p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <span>Trendlines: {trendlines.length}</span>
+                  {trendlines.length > 0 && (
+                    <button onClick={clearAllDrawings} className="text-[10px] text-destructive hover:text-destructive/80">Clear All</button>
+                  )}
+                </div>
+                <div>Fibonacci: {fibonacciDrawings.length}</div>
+              </div>
+            </div>
+
+            {/* Telegram */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Telegram Alerts</p>
+              <TelegramSettings />
+            </div>
+
+            {/* Sync */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Server Sync</p>
+              <SyncControls />
+            </div>
+          </div>
+        )}
+
+        {/* ---- WATCHLIST TAB ---- */}
+        {rightPanelTab === 'watchlist' && <WatchlistPanel />}
+
+        {/* ---- HEATMAP TAB ---- */}
+        {rightPanelTab === 'heatmap' && <HeatmapView />}
       </div>
     </div>
   );
