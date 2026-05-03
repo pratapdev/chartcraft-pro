@@ -1,0 +1,184 @@
+export interface Candle {
+  time: number; // unix timestamp in seconds
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export type Timeframe = '1m' | '3m' | '5m' | '15m' | '1h' | '4h' | '1D' | '1W';
+
+export type MarketType = 'crypto' | 'indian';
+
+export type LineStyleType = 'solid' | 'dashed' | 'dotted';
+
+export interface Trendline {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  startTime: number;
+  startPrice: number;
+  endTime: number;
+  endPrice: number;
+  color: string;
+  thickness: number;
+  lineStyle?: LineStyleType;
+  createdAt: number;
+}
+
+export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'vertical' | 'ray' | 'measure' | 'fibonacci' | 'riskreward';
+
+export interface RiskRewardDrawing {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  entryTime: number;
+  createdAt: number;
+}
+
+export interface FibonacciDrawing {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  startTime: number;
+  startPrice: number;
+  endTime: number;
+  endPrice: number;
+  createdAt: number;
+}
+
+export type AlertCondition = 'cross_above' | 'cross_below' | 'cross_any';
+export type ThresholdCondition = 'above' | 'below';
+
+export interface Alert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  trendlineId: string;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export interface IndicatorCrossAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  indicatorId1: string;
+  indicatorId2: string;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export interface IndicatorThresholdAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  /** Which indicator (by id) to watch */
+  indicatorId: string;
+  /** 'above' or 'below' */
+  condition: ThresholdCondition;
+  /** The threshold value (e.g. RSI 70, ADX 25) */
+  threshold: number;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export interface StochRSICrossAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  /** The StochRSI indicator id */
+  indicatorId: string;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export type PctDiffDonLine = 'main' | 'ema' | 'basis' | 'upper' | 'lower' | 'upperNew' | 'lowerNew';
+
+export interface PctDiffDonCrossAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  indicatorId: string;
+  line1: PctDiffDonLine;
+  line2: PctDiffDonLine;
+  condition: AlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+}
+
+export interface AlertLog {
+  id: string;
+  alertId: string;
+  symbol: string;
+  message: string;
+  timestamp: number;
+  price: number;
+}
+
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE';
+
+export interface IndicatorConfig {
+  id: string;
+  type: IndicatorType;
+  period: number;
+  color: string;
+  visible: boolean;
+  /** Line width for the indicator */
+  lineWidth?: number;
+  /** Line style for the indicator */
+  lineStyle?: LineStyleType;
+  /** For StochRSI: smoothing K period */
+  kPeriod?: number;
+  /** For StochRSI: smoothing D period */
+  dPeriod?: number;
+  /** Secondary color for D line in StochRSI, or sell color for Supertrend */
+  color2?: string;
+  /** Standard deviation multiplier for Bollinger Bands */
+  stdDev?: number;
+  /** ATR multiplier for Supertrend */
+  multiplier?: number;
+  /** PCT_DIFF_DON: lookback window for EMA average */
+  lookbackWindow?: number;
+  /** PCT_DIFF_DON: EMA smoothing period for the percentage diff line */
+  emaSmoothing?: number;
+  /** PCT_DIFF_DON: Donchian channel length */
+  donchianLength?: number;
+  /** PCT_DIFF_DON: Donchian line diff multiplier */
+  donLineDiff?: number;
+  /** MSB_OB: ZigZag length */
+  zigzagLength?: number;
+  /** MSB_OB: Fib factor for breakout confirmation */
+  fibFactor?: number;
+  /** IMBALANCE: ratio threshold (e.g. 3 = 300%) */
+  threshold?: number;
+  /** IMBALANCE: minimum consecutive levels for stacked zone */
+  minStack?: number;
+}
