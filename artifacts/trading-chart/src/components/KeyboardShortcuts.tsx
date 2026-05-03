@@ -33,64 +33,47 @@ const TOOL_MAP: Record<string, DrawingTool> = {
 export const KeyboardShortcuts: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [symbolSearchOpen, setSymbolSearchOpen] = useState(false);
-  const {
-    setActiveTool,
-    setRightPanelTab,
-    selectedTrendlineId,
-    removeTrendline,
-    setSelectedTrendlineId,
-    selectedFibId,
-    removeFibonacci,
-  } = useChartStore.getState as any;
+  const store = useChartStore();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't trigger if typing in an input
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
       const key = e.key.toLowerCase();
-      const store = useChartStore.getState();
 
-      // Ctrl+K for symbol search
       if ((e.ctrlKey || e.metaKey) && key === 'k') {
         e.preventDefault();
         setSymbolSearchOpen(true);
         return;
       }
 
-      // Toggle shortcuts panel
       if (e.key === '?') {
         setOpen((prev) => !prev);
         return;
       }
 
-      // Tool shortcuts
       if (TOOL_MAP[key]) {
         store.setActiveTool(TOOL_MAP[key]);
         return;
       }
 
-      // Panel shortcuts
       if (key === 'a') { store.setRightPanelTab('alerts'); return; }
       if (key === 'i') { store.setRightPanelTab('indicators'); return; }
       if (key === 's') { store.setRightPanelTab('settings'); return; }
 
-      // Undo
       if (key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
         store.undoLastDeletion();
         return;
       }
 
-      // Redo (Ctrl+Y or Ctrl+Shift+Z)
       if ((key === 'y' && (e.ctrlKey || e.metaKey)) || (key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
         e.preventDefault();
         store.redoLastDeletion();
         return;
       }
 
-      // Delete selected
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (store.selectedTrendlineId) {
           store.removeTrendline(store.selectedTrendlineId);
@@ -105,7 +88,6 @@ export const KeyboardShortcuts: React.FC = () => {
         }
       }
 
-      // Escape
       if (e.key === 'Escape') {
         store.setActiveTool('cursor');
         store.setSelectedTrendlineId(null);
@@ -115,14 +97,11 @@ export const KeyboardShortcuts: React.FC = () => {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [store]);
 
   return (
     <>
-      {/* Symbol Search Dialog */}
       <SymbolSearch open={symbolSearchOpen} onOpenChange={setSymbolSearchOpen} />
-
-      {/* Trigger button */}
       <button
         onClick={() => setOpen((prev: boolean) => !prev)}
         className="fixed bottom-3 right-3 z-50 w-8 h-8 flex items-center justify-center rounded bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -130,8 +109,6 @@ export const KeyboardShortcuts: React.FC = () => {
       >
         <Keyboard size={14} />
       </button>
-
-      {/* Panel */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setOpen(false)}>
           <div

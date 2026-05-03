@@ -128,3 +128,188 @@ const SyncControls: React.FC = () => {
     </div>
   );
 };
+
+export const RightSidebar: React.FC = () => {
+  const {
+    rightPanelOpen,
+    rightPanelTab,
+    setRightPanelOpen,
+    alerts,
+    alertLogs,
+    removeAlert,
+    clearAllAlerts,
+    indicators,
+    addIndicator,
+    clearAllIndicators,
+    trendlines,
+    fibonacciDrawings,
+    clearAllDrawings,
+    indicatorCrossAlerts,
+    removeIndicatorCrossAlert,
+    indicatorThresholdAlerts,
+    removeIndicatorThresholdAlert,
+    stochRSICrossAlerts,
+    removeStochRSICrossAlert,
+    pctDiffDonCrossAlerts,
+    removePctDiffDonCrossAlert,
+  } = useChartStore();
+
+  const [showAdd, setShowAdd] = useState(false);
+
+  if (!rightPanelOpen) return null;
+
+  const handleAddIndicator = (preset: typeof INDICATOR_PRESETS[number]) => {
+    const id = `${preset.type.toLowerCase()}-${Date.now()}`;
+    addIndicator({
+      id,
+      type: preset.type,
+      period: preset.defaults.period ?? 14,
+      color: preset.defaults.color ?? '#2962FF',
+      visible: true,
+      kPeriod: preset.defaults.kPeriod,
+      dPeriod: preset.defaults.dPeriod,
+      color2: preset.defaults.color2,
+      stdDev: preset.defaults.stdDev,
+      multiplier: preset.defaults.multiplier,
+      lookbackWindow: preset.defaults.lookbackWindow,
+      emaSmoothing: preset.defaults.emaSmoothing,
+      donchianLength: preset.defaults.donchianLength,
+      donLineDiff: preset.defaults.donLineDiff,
+      zigzagLength: preset.defaults.zigzagLength,
+      fibFactor: preset.defaults.fibFactor,
+    });
+    setShowAdd(false);
+  };
+
+  return (
+    <div className="bg-card border-l border-border flex flex-col h-full w-full">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-panel-header">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {rightPanelTab}
+        </span>
+        <button onClick={() => setRightPanelOpen(false)} className="text-muted-foreground hover:text-foreground">
+          <X size={14} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2">
+        {rightPanelTab === 'alerts' && (
+          <div className="space-y-2">
+            <QuickPriceAlert />
+            <CompoundAlertForm />
+            <IndicatorCrossAlertForm />
+            <StochRSICrossAlertForm />
+            <IndicatorThresholdAlertForm />
+            <PctDiffDonCrossAlertForm />
+            <CompoundAlertsList />
+            <AlertTemplatesSection />
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs text-muted-foreground">
+                {(() => {
+                  const total = alerts.length
+                    + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length
+                    + (indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).length
+                    + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length;
+                  return total === 0 ? 'No alerts set.' : `${total} active alert(s)`;
+                })()}
+              </p>
+              {(alerts.length > 0 || indicatorCrossAlerts.length > 0 || (indicatorThresholdAlerts ?? []).length > 0 || (stochRSICrossAlerts ?? []).length > 0) && (
+                <button onClick={clearAllAlerts} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">
+                  Delete All
+                </button>
+              )}
+            </div>
+            {alerts.map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeAlert(alert.id); useChartStore.getState().addAlert(updated); }}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+                    <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  </div>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {indicatorCrossAlerts.filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-primary" />
+                    <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeIndicatorCrossAlert(alert.id); useChartStore.getState().addIndicatorCrossAlert(updated); }}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+                    <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  </div>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">StochRSI {alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <button onClick={() => removeStochRSICrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Bell size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">{alert.condition} {alert.threshold}</span>
+                  </div>
+                  <button onClick={() => removeIndicatorThresholdAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {(pctDiffDonCrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowRightLeft size={10} className="text-accent-foreground" />
+                    <span className="text-foreground">%Diff {alert.condition.replace('_', ' ')}</span>
+                  </div>
+                  <button onClick={() => removePctDiffDonCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+              </div>
+            ))}
+            {alertLogs.length > 0 && (
+              <>
+                <div className="flex items-center justify-between mt-4 px-1">
+                  <span className="text-xs font-semibold text-muted-foreground">Recent Alerts</span>
+                  <button onClick={() => useChartStore.getState().clearAlertLogs()} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">Clear All</button>
+                </div>
+                {alertLogs.slice(0, 10).map((log) => (
+                  <div key={log.id} className="panel-section rounded p-2 text-xs">
+                    <div className="text-foreground">{log.message}</div>
+                    <div className="text-muted-foreground mt-1">
+                      {new Date(log.timestamp).toLocaleTimeString()} · {log.price.toFixed(2)}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default RightSidebar;
