@@ -143,13 +143,20 @@ const normalizeSyncPayload = (data: RawServerPayload): SyncPayload => ({
   })),
 });
 
+// Include X-Sync-Key header when VITE_SYNC_API_KEY is configured so it
+// matches the server-side syncAuthMiddleware guard in api-server/src/routes/sync.ts.
+const syncHeaders = (): Record<string, string> => {
+  const key = import.meta.env.VITE_SYNC_API_KEY as string | undefined;
+  return key ? { 'X-Sync-Key': key } : {};
+};
+
 export async function pullState(): Promise<SyncPayload | null> {
   try {
     const res = await fetch('/api/sync/state', {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...syncHeaders() },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return normalizeSyncPayload(await res.json());
+    return normalizeSyncPayload(await res.json() as RawServerPayload);
   } catch (error) {
     console.warn('[Sync] Pull failed:', error instanceof Error ? error.message : String(error));
     return null;
@@ -160,7 +167,7 @@ export async function pushState(data: SyncPayload): Promise<boolean> {
   try {
     const res = await fetch('/api/sync/state', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...syncHeaders() },
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
