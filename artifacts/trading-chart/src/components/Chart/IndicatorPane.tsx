@@ -173,6 +173,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         timeVisible: false,
         secondsVisible: false,
         visible: false,
+        rightOffset: 50,
         shiftVisibleRangeOnNewBar: false,
       },
       // CRITICAL: disable all user interaction so pane cannot be dragged independently
@@ -256,6 +257,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       const unsubscribeMain = chartSync.subscribeMainTimeRange((range: TimeRange) => {
         lastMainRangeRef.current = range;
         try { chart.timeScale().setVisibleRange(range); } catch {}
+        try { chart.timeScale().applyOptions({ rightOffset: 50 }); } catch {}
       });
 
       return () => {
