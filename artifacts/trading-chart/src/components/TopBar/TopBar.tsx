@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch, Sparkles } from 'lucide-react';
 import { ChartLayoutMenu } from './ChartLayoutMenu';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
@@ -133,7 +133,12 @@ const SyncStatusIndicator: React.FC = () => {
   );
 };
 
-export const TopBar: React.FC = () => {
+interface TopBarProps {
+  aiOpen?: boolean;
+  onToggleAI?: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore();
@@ -403,6 +408,17 @@ export const TopBar: React.FC = () => {
           <span className="w-1.5 h-1.5 rounded-full bg-destructive absolute -top-0.5 -right-0.5" />
         )}
       </button>
+
+      {onToggleAI && (
+        <button
+          onClick={onToggleAI}
+          className={`trading-btn flex items-center gap-1 ml-1 ${aiOpen ? 'text-blue-400 bg-blue-900/20' : ''}`}
+          title="AI Trading Sidekick"
+        >
+          <Sparkles size={14} className={aiOpen ? 'text-blue-400' : ''} />
+          <span className="hidden sm:inline">AI</span>
+        </button>
+      )}
     </div>
   );
 };

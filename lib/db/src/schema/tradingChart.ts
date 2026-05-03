@@ -59,6 +59,27 @@ export const chartIndicatorsTable = pgTable("chart_indicators", {
   color2: text("color2"),
   stdDev: numeric("std_dev"),
   multiplier: numeric("multiplier"),
+  // Extended indicator fields
+  paneMode: text("pane_mode"),
+  lookbackWindow: integer("lookback_window"),
+  emaSmoothing: integer("ema_smoothing"),
+  donchianLength: integer("donchian_length"),
+  donLineDiff: numeric("don_line_diff"),
+  zigzagLength: integer("zigzag_length"),
+  fibFactor: numeric("fib_factor"),
+  indicatorThreshold: numeric("indicator_threshold"),
+  minStack: integer("min_stack"),
+  anchorTime: bigint("anchor_time", { mode: "number" }),
+  showBands: boolean("show_bands"),
+  pivotLen: integer("pivot_len"),
+  sdStrength: numeric("sd_strength"),
+  sdAtrMult: numeric("sd_atr_mult"),
+  showMitigated: boolean("show_mitigated"),
+  showSweeps: boolean("show_sweeps"),
+  showSwingDots: boolean("show_swing_dots"),
+  htfTimeframe: text("htf_timeframe"),
+  htfDisplayMode: text("htf_display_mode"),
+  htfShowWicks: boolean("htf_show_wicks"),
 });
 
 export const fibonacciDrawingsTable = pgTable("fibonacci_drawings", {
