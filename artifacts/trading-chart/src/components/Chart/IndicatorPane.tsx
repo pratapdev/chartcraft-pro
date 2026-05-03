@@ -28,15 +28,12 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartSync = useChartSync();
   const chartId = `indicator-${indicator.id}`;
-  const savedRangeRef = useRef<{ from: number; to: number } | null>(null);
   const prevIndicatorRef = useRef<string>('');
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     if (chartRef.current) {
-      const range = chartRef.current.timeScale().getVisibleLogicalRange();
-      if (range) savedRangeRef.current = range;
       if (chartSync) chartSync.unregisterChart(chartId);
       chartRef.current.remove();
       chartRef.current = null;
@@ -144,25 +141,17 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       const mainTimeRange = chartSync.getMainTimeRange();
       if (mainTimeRange) {
         try { chart.timeScale().setVisibleRange(mainTimeRange); } catch {}
-      } else if (savedRangeRef.current) {
-        chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
       }
 
       chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
         if (range) chartSync.syncRange(chartId, range);
       });
-    } else if (savedRangeRef.current) {
-      chart.timeScale().setVisibleLogicalRange(savedRangeRef.current);
     }
 
     prevIndicatorRef.current = `${indicator.type}-${indicator.id}-${indicator.color}-${indicator.lineWidth}-${indicator.lineStyle}`;
 
     return () => {
       ro.disconnect();
-      if (chartRef.current) {
-        const range = chartRef.current.timeScale().getVisibleLogicalRange();
-        if (range) savedRangeRef.current = range;
-      }
       if (chartSync) chartSync.unregisterChart(chartId);
       chart.remove();
       chartRef.current = null;
@@ -174,8 +163,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     if (!chartRef.current || seriesRefs.current.length === 0 || candles.length === 0) return;
 
     const timeScale = chartRef.current.timeScale();
-    const prevRange = timeScale.getVisibleLogicalRange();
-
     const toLD = (d: { time: number; value: number }) => ({ time: d.time as Time, value: d.value });
 
     if (indicator.type === 'RSI') {
@@ -251,11 +238,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    if (prevRange) {
-      requestAnimationFrame(() => {
-        try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
-      });
-    } else if (chartSync) {
+    if (chartSync) {
       const mainTimeRange = chartSync.getMainTimeRange();
       if (mainTimeRange) {
         requestAnimationFrame(() => {
