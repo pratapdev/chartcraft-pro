@@ -26,6 +26,7 @@ export const FootprintChart: React.FC = () => {
   const dragStartX = useRef(0);
   const dragStartOffset = useRef(0);
   const resizeRaf = useRef<number | null>(null);
+  const wasAtEnd = useRef(true);
 
   const { symbol, timeframe, candles: ohlcCandles } = useChartStore();
 
@@ -65,6 +66,7 @@ export const FootprintChart: React.FC = () => {
         fpCandlesRef.current = processed;
         setFpCandles(processed);
         setOffsetX(0);
+        wasAtEnd.current = true;
         setLoading(false);
 
         // Start live subscription
@@ -116,7 +118,7 @@ export const FootprintChart: React.FC = () => {
 
     if (!fpCandles.length) return;
 
-    const candleWidth = Math.max(18, Math.min(42, 28 * zoom));
+    const candleWidth = Math.max(40, Math.min(88, Math.floor((W - 100) / Math.max(4, Math.min(fpCandles.length, 10)))));
     const gap = 4;
     // Price range across all visible candles
     const rightEdge = W - 60; // space for price axis
@@ -124,7 +126,8 @@ export const FootprintChart: React.FC = () => {
 
     // Determine visible candle range based on offset
     const totalWidth = fpCandles.length * (candleWidth + gap);
-    const startPx = Math.min(0, W - totalWidth - 72) + offsetX;
+    const baseStart = Math.min(0, W - totalWidth - 72);
+    const startPx = baseStart + offsetX;
     const visibleStart = Math.max(0, Math.floor(-startPx / (candleWidth + gap)) - 1);
     const visibleEnd = Math.min(fpCandles.length, Math.ceil((W - startPx) / (candleWidth + gap)) + 2);
 
@@ -149,7 +152,7 @@ export const FootprintChart: React.FC = () => {
     const chartHeight = bottomEdge - chartTop;
 
     const priceToY = (p: number) => chartTop + ((maxPrice + tickSize * 2 - p) / priceRange) * chartHeight;
-    const rowHeight = Math.max(10, chartHeight / Math.max(1, ((maxPrice - minPrice) / tickSize + 1)));
+    const rowHeight = Math.max(14, chartHeight / Math.max(1, ((maxPrice - minPrice) / tickSize + 1)));
 
     // Find max volume at any level for color intensity scaling
     let maxLevelVol = 1;
@@ -320,9 +323,9 @@ export const FootprintChart: React.FC = () => {
 
   // Auto-scroll to show latest candles
   useEffect(() => {
-    if (!containerRef.current || !fpCandles.length || isDragging.current) return;
+    if (!containerRef.current || !fpCandles.length || isDragging.current || !wasAtEnd.current) return;
     const W = containerRef.current.getBoundingClientRect().width;
-    const candleWidth = Math.max(18, Math.min(42, 28 * zoom));
+    const candleWidth = Math.max(28, Math.min(72, Math.floor((W - 100) / Math.max(6, Math.min(fpCandles.length, 18)))));
     const gap = 4;
     const totalWidth = fpCandles.length * (candleWidth + gap);
     // Show the right edge with some padding
