@@ -29,6 +29,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const chartSync = useChartSync();
   const chartId = `indicator-${indicator.id}`;
   const prevIndicatorRef = useRef<string>('');
+  const isSyncingRange = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -140,11 +141,15 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
       const mainTimeRange = chartSync.getMainTimeRange();
       if (mainTimeRange) {
+        isSyncingRange.current = true;
         try { chart.timeScale().setVisibleRange(mainTimeRange); } catch {}
+        requestAnimationFrame(() => {
+          isSyncingRange.current = false;
+        });
       }
 
       chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (range) chartSync.syncRange(chartId, range);
+        if (range && !isSyncingRange.current) chartSync.syncRange(chartId, range);
       });
     }
 
@@ -238,14 +243,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    if (chartSync) {
-      const mainTimeRange = chartSync.getMainTimeRange();
-      if (mainTimeRange) {
-        requestAnimationFrame(() => {
-          try { timeScale.setVisibleRange(mainTimeRange); } catch {}
-        });
-      }
-    }
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :

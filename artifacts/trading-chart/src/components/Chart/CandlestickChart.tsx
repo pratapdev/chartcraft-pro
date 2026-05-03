@@ -266,9 +266,6 @@ export const CandlestickChart: React.FC = () => {
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || !chartRef.current || candles.length === 0) return;
 
-    const timeScale = chartRef.current.timeScale();
-    const prevRange = timeScale.getVisibleLogicalRange();
-
     const sorted = dedupeAndSort(candles);
 
     const candleData: CandlestickData[] = sorted.map((c) => ({
@@ -288,12 +285,8 @@ export const CandlestickChart: React.FC = () => {
     candleSeriesRef.current.setData(candleData);
     volumeSeriesRef.current.setData(volumeData);
 
-    if (prevRange) {
-      try { timeScale.setVisibleLogicalRange(prevRange); } catch {}
-    }
-
     if (!initialRangeRef.current) {
-      const r = timeScale.getVisibleLogicalRange();
+      const r = chartRef.current.timeScale().getVisibleLogicalRange();
       if (r) initialRangeRef.current = { from: r.from, to: r.to };
     }
   }, [candles]);
