@@ -29,27 +29,68 @@ interface SyncState {
   indicatorCrossAlerts: any[];
   indicatorThresholdAlerts: any[];
   stochRSICrossAlerts: any[];
+  pctDiffDonCrossAlerts: any[];
 }
 
-/**
- * Pull the full chart state from the server
- */
+const toNum = (value: any, fallback = 0) => {
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const normalizeSyncState = (data: any): SyncState => ({
+  state: data?.state ? {
+    symbol: data.state.symbol,
+    timeframe: data.state.timeframe,
+    marketType: data.state.marketType,
+    chartFontSize: toNum(data.state.chartFontSize, 11),
+    drawingDefaults: data.state.drawingDefaults || {},
+  } : null,
+  trendlines: (data?.trendlines || []).map((t: any) => ({
+    ...t,
+    startPrice: toNum(t.startPrice),
+    endPrice: toNum(t.endPrice),
+    thickness: toNum(t.thickness, 1),
+  })),
+  indicators: (data?.indicators || []).map((i: any) => ({
+    ...i,
+    period: toNum(i.period, 20),
+    lineWidth: toNum(i.lineWidth, 1),
+    stdDev: i.stdDev === null || i.stdDev === undefined ? null : toNum(i.stdDev),
+    multiplier: i.multiplier === null || i.multiplier === undefined ? null : toNum(i.multiplier),
+  })),
+  alerts: data?.alerts || [],
+  alertLogs: (data?.alertLogs || []).map((l: any) => ({
+    ...l,
+    timestamp: toNum(l.timestamp),
+    price: toNum(l.price),
+  })),
+  fibonacciDrawings: (data?.fibonacciDrawings || []).map((f: any) => ({
+    ...f,
+    startPrice: toNum(f.startPrice),
+    endPrice: toNum(f.endPrice),
+  })),
+  indicatorCrossAlerts: data?.indicatorCrossAlerts || [],
+  indicatorThresholdAlerts: (data?.indicatorThresholdAlerts || []).map((a: any) => ({
+    ...a,
+    threshold: toNum(a.threshold),
+  })),
+  stochRSICrossAlerts: data?.stochRSICrossAlerts || [],
+  pctDiffDonCrossAlerts: data?.pctDiffDonCrossAlerts || [],
+});
+
 export async function pullState(): Promise<SyncState | null> {
   try {
     const res = await fetch('/api/sync/state', {
       headers: { 'Accept': 'application/json' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    return normalizeSyncState(await res.json());
   } catch (err) {
     console.warn('[Sync] Pull failed (server may be offline):', (err as Error).message);
     return null;
   }
 }
 
-/**
- * Push the full chart state to the server
- */
 export async function pushState(data: SyncState): Promise<boolean> {
   try {
     const res = await fetch('/api/sync/state', {
@@ -65,9 +106,6 @@ export async function pushState(data: SyncState): Promise<boolean> {
   }
 }
 
-/**
- * Check if the sync server is reachable
- */
 export async function checkSyncHealth(): Promise<boolean> {
   try {
     const res = await fetch('/api/healthz', { signal: AbortSignal.timeout(3000) });
@@ -77,9 +115,6 @@ export async function checkSyncHealth(): Promise<boolean> {
   }
 }
 
-/**
- * Extract syncable state from chart store
- */
 export function extractSyncPayload(storeState: any): SyncState {
   return {
     state: {
@@ -97,5 +132,6 @@ export function extractSyncPayload(storeState: any): SyncState {
     indicatorCrossAlerts: storeState.indicatorCrossAlerts || [],
     indicatorThresholdAlerts: storeState.indicatorThresholdAlerts || [],
     stochRSICrossAlerts: storeState.stochRSICrossAlerts || [],
+    pctDiffDonCrossAlerts: storeState.pctDiffDonCrossAlerts || [],
   };
 }
