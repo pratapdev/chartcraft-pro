@@ -29,19 +29,18 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
-  // Prevent re-entrancy when we programmatically set the range
-  const isApplyingRange = useRef(false);
+  const lastMainRangeRef = useRef<LogicalRange | null>(null);
+  const pendingRangeRef = useRef<LogicalRange | null>(null);
 
   // Helper: apply the main chart's current logical range to this pane
   const applyMainRange = useCallback(() => {
     if (!chartRef.current || !chartSync) return;
-    const range = chartSync.getMainLogicalRange();
+    const range = chartSync.getMainLogicalRange() ?? lastMainRangeRef.current;
     if (!range) return;
-    isApplyingRange.current = true;
+    lastMainRangeRef.current = range;
     try {
       chartRef.current.timeScale().setVisibleLogicalRange(range);
     } catch {}
-    requestAnimationFrame(() => { isApplyingRange.current = false; });
   }, [chartSync]);
 
   // --- Chart creation / destruction ---
@@ -81,7 +80,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         borderColor: '#1c2333',
         timeVisible: true,
         secondsVisible: false,
-        visible: false,
         rightOffset: 50,
         shiftVisibleRangeOnNewBar: false,
       },
@@ -154,24 +152,19 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       // Register so syncRange can push the main chart's range here
       chartSync.registerChart(chartId, chart);
 
-      // Apply main range immediately (may have no data yet; will be re-applied after setData)
-      const mainRange = chartSync.getMainLogicalRange();
-      if (mainRange) {
-        isApplyingRange.current = true;
-        try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
-        requestAnimationFrame(() => { isApplyingRange.current = false; });
-      }
-
       // When the main chart pans/zooms, mirror it here (FIX #1 & #2: now actually fires, uses logical range)
       const unsubscribeMain = chartSync.subscribeMainRange((range: LogicalRange) => {
-        isApplyingRange.current = true;
-        try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
-        requestAnimationFrame(() => { isApplyingRange.current = false; });
+        lastMainRangeRef.current = range;
+        pendingRangeRef.current = range;
+        if (seriesRefs.current.length > 0) {
+          try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
+          pendingRangeRef.current = null;
+        }
       });
 
-      // When the user drags this pane, sync back to main (guarded to prevent loops)
       const onPaneRange = (range: LogicalRange | null) => {
-        if (range && !isApplyingRange.current) chartSync.syncRange(chartId, range);
+        if (!range) return;
+        lastMainRangeRef.current = range;
       };
       chart.timeScale().subscribeVisibleLogicalRangeChange(onPaneRange);
 
@@ -276,6 +269,12 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
     // After setData the chart auto-fits to all data — snap back to the main chart's range
     applyMainRange();
+    if (pendingRangeRef.current) {
+      try {
+        chartRef.current.timeScale().setVisibleLogicalRange(pendingRangeRef.current);
+      } catch {}
+      pendingRangeRef.current = null;
+    }
 
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, applyMainRange]);
 
