@@ -17,12 +17,14 @@ export const ChartContainer: React.FC = () => {
     <ChartSyncProvider>
       <div className="flex flex-col h-full bg-background">
         <ChartHeader />
-        <div className="flex-1 relative min-h-0">
-          {chartMode === 'footprint' ? <FootprintChart /> : <CandlestickChart />}
+        <div className="flex-1 relative min-h-0 flex flex-col">
+          <div className="flex-1 relative min-h-0">
+            {chartMode === 'footprint' ? <FootprintChart /> : <CandlestickChart />}
+          </div>
+          {chartMode === 'candles' && subIndicators.map((ind) => (
+            <IndicatorPane key={ind.id} indicator={ind} />
+          ))}
         </div>
-        {chartMode === 'candles' && subIndicators.map((ind) => (
-          <IndicatorPane key={ind.id} indicator={ind} />
-        ))}
       </div>
     </ChartSyncProvider>
   );
