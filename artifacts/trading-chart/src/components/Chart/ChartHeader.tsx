@@ -36,6 +36,17 @@ export const ChartHeader: React.FC = () => {
 
   const currentTz = TIMEZONES.find((t) => t.value === timezone) || TIMEZONES[0];
 
+  const handleTimeframeChange = async (tf: Timeframe) => {
+    if (tf === timeframe) return;
+    const store = useChartStore.getState();
+    store.stopLiveUpdates();
+    store.setTimeframe(tf);
+    await store.loadCandles();
+    if (store.marketType === 'crypto') {
+      store.startLiveUpdates();
+    }
+  };
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (tzRef.current && !tzRef.current.contains(e.target as Node)) {
@@ -79,7 +90,7 @@ export const ChartHeader: React.FC = () => {
         {TIMEFRAMES.map((tf) => (
           <button
             key={tf}
-            onClick={() => setTimeframe(tf)}
+            onClick={() => void handleTimeframeChange(tf)}
             className={`trading-btn ${timeframe === tf ? 'active' : ''}`}
           >
             {tf}
