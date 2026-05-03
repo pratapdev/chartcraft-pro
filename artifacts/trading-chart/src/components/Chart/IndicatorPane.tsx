@@ -6,6 +6,7 @@ import {
   LineData,
   HistogramData,
   Time,
+  LogicalRange,
   LineSeries,
   HistogramSeries,
 } from 'lightweight-charts';
@@ -26,10 +27,10 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<ISeriesApi<'Line' | 'Histogram'>[]>([]);
   const { candles, removeIndicator, chartFontSize } = useChartStore();
-  const chartSync = useChartSync();
   const chartId = `indicator-${indicator.id}`;
   const prevIndicatorRef = useRef<string>('');
-  const isSyncingRange = useRef(false);
+  const chartSync = useChartSync();
+  const isApplyingMainRange = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -138,19 +139,32 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
-
-      const mainTimeRange = chartSync.getMainTimeRange();
-      if (mainTimeRange) {
-        isSyncingRange.current = true;
-        try { chart.timeScale().setVisibleRange(mainTimeRange); } catch {}
+      const applyMainRange = () => {
+        const mainRange = chartSync.getMainTimeRange();
+        if (!mainRange) return;
+        isApplyingMainRange.current = true;
+        try {
+          chart.timeScale().setVisibleRange(mainRange);
+        } catch {}
         requestAnimationFrame(() => {
-          isSyncingRange.current = false;
+          isApplyingMainRange.current = false;
         });
-      }
-
-      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (range && !isSyncingRange.current) chartSync.syncRange(chartId, range);
-      });
+      };
+      applyMainRange();
+      const unsubscribe = chartSync.subscribeMainChart(applyMainRange);
+      const onRange = (range: LogicalRange | null) => {
+        if (range && !isApplyingMainRange.current) chartSync.syncRange(chartId, range);
+      };
+      chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
+      const cleanup = () => {
+        unsubscribe();
+        try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange); } catch {}
+      };
+      const prevCleanup = ro.disconnect.bind(ro);
+      ro.disconnect = () => {
+        cleanup();
+        prevCleanup();
+      };
     }
 
     prevIndicatorRef.current = `${indicator.type}-${indicator.id}-${indicator.color}-${indicator.lineWidth}-${indicator.lineStyle}`;

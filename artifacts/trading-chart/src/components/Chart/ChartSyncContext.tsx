@@ -6,6 +6,7 @@ interface ChartSyncContextValue {
   unregisterChart: (id: string) => void;
   syncRange: (sourceId: string, range: LogicalRange) => void;
   getMainTimeRange: () => Range<Time> | null;
+  subscribeMainChart: (handler: () => void) => () => void;
 }
 
 const ChartSyncContext = createContext<ChartSyncContextValue | null>(null);
@@ -14,6 +15,7 @@ export const useChartSync = () => useContext(ChartSyncContext);
 
 export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const chartsRef = useRef<Map<string, IChartApi>>(new Map());
+  const mainListenersRef = useRef(new Set<() => void>());
   const isSyncing = useRef(false);
 
   const registerChart = useCallback((id: string, chart: IChartApi) => {
@@ -47,8 +49,15 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
+  const subscribeMainChart = useCallback((handler: () => void) => {
+    mainListenersRef.current.add(handler);
+    return () => {
+      mainListenersRef.current.delete(handler);
+    };
+  }, []);
+
   return (
-    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainTimeRange }}>
+    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainTimeRange, subscribeMainChart }}>
       {children}
     </ChartSyncContext.Provider>
   );
