@@ -202,4 +202,12 @@ export interface IndicatorConfig {
   threshold?: number;
   /** IMBALANCE: minimum consecutive levels for stacked zone */
   minStack?: number;
+  /** HTF overlay: timeframe to display */
+  timeframe?: Timeframe;
+  /** HTF overlay: display mode */
+  displayMode?: 'candles' | 'zones' | 'highlow';
+  /** HTF overlay: show candle wicks */
+  showWicks?: boolean;
+  /** Smart money: show mitigated FVGs */
+  showMitigated?: boolean;
 }

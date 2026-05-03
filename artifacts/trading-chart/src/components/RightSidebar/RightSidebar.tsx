@@ -63,6 +63,8 @@ const INDICATOR_PRESETS: {
   { type: 'MSB_OB', label: 'MSB + Order Blocks', description: 'Market Structure Break & Order Blocks (ZigZag)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', zigzagLength: 9, fibFactor: 0.33 } },
   { type: 'FVG', label: 'Fair Value Gap', description: 'Bullish & bearish FVG / imbalance zones (3-candle)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', threshold: 0.1 } },
   { type: 'MARKET_STRUCTURE', label: 'Market Structure', description: 'BOS, CHOCH & liquidity sweeps', group: 'Smart Money', defaults: { period: 5, color: '#22c55e' } },
+  { type: 'VWAP', label: 'Anchored VWAP', description: 'Anchored/session volume weighted average price', group: 'Smart Money', defaults: { period: 1, color: '#a855f7' } },
+  { type: 'VPVR', label: 'Session Profile', description: 'Session profile / volume profile overlay', group: 'Smart Money', defaults: { period: 1, color: '#f59e0b' } },
 ];
 
 // Group presets
