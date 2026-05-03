@@ -297,6 +297,8 @@ export const CandlestickChart: React.FC = () => {
       const r = chartRef.current.timeScale().getVisibleLogicalRange();
       if (r) initialRangeRef.current = { from: r.from, to: r.to };
     }
+
+    chartRef.current.timeScale().scrollToRealTime();
   }, [candles]);
 
   const resetChart = useCallback(() => {
