@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useRef, useCallback } from 'react';
-import { IChartApi, LogicalRange, Time, Range } from 'lightweight-charts';
+import { IChartApi, LogicalRange } from 'lightweight-charts';
 
 interface ChartSyncContextValue {
   registerChart: (id: string, chart: IChartApi) => void;
   unregisterChart: (id: string) => void;
   syncRange: (sourceId: string, range: LogicalRange) => void;
-  getMainTimeRange: () => Range<Time> | null;
-  subscribeMainChart: (handler: () => void) => () => void;
+  getMainLogicalRange: () => LogicalRange | null;
+  subscribeMainRange: (handler: (range: LogicalRange) => void) => () => void;
 }
 
 const ChartSyncContext = createContext<ChartSyncContextValue | null>(null);
@@ -15,7 +15,7 @@ export const useChartSync = () => useContext(ChartSyncContext);
 
 export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const chartsRef = useRef<Map<string, IChartApi>>(new Map());
-  const mainListenersRef = useRef(new Set<() => void>());
+  const mainRangeListeners = useRef<Set<(range: LogicalRange) => void>>(new Set());
   const isSyncing = useRef(false);
 
   const registerChart = useCallback((id: string, chart: IChartApi) => {
@@ -29,6 +29,7 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const syncRange = useCallback((sourceId: string, range: LogicalRange) => {
     if (isSyncing.current) return;
     isSyncing.current = true;
+
     chartsRef.current.forEach((chart, id) => {
       if (id !== sourceId) {
         try {
@@ -36,28 +37,35 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } catch {}
       }
     });
+
+    if (sourceId === 'main') {
+      mainRangeListeners.current.forEach((fn) => {
+        try { fn(range); } catch {}
+      });
+    }
+
     isSyncing.current = false;
   }, []);
 
-  const getMainTimeRange = useCallback((): Range<Time> | null => {
+  const getMainLogicalRange = useCallback((): LogicalRange | null => {
     const mainChart = chartsRef.current.get('main');
     if (!mainChart) return null;
     try {
-      return mainChart.timeScale().getVisibleRange();
+      return mainChart.timeScale().getVisibleLogicalRange();
     } catch {
       return null;
     }
   }, []);
 
-  const subscribeMainChart = useCallback((handler: () => void) => {
-    mainListenersRef.current.add(handler);
+  const subscribeMainRange = useCallback((handler: (range: LogicalRange) => void) => {
+    mainRangeListeners.current.add(handler);
     return () => {
-      mainListenersRef.current.delete(handler);
+      mainRangeListeners.current.delete(handler);
     };
   }, []);
 
   return (
-    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainTimeRange, subscribeMainChart }}>
+    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainLogicalRange, subscribeMainRange }}>
       {children}
     </ChartSyncContext.Provider>
   );

@@ -13,10 +13,10 @@ import {
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig, LineStyleType } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
-
-const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
+
+const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
 
 interface IndicatorPaneProps {
   indicator: IndicatorConfig;
@@ -28,10 +28,23 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const seriesRefs = useRef<ISeriesApi<'Line' | 'Histogram'>[]>([]);
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
-  const prevIndicatorRef = useRef<string>('');
   const chartSync = useChartSync();
-  const isApplyingMainRange = useRef(false);
+  // Prevent re-entrancy when we programmatically set the range
+  const isApplyingRange = useRef(false);
 
+  // Helper: apply the main chart's current logical range to this pane
+  const applyMainRange = useCallback(() => {
+    if (!chartRef.current || !chartSync) return;
+    const range = chartSync.getMainLogicalRange();
+    if (!range) return;
+    isApplyingRange.current = true;
+    try {
+      chartRef.current.timeScale().setVisibleLogicalRange(range);
+    } catch {}
+    requestAnimationFrame(() => { isApplyingRange.current = false; });
+  }, [chartSync]);
+
+  // --- Chart creation / destruction ---
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -138,50 +151,54 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     ro.observe(containerRef.current);
 
     if (chartSync) {
+      // Register so syncRange can push the main chart's range here
       chartSync.registerChart(chartId, chart);
-      const applyMainRange = () => {
-        const mainRange = chartSync.getMainTimeRange();
-        if (!mainRange) return;
-        isApplyingMainRange.current = true;
-        try {
-          chart.timeScale().setVisibleRange(mainRange);
-        } catch {}
-        requestAnimationFrame(() => {
-          isApplyingMainRange.current = false;
-        });
+
+      // Apply main range immediately (may have no data yet; will be re-applied after setData)
+      const mainRange = chartSync.getMainLogicalRange();
+      if (mainRange) {
+        isApplyingRange.current = true;
+        try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
+        requestAnimationFrame(() => { isApplyingRange.current = false; });
+      }
+
+      // When the main chart pans/zooms, mirror it here (FIX #1 & #2: now actually fires, uses logical range)
+      const unsubscribeMain = chartSync.subscribeMainRange((range: LogicalRange) => {
+        isApplyingRange.current = true;
+        try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
+        requestAnimationFrame(() => { isApplyingRange.current = false; });
+      });
+
+      // When the user drags this pane, sync back to main (guarded to prevent loops)
+      const onPaneRange = (range: LogicalRange | null) => {
+        if (range && !isApplyingRange.current) chartSync.syncRange(chartId, range);
       };
-      applyMainRange();
-      const unsubscribe = chartSync.subscribeMainChart(applyMainRange);
-      const onRange = (range: LogicalRange | null) => {
-        if (range && !isApplyingMainRange.current) chartSync.syncRange(chartId, range);
-      };
-      chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
-      const cleanup = () => {
-        unsubscribe();
-        try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange); } catch {}
-      };
-      const prevCleanup = ro.disconnect.bind(ro);
-      ro.disconnect = () => {
-        cleanup();
-        prevCleanup();
+      chart.timeScale().subscribeVisibleLogicalRangeChange(onPaneRange);
+
+      return () => {
+        ro.disconnect();
+        unsubscribeMain();
+        try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(onPaneRange); } catch {}
+        chartSync.unregisterChart(chartId);
+        chart.remove();
+        chartRef.current = null;
+        seriesRefs.current = [];
       };
     }
 
-    prevIndicatorRef.current = `${indicator.type}-${indicator.id}-${indicator.color}-${indicator.lineWidth}-${indicator.lineStyle}`;
-
     return () => {
       ro.disconnect();
-      if (chartSync) chartSync.unregisterChart(chartId);
       chart.remove();
       chartRef.current = null;
       seriesRefs.current = [];
     };
   }, [indicator.type, indicator.id, indicator.color, indicator.color2, indicator.lineWidth, indicator.lineStyle, chartFontSize]);
 
+  // --- Data loading ---
+  // FIX #3: after setData (which resets the view to fit-all), re-apply the main range
   useEffect(() => {
     if (!chartRef.current || seriesRefs.current.length === 0 || candles.length === 0) return;
 
-    const timeScale = chartRef.current.timeScale();
     const toLD = (d: { time: number; value: number }) => ({ time: d.time as Time, value: d.value });
 
     if (indicator.type === 'RSI') {
@@ -257,7 +274,10 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-  }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);
+    // After setData the chart auto-fits to all data — snap back to the main chart's range
+    applyMainRange();
+
+  }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, applyMainRange]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
