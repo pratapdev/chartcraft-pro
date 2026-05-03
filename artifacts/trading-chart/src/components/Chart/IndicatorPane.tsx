@@ -29,7 +29,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
-  const lastMainRangeRef = useRef<TimeRange | null>(null);
 
   // Forward pointer/wheel events from pane overlay → main chart container
   useEffect(() => {
@@ -162,6 +161,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         timeVisible: false,
         secondsVisible: false,
         visible: false,
+        rightOffset: 50,
         shiftVisibleRangeOnNewBar: false,
       },
       // CRITICAL: disable all user interaction so pane cannot be dragged independently
@@ -234,22 +234,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
 
-      // Apply current main time range immediately
-      const mainRange = chartSync.getMainTimeRange();
-      if (mainRange) {
-        lastMainRangeRef.current = mainRange;
-        try { chart.timeScale().setVisibleRange(mainRange); } catch {}
-      }
-
-      // Mirror every main chart time range change
-      const unsubscribeMain = chartSync.subscribeMainTimeRange((range: TimeRange) => {
-        lastMainRangeRef.current = range;
-        try { chart.timeScale().setVisibleRange(range); } catch {}
-      });
-
       return () => {
         ro.disconnect();
-        unsubscribeMain();
         chartSync.unregisterChart(chartId);
         try { chart.remove(); } catch {}
         chartRef.current = null;
