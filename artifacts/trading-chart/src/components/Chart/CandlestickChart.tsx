@@ -21,6 +21,8 @@ import { VPVROverlay } from './VPVROverlay';
 import { RiskRewardToolbar } from './RiskRewardToolbar';
 import { ImbalanceOverlay } from './ImbalanceOverlay';
 import { HTFOverlay } from './HTFOverlay';
+import { PatternOverlay } from './PatternOverlay';
+import { AnchoredVWAPOverlay } from './AnchoredVWAPOverlay';
 import { SmartMoneyOverlay } from './SmartMoneyOverlay';
 
 export const CandlestickChart: React.FC = () => {
@@ -321,6 +323,8 @@ export const CandlestickChart: React.FC = () => {
       <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <SmartMoneyOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <AnchoredVWAPOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <PatternOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <HTFOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />

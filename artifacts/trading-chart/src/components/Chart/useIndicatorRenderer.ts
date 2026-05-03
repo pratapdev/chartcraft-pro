@@ -30,6 +30,16 @@ export function useIndicatorRenderer(
     for (const ind of indicators) {
       if (!ind.visible) continue;
 
+      // Canvas-only overlays — handled by dedicated overlay components, skip here
+      if (
+        ind.type === 'FVG' ||
+        ind.type === 'MARKET_STRUCTURE' ||
+        ind.type === 'SUPPLY_DEMAND' ||
+        ind.type === 'PATTERN' ||
+        ind.type === 'ANCHORED_VWAP' ||
+        ind.type === 'SESSION_VWAP'
+      ) continue;
+
       if (ind.type === 'EMA' || ind.type === 'SMA') {
         const data = ind.type === 'EMA' ? computeEMA(candles, ind.period) : computeSMA(candles, ind.period);
         if (data.length === 0) continue;

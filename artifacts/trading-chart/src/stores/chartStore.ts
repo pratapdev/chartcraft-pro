@@ -130,9 +130,9 @@ interface ChartStore {
   // Right sidebar
   // Right sidebar
   rightPanelOpen: boolean;
-  rightPanelTab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap';
+  rightPanelTab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap' | 'guide';
   setRightPanelOpen: (open: boolean) => void;
-  setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap') => void;
+  setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap' | 'guide') => void;
 
   // Undo
   undoLastDeletion: () => void;

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { computeFVG, computeMarketStructure } from '@/lib/smartMoney';
+import { computeFVG, computeMarketStructure, computeSupplyDemand } from '@/lib/smartMoney';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -15,13 +15,14 @@ export const SmartMoneyOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
 
   const fvgInd = indicators.find((i) => i.type === 'FVG' && i.visible);
   const msInd = indicators.find((i) => i.type === 'MARKET_STRUCTURE' && i.visible);
+  const sdInd = indicators.find((i) => i.type === 'SUPPLY_DEMAND' && i.visible);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
     const series = seriesRef.current;
     if (!canvas || !chart || !series || candles.length === 0) return;
-    if (!fvgInd && !msInd) return;
+    if (!fvgInd && !msInd && !sdInd) return;
 
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -202,34 +203,94 @@ export const SmartMoneyOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
         }
       }
     }
-  }, [chartRef, seriesRef, candles, fvgInd, msInd]);
+    // ---- Supply & Demand Zones ----
+    if (sdInd) {
+      const pivotLen = sdInd.period ?? 5;
+      const atrMult = sdInd.sdAtrMult ?? 0.5;
+      const strengthThreshold = sdInd.sdStrength ?? 0.4;
+      const zones = computeSupplyDemand(candles, pivotLen, atrMult, strengthThreshold);
+
+      for (const z of zones) {
+        if (z.endTime < fromT || z.startTime > toT) continue;
+        const x1 = timeToX(z.startTime);
+        const yTop = priceToY(z.top);
+        const yBot = priceToY(z.bottom);
+        if (x1 === null || yTop === null || yBot === null) continue;
+
+        const rectX = x1;
+        const rectW = rightEdgeX - x1;
+        const rectY = Math.min(yTop, yBot);
+        const rectH = Math.max(3, Math.abs(yTop - yBot));
+
+        const alpha = 0.1 + z.strength * 0.12;
+        const borderAlpha = 0.4 + z.strength * 0.35;
+
+        if (z.type === 'supply') {
+          ctx.fillStyle = z.broken
+            ? `rgba(239,68,68,${alpha * 0.4})`
+            : z.tested
+              ? `rgba(239,68,68,${alpha * 0.7})`
+              : `rgba(239,68,68,${alpha})`;
+          ctx.strokeStyle = z.broken
+            ? `rgba(239,68,68,0.15)`
+            : `rgba(239,68,68,${borderAlpha})`;
+        } else {
+          ctx.fillStyle = z.broken
+            ? `rgba(34,197,94,${alpha * 0.4})`
+            : z.tested
+              ? `rgba(34,197,94,${alpha * 0.7})`
+              : `rgba(34,197,94,${alpha})`;
+          ctx.strokeStyle = z.broken
+            ? `rgba(34,197,94,0.15)`
+            : `rgba(34,197,94,${borderAlpha})`;
+        }
+
+        ctx.lineWidth = 1;
+        ctx.setLineDash(z.broken ? [3, 3] : []);
+        ctx.fillRect(rectX, rectY, rectW, rectH);
+        ctx.strokeRect(rectX, rectY, rectW, rectH);
+        ctx.setLineDash([]);
+
+        // Label
+        if (rectH > 8) {
+          ctx.font = '9px JetBrains Mono, monospace';
+          ctx.fillStyle = z.type === 'supply'
+            ? `rgba(239,68,68,0.9)` : `rgba(34,197,94,0.9)`;
+          const tag = z.type === 'supply'
+            ? (z.broken ? 'SS ✗' : z.tested ? 'Supply ◇' : 'Supply')
+            : (z.broken ? 'DS ✗' : z.tested ? 'Demand ◇' : 'Demand');
+          ctx.fillText(tag, rectX + 3, rectY + Math.min(11, rectH - 2));
+        }
+      }
+    }
+  }, [chartRef, seriesRef, candles, fvgInd, msInd, sdInd]);
 
   // Re-render when data or indicators change
   useEffect(() => {
-    if (!fvgInd && !msInd) return;
+    if (!fvgInd && !msInd && !sdInd) return;
     render();
-  }, [render, fvgInd, msInd, candles]);
+  }, [render, fvgInd, msInd, sdInd, candles]);
 
   // Re-render on zoom/pan
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || (!fvgInd && !msInd)) return;
+    if (!chart || (!fvgInd && !msInd && !sdInd)) return;
     const handler = () => render();
     chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
     return () => {
       try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler); } catch {}
     };
-  }, [chartRef, fvgInd, msInd, render]);
+  }, [chartRef, fvgInd, msInd, sdInd, render]);
 
-  // Also clear canvas when both indicators disabled
+  // Also clear canvas when all indicators disabled
   useEffect(() => {
-    if (!fvgInd && !msInd) {
+    if (!fvgInd && !msInd && !sdInd) {
       const ctx = canvasRef.current?.getContext('2d');
       if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
-  }, [fvgInd, msInd]);
+  }, [fvgInd, msInd, sdInd]);
 
-  if (!fvgInd && !msInd) return null;
+  if (!fvgInd && !msInd && !sdInd) return null;
 
   return <canvas ref={canvasRef} className="absolute inset-0 z-[7] pointer-events-none" />;
 };

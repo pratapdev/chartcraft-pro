@@ -263,3 +263,132 @@ export function computeMarketStructure(
 
   return result;
 }
+
+// ============================================================
+// Supply & Demand Zones
+// ============================================================
+
+export interface SDZone {
+  type: 'supply' | 'demand';
+  top: number;
+  bottom: number;
+  startTime: number;
+  endTime: number;
+  strength: number; // 0-1: how strongly price moved away
+  tested: boolean;   // price came back and retested
+  broken: boolean;   // price closed through zone
+}
+
+/**
+ * Auto-detect supply and demand zones from swing pivot extremes.
+ * Supply zones: areas where price rejected sharply downward (potential sell wall).
+ * Demand zones: areas where price bounced sharply upward (potential buy wall).
+ * atrMult: zone height = atrMult × ATR
+ */
+export function computeSupplyDemand(
+  candles: Candle[],
+  pivotLen: number = 5,
+  atrMult: number = 0.5,
+  strengthThreshold: number = 0.5,
+): SDZone[] {
+  if (candles.length < pivotLen * 3) return [];
+
+  // ATR (14)
+  const atr14: number[] = new Array(candles.length).fill(0);
+  for (let i = 1; i < candles.length; i++) {
+    const tr = Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close),
+    );
+    atr14[i] = i === 1 ? tr : atr14[i - 1] * 13 / 14 + tr / 14;
+  }
+
+  const zones: SDZone[] = [];
+
+  for (let i = pivotLen; i < candles.length - pivotLen; i++) {
+    const c = candles[i];
+    const atr = atr14[i];
+    const zoneH = atr * atrMult;
+
+    // Pivot HIGH → potential Supply zone (top = high, bottom = high - zoneH)
+    let isPH = true;
+    for (let j = i - pivotLen; j <= i + pivotLen; j++) {
+      if (j !== i && candles[j].high >= c.high) { isPH = false; break; }
+    }
+    if (isPH) {
+      // Measure how far price moved DOWN after this high
+      let maxDown = 0;
+      for (let j = i + 1; j < Math.min(i + 40, candles.length); j++) {
+        maxDown = Math.max(maxDown, c.high - candles[j].low);
+      }
+      const strength = Math.min(1, maxDown / (atr * 5));
+      if (strength >= strengthThreshold) {
+        const top = c.high;
+        const bottom = c.high - zoneH;
+        // Check if tested or broken after zone formation
+        let tested = false, broken = false;
+        for (let j = i + 1; j < candles.length; j++) {
+          if (candles[j].high >= bottom && !broken) tested = true;
+          if (candles[j].close > top) { broken = true; break; }
+        }
+        zones.push({
+          type: 'supply',
+          top,
+          bottom,
+          startTime: c.time,
+          endTime: candles[candles.length - 1].time,
+          strength,
+          tested,
+          broken,
+        });
+      }
+    }
+
+    // Pivot LOW → potential Demand zone (bottom = low, top = low + zoneH)
+    let isPL = true;
+    for (let j = i - pivotLen; j <= i + pivotLen; j++) {
+      if (j !== i && candles[j].low <= c.low) { isPL = false; break; }
+    }
+    if (isPL) {
+      let maxUp = 0;
+      for (let j = i + 1; j < Math.min(i + 40, candles.length); j++) {
+        maxUp = Math.max(maxUp, candles[j].high - c.low);
+      }
+      const strength = Math.min(1, maxUp / (atr * 5));
+      if (strength >= strengthThreshold) {
+        const bottom = c.low;
+        const top = c.low + zoneH;
+        let tested = false, broken = false;
+        for (let j = i + 1; j < candles.length; j++) {
+          if (candles[j].low <= top && !broken) tested = true;
+          if (candles[j].close < bottom) { broken = true; break; }
+        }
+        zones.push({
+          type: 'demand',
+          top,
+          bottom,
+          startTime: c.time,
+          endTime: candles[candles.length - 1].time,
+          strength,
+          tested,
+          broken,
+        });
+      }
+    }
+  }
+
+  // Deduplicate overlapping zones, keep strongest
+  const deduped: SDZone[] = [];
+  for (const z of zones) {
+    const overlap = deduped.find(d =>
+      d.type === z.type &&
+      Math.abs(d.top - z.top) < (z.top - z.bottom) * 1.5 &&
+      Math.abs(d.bottom - z.bottom) < (z.top - z.bottom) * 1.5
+    );
+    if (!overlap) deduped.push(z);
+    else if (z.strength > overlap.strength) Object.assign(overlap, z);
+  }
+
+  return deduped.slice(-30); // max 30 most recent zones
+}

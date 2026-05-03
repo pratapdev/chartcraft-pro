@@ -14,6 +14,8 @@ import { pushState, pullState, checkSyncHealth, extractSyncPayload } from '@/lib
 import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/components/Alerts/CompoundAlerts';
 import { WatchlistPanel } from '@/components/Watchlist/WatchlistPanel';
 import { HeatmapView } from '@/components/Heatmap/HeatmapView';
+import { FeatureGuide } from '@/components/Guide/FeatureGuide';
+import { HelpCircle } from 'lucide-react';
 
 // ============================================================
 // Indicator presets — including new Smart Money indicators
@@ -63,8 +65,10 @@ const INDICATOR_PRESETS: {
   { type: 'MSB_OB', label: 'MSB + Order Blocks', description: 'Market Structure Break & Order Blocks (ZigZag)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', zigzagLength: 9, fibFactor: 0.33 } },
   { type: 'FVG', label: 'Fair Value Gap', description: 'Bullish & bearish FVG / imbalance zones (3-candle)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', threshold: 0.1 } },
   { type: 'MARKET_STRUCTURE', label: 'Market Structure', description: 'BOS, CHOCH & liquidity sweeps', group: 'Smart Money', defaults: { period: 5, color: '#22c55e' } },
-  { type: 'VWAP', label: 'Anchored VWAP', description: 'Anchored/session volume weighted average price', group: 'Smart Money', defaults: { period: 1, color: '#a855f7' } },
-  { type: 'VPVR', label: 'Session Profile', description: 'Session profile / volume profile overlay', group: 'Smart Money', defaults: { period: 1, color: '#f59e0b' } },
+  { type: 'PATTERN', label: 'Pattern Detection', description: 'Auto-detect triangles, wedges & channels', group: 'Smart Money', defaults: { period: 5, color: '#facc15' } },
+  { type: 'ANCHORED_VWAP', label: 'Anchored VWAP', description: 'VWAP anchored to a specific bar with ±1σ/2σ bands', group: 'Smart Money', defaults: { period: 1, color: '#a855f7' } },
+  { type: 'SESSION_VWAP', label: 'Session VWAP', description: 'Daily-reset VWAP with standard deviation bands', group: 'Smart Money', defaults: { period: 1, color: '#f59e0b' } },
+  { type: 'SUPPLY_DEMAND', label: 'Supply & Demand', description: 'Auto supply (red) and demand (green) zone detection', group: 'Smart Money', defaults: { period: 5, color: '#f97316', threshold: 0.4 } },
 ];
 
 // Group presets
@@ -534,9 +538,10 @@ export const RightSidebar: React.FC = () => {
   });
 
   const tabs = [
-    { id: 'indicators', icon: <TrendingUp size={12} /> },
-    { id: 'alerts', icon: <Bell size={12} /> },
-    { id: 'settings', icon: <Settings size={12} /> },
+    { id: 'indicators', icon: <TrendingUp size={12} />, title: 'Indicators' },
+    { id: 'alerts', icon: <Bell size={12} />, title: 'Alerts' },
+    { id: 'settings', icon: <Settings size={12} />, title: 'Settings' },
+    { id: 'guide', icon: <HelpCircle size={12} />, title: 'Guide' },
   ];
 
   return (
@@ -585,7 +590,7 @@ export const RightSidebar: React.FC = () => {
                     {ind.period > 1 && <span className="text-muted-foreground shrink-0">({ind.period})</span>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE') && (
+                    {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE' || ind.type === 'PATTERN' || ind.type === 'ANCHORED_VWAP' || ind.type === 'SESSION_VWAP' || ind.type === 'SUPPLY_DEMAND') && (
                       <button
                         onClick={() => setExpandedSettingsId(expandedSettingsId === ind.id ? null : ind.id)}
                         className={`p-0.5 transition-colors ${expandedSettingsId === ind.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -603,7 +608,7 @@ export const RightSidebar: React.FC = () => {
                   </div>
                 </div>
                 {/* Smart Money indicator badges */}
-                {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE' || ind.type === 'MSB_OB') && (
+                {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE' || ind.type === 'MSB_OB' || ind.type === 'PATTERN' || ind.type === 'ANCHORED_VWAP' || ind.type === 'SESSION_VWAP' || ind.type === 'SUPPLY_DEMAND') && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {ind.type === 'FVG' && (
                       <>
@@ -625,6 +630,33 @@ export const RightSidebar: React.FC = () => {
                         <span className="bg-bull/10 text-bull text-[9px] px-1.5 py-0.5 rounded">Bu-OB</span>
                         <span className="bg-bear/10 text-bear text-[9px] px-1.5 py-0.5 rounded">Be-OB</span>
                         <span className="text-[9px] text-muted-foreground">zz {ind.zigzagLength}</span>
+                      </>
+                    )}
+                    {ind.type === 'PATTERN' && (
+                      <>
+                        <span className="bg-yellow-500/10 text-yellow-400 text-[9px] px-1.5 py-0.5 rounded">Triangles</span>
+                        <span className="bg-yellow-500/10 text-yellow-400 text-[9px] px-1.5 py-0.5 rounded">Wedges</span>
+                        <span className="bg-yellow-500/10 text-yellow-400 text-[9px] px-1.5 py-0.5 rounded">Channels</span>
+                        <span className="text-[9px] text-muted-foreground">pivot {ind.pivotLen ?? ind.period ?? 5}</span>
+                      </>
+                    )}
+                    {ind.type === 'ANCHORED_VWAP' && (
+                      <>
+                        <span className="bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">⚓ AVWAP</span>
+                        {(ind.showBands ?? true) && <span className="bg-purple-500/10 text-purple-400 text-[9px] px-1.5 py-0.5 rounded">±1σ ±2σ</span>}
+                      </>
+                    )}
+                    {ind.type === 'SESSION_VWAP' && (
+                      <>
+                        <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded">Daily Reset</span>
+                        {(ind.showBands ?? true) && <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded">±1σ ±2σ</span>}
+                      </>
+                    )}
+                    {ind.type === 'SUPPLY_DEMAND' && (
+                      <>
+                        <span className="bg-bear/10 text-bear text-[9px] px-1.5 py-0.5 rounded">Supply</span>
+                        <span className="bg-bull/10 text-bull text-[9px] px-1.5 py-0.5 rounded">Demand</span>
+                        <span className="text-[9px] text-muted-foreground">str ≥{(ind.sdStrength ?? 0.4).toFixed(1)}</span>
                       </>
                     )}
                   </div>
@@ -663,35 +695,101 @@ export const RightSidebar: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] text-muted-foreground">Swing Length</label>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateIndicator(ind.id, { period: Math.max(2, (ind.period ?? 5) - 1) })}
-                          className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center"
-                        >−</button>
+                        <button onClick={() => updateIndicator(ind.id, { period: Math.max(2, (ind.period ?? 5) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
                         <span className="w-6 text-center text-[11px] tabular-nums">{ind.period ?? 5}</span>
-                        <button
-                          onClick={() => updateIndicator(ind.id, { period: (ind.period ?? 5) + 1 })}
-                          className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center"
-                        >+</button>
+                        <button onClick={() => updateIndicator(ind.id, { period: (ind.period ?? 5) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] text-muted-foreground">Show Sweeps</label>
-                      <button
-                        onClick={() => updateIndicator(ind.id, { showSweeps: !(ind.showSweeps ?? true) })}
-                        className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showSweeps ?? true) ? 'bg-primary' : 'bg-accent'}`}
-                      >
+                      <button onClick={() => updateIndicator(ind.id, { showSweeps: !(ind.showSweeps ?? true) })} className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showSweeps ?? true) ? 'bg-primary' : 'bg-accent'}`}>
                         <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showSweeps ?? true) ? 'left-4' : 'left-0.5'}`} />
                       </button>
                     </div>
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] text-muted-foreground">Show Swing Dots</label>
-                      <button
-                        onClick={() => updateIndicator(ind.id, { showSwingDots: !(ind.showSwingDots ?? true) })}
-                        className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showSwingDots ?? true) ? 'bg-primary' : 'bg-accent'}`}
-                      >
+                      <button onClick={() => updateIndicator(ind.id, { showSwingDots: !(ind.showSwingDots ?? true) })} className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showSwingDots ?? true) ? 'bg-primary' : 'bg-accent'}`}>
                         <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showSwingDots ?? true) ? 'left-4' : 'left-0.5'}`} />
                       </button>
                     </div>
+                  </div>
+                )}
+                {/* Inline settings: PATTERN */}
+                {ind.type === 'PATTERN' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Pivot Length</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { period: Math.max(2, (ind.period ?? 5) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-6 text-center text-[11px] tabular-nums">{ind.period ?? 5}</span>
+                        <button onClick={() => updateIndicator(ind.id, { period: (ind.period ?? 5) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">Shorter = more sensitive, longer = only major patterns.</p>
+                  </div>
+                )}
+                {/* Inline settings: ANCHORED_VWAP */}
+                {ind.type === 'ANCHORED_VWAP' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Show ±σ Bands</label>
+                      <button onClick={() => updateIndicator(ind.id, { showBands: !(ind.showBands ?? true) })} className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showBands ?? true) ? 'bg-primary' : 'bg-accent'}`}>
+                        <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showBands ?? true) ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">Anchor Time (Unix s, 0 = start)</label>
+                      <input
+                        type="number"
+                        value={ind.anchorTime ?? 0}
+                        onChange={(e) => updateIndicator(ind.id, { anchorTime: Number(e.target.value) })}
+                        className="w-full bg-input border border-border rounded px-2 py-1 text-[10px] text-foreground tabular-nums"
+                        placeholder="0"
+                      />
+                      <p className="text-[9px] text-muted-foreground mt-0.5">0 = full dataset start. Paste a Unix timestamp to anchor at a specific bar.</p>
+                    </div>
+                  </div>
+                )}
+                {/* Inline settings: SESSION_VWAP */}
+                {ind.type === 'SESSION_VWAP' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Show ±σ Bands</label>
+                      <button onClick={() => updateIndicator(ind.id, { showBands: !(ind.showBands ?? true) })} className={`w-8 h-4 rounded-full transition-colors relative ${(ind.showBands ?? true) ? 'bg-primary' : 'bg-accent'}`}>
+                        <div className={`w-3 h-3 rounded-full bg-foreground absolute top-0.5 transition-all ${(ind.showBands ?? true) ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">Resets every UTC day. Best on 1m–15m timeframes.</p>
+                  </div>
+                )}
+                {/* Inline settings: SUPPLY_DEMAND */}
+                {ind.type === 'SUPPLY_DEMAND' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Pivot Length</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { period: Math.max(2, (ind.period ?? 5) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-6 text-center text-[11px] tabular-nums">{ind.period ?? 5}</span>
+                        <button onClick={() => updateIndicator(ind.id, { period: (ind.period ?? 5) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Zone Height (ATR×)</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { sdAtrMult: Math.max(0.1, Number(((ind.sdAtrMult ?? 0.5) - 0.1).toFixed(1))) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{(ind.sdAtrMult ?? 0.5).toFixed(1)}</span>
+                        <button onClick={() => updateIndicator(ind.id, { sdAtrMult: Number(((ind.sdAtrMult ?? 0.5) + 0.1).toFixed(1)) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Min Strength</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { sdStrength: Math.max(0.1, Number(((ind.sdStrength ?? 0.4) - 0.1).toFixed(1))) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{(ind.sdStrength ?? 0.4).toFixed(1)}</span>
+                        <button onClick={() => updateIndicator(ind.id, { sdStrength: Math.min(0.9, Number(((ind.sdStrength ?? 0.4) + 0.1).toFixed(1))) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">Higher strength = fewer but cleaner zones. ◇ = tested, ✗ = broken.</p>
                   </div>
                 )}
               </div>
@@ -960,6 +1058,9 @@ export const RightSidebar: React.FC = () => {
 
         {/* ---- HEATMAP TAB ---- */}
         {rightPanelTab === 'heatmap' && <HeatmapView />}
+
+        {/* ---- GUIDE TAB ---- */}
+        {rightPanelTab === 'guide' && <FeatureGuide />}
       </div>
     </div>
   );

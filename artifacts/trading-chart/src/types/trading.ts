@@ -164,7 +164,7 @@ export interface SmartMoneyAlert {
   telegramEnabled?: boolean;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE' | 'PATTERN' | 'ANCHORED_VWAP' | 'SESSION_VWAP' | 'SUPPLY_DEMAND';
 
 export interface IndicatorConfig {
   id: string;
@@ -214,4 +214,14 @@ export interface IndicatorConfig {
   showSweeps?: boolean;
   /** MARKET_STRUCTURE: show swing high/low dots */
   showSwingDots?: boolean;
+  /** ANCHORED_VWAP: unix timestamp (seconds) of the anchor bar; 0 = session start */
+  anchorTime?: number;
+  /** ANCHORED_VWAP / SESSION_VWAP: show +/-1σ and +/-2σ bands */
+  showBands?: boolean;
+  /** PATTERN: pivot lookback length */
+  pivotLen?: number;
+  /** SUPPLY_DEMAND: strength threshold 0-1 */
+  sdStrength?: number;
+  /** SUPPLY_DEMAND: zone ATR multiplier for height */
+  sdAtrMult?: number;
 }
