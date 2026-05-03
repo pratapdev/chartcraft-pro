@@ -22,6 +22,10 @@ interface AIChatBody {
   message: string;
   context?: ChartContext;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+  provider?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 function buildSystemPrompt(ctx?: ChartContext): string {
@@ -63,8 +67,57 @@ function buildSystemPrompt(ctx?: ChartContext): string {
   return parts.join("\n");
 }
 
+type ProviderName = "openai" | "google" | "anthropic";
+
+function resolveProvider(raw?: string): ProviderName {
+  if (raw === "google" || raw === "anthropic") return raw;
+  return "openai";
+}
+
+async function streamWithFetch(params: {
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  provider: ProviderName;
+}) {
+  const { baseUrl, apiKey, model, messages, provider } = params;
+  const url = provider === "anthropic" ? `${baseUrl}/v1/messages` : `${baseUrl}/v1/chat/completions`;
+  const body =
+    provider === "anthropic"
+      ? {
+          model,
+          max_tokens: 4096,
+          messages: messages.map((m) => ({
+            role: m.role === "system" ? "user" : m.role,
+            content: m.role === "system" ? `System instructions:\n${m.content}` : m.content,
+          })),
+        }
+      : {
+          model,
+          messages,
+          stream: true,
+        };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      ...(provider === "anthropic" ? { "anthropic-version": "2023-06-01" } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Provider error: ${response.status}`);
+  }
+
+  return response.body;
+}
+
 router.post("/ai/chat", async (req: Request<object, object, AIChatBody>, res: Response) => {
-  const { message, context, history = [] } = req.body;
+  const { message, context, history = [], provider, apiKey, baseUrl, model } = req.body;
 
   if (!message?.trim()) {
     res.status(400).json({ error: "message is required" });
@@ -78,6 +131,21 @@ router.post("/ai/chat", async (req: Request<object, object, AIChatBody>, res: Re
 
   try {
     const systemPrompt = buildSystemPrompt(context);
+    const selectedProvider = resolveProvider(provider);
+    const resolvedBaseUrl =
+      baseUrl ||
+      (selectedProvider === "anthropic"
+        ? "https://api.anthropic.com"
+        : selectedProvider === "google"
+          ? "https://generativelanguage.googleapis.com"
+          : "https://api.openai.com");
+    const resolvedModel =
+      model ||
+      (selectedProvider === "anthropic"
+        ? "claude-3-5-sonnet-latest"
+        : selectedProvider === "google"
+          ? "gemini-1.5-pro"
+          : "gpt-5.1");
 
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: systemPrompt },
@@ -85,17 +153,53 @@ router.post("/ai/chat", async (req: Request<object, object, AIChatBody>, res: Re
       { role: "user", content: message },
     ];
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      max_completion_tokens: 8192,
-      messages,
-      stream: true,
-    });
+    if (selectedProvider === "openai" && !apiKey) {
+      const stream = await openai.chat.completions.create({
+        model: resolvedModel,
+        max_completion_tokens: 8192,
+        messages,
+        stream: true,
+      });
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+    } else {
+      const body = await streamWithFetch({
+        baseUrl: resolvedBaseUrl,
+        apiKey,
+        model: resolvedModel,
+        messages,
+        provider: selectedProvider,
+      });
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          if (line.startsWith("data: ")) {
+            const payload = line.slice(6);
+            if (payload === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(payload);
+              const content =
+                parsed?.choices?.[0]?.delta?.content ||
+                parsed?.content?.[0]?.text ||
+                parsed?.content ||
+                "";
+              if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            } catch {}
+          }
+        }
       }
     }
 
