@@ -1,64 +1,58 @@
-/**
- * Sync service for pushing/pulling chart state to/from the API server.
- * 
- * Uses the Replit shared proxy at /api/sync/*
- * Falls back gracefully to localStorage when the server is not reachable.
- */
+import type { Alert, AlertLog, FibonacciDrawing, IndicatorConfig, IndicatorCrossAlert, IndicatorThresholdAlert, MarketType, PctDiffDonCrossAlert, StochRSICrossAlert, Timeframe, Trendline } from '@/types/trading';
 
-export function getSyncServerUrl(): string {
-  return '';
-}
-
-export function setSyncServerUrl(_url: string) {
-  // No-op: in Replit we always use the relative /api path via the shared proxy
-}
-
-interface SyncState {
+export interface SyncPayload {
   state: {
     symbol: string;
-    timeframe: string;
-    marketType: string;
+    timeframe: Timeframe;
+    marketType: MarketType;
     chartFontSize: number;
-    drawingDefaults: any;
+    drawingDefaults: Record<string, unknown>;
   };
-  trendlines: any[];
-  indicators: any[];
-  alerts: any[];
-  alertLogs: any[];
-  fibonacciDrawings: any[];
-  indicatorCrossAlerts: any[];
-  indicatorThresholdAlerts: any[];
-  stochRSICrossAlerts: any[];
-  pctDiffDonCrossAlerts: any[];
+  trendlines: Trendline[];
+  indicators: IndicatorConfig[];
+  alerts: Alert[];
+  alertLogs: AlertLog[];
+  fibonacciDrawings: FibonacciDrawing[];
+  indicatorCrossAlerts: IndicatorCrossAlert[];
+  indicatorThresholdAlerts: IndicatorThresholdAlert[];
+  stochRSICrossAlerts: StochRSICrossAlert[];
+  pctDiffDonCrossAlerts: PctDiffDonCrossAlert[];
 }
 
-const toNum = (value: any, fallback = 0) => {
-  const n = typeof value === 'number' ? value : parseFloat(value);
+const toNum = (value: unknown, fallback = 0) => {
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value));
   return Number.isFinite(n) ? n : fallback;
 };
 
-const normalizeSyncState = (data: any): SyncState => ({
+const normalizeSyncPayload = (data: any): SyncPayload => ({
   state: data?.state ? {
-    symbol: data.state.symbol,
-    timeframe: data.state.timeframe,
-    marketType: data.state.marketType,
+    symbol: String(data.state.symbol),
+    timeframe: data.state.timeframe as Timeframe,
+    marketType: data.state.marketType as MarketType,
     chartFontSize: toNum(data.state.chartFontSize, 11),
     drawingDefaults: data.state.drawingDefaults || {},
   } : null,
   trendlines: (data?.trendlines || []).map((t: any) => ({
     ...t,
+    startTime: toNum(t.startTime),
     startPrice: toNum(t.startPrice),
+    endTime: toNum(t.endTime),
     endPrice: toNum(t.endPrice),
     thickness: toNum(t.thickness, 1),
+    createdAt: toNum(t.createdAt),
   })),
   indicators: (data?.indicators || []).map((i: any) => ({
     ...i,
     period: toNum(i.period, 20),
     lineWidth: toNum(i.lineWidth, 1),
-    stdDev: i.stdDev === null || i.stdDev === undefined ? null : toNum(i.stdDev),
-    multiplier: i.multiplier === null || i.multiplier === undefined ? null : toNum(i.multiplier),
+    stdDev: i.stdDev === null || i.stdDev === undefined ? undefined : toNum(i.stdDev),
+    multiplier: i.multiplier === null || i.multiplier === undefined ? undefined : toNum(i.multiplier),
   })),
-  alerts: data?.alerts || [],
+  alerts: (data?.alerts || []).map((a: any) => ({
+    ...a,
+    createdAt: toNum(a.createdAt),
+    triggeredAt: a.triggeredAt === null || a.triggeredAt === undefined ? undefined : toNum(a.triggeredAt),
+  })),
   alertLogs: (data?.alertLogs || []).map((l: any) => ({
     ...l,
     timestamp: toNum(l.timestamp),
@@ -66,32 +60,49 @@ const normalizeSyncState = (data: any): SyncState => ({
   })),
   fibonacciDrawings: (data?.fibonacciDrawings || []).map((f: any) => ({
     ...f,
+    startTime: toNum(f.startTime),
     startPrice: toNum(f.startPrice),
+    endTime: toNum(f.endTime),
     endPrice: toNum(f.endPrice),
+    createdAt: toNum(f.createdAt),
   })),
-  indicatorCrossAlerts: data?.indicatorCrossAlerts || [],
+  indicatorCrossAlerts: (data?.indicatorCrossAlerts || []).map((a: any) => ({
+    ...a,
+    createdAt: toNum(a.createdAt),
+    triggeredAt: a.triggeredAt === null || a.triggeredAt === undefined ? undefined : toNum(a.triggeredAt),
+  })),
   indicatorThresholdAlerts: (data?.indicatorThresholdAlerts || []).map((a: any) => ({
     ...a,
     threshold: toNum(a.threshold),
+    createdAt: toNum(a.createdAt),
+    triggeredAt: a.triggeredAt === null || a.triggeredAt === undefined ? undefined : toNum(a.triggeredAt),
   })),
-  stochRSICrossAlerts: data?.stochRSICrossAlerts || [],
-  pctDiffDonCrossAlerts: data?.pctDiffDonCrossAlerts || [],
+  stochRSICrossAlerts: (data?.stochRSICrossAlerts || []).map((a: any) => ({
+    ...a,
+    createdAt: toNum(a.createdAt),
+    triggeredAt: a.triggeredAt === null || a.triggeredAt === undefined ? undefined : toNum(a.triggeredAt),
+  })),
+  pctDiffDonCrossAlerts: (data?.pctDiffDonCrossAlerts || []).map((a: any) => ({
+    ...a,
+    createdAt: toNum(a.createdAt),
+    triggeredAt: a.triggeredAt === null || a.triggeredAt === undefined ? undefined : toNum(a.triggeredAt),
+  })),
 });
 
-export async function pullState(): Promise<SyncState | null> {
+export async function pullState(): Promise<SyncPayload | null> {
   try {
     const res = await fetch('/api/sync/state', {
-      headers: { 'Accept': 'application/json' },
+      headers: { Accept: 'application/json' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return normalizeSyncState(await res.json());
-  } catch (err) {
-    console.warn('[Sync] Pull failed (server may be offline):', (err as Error).message);
+    return normalizeSyncPayload(await res.json());
+  } catch (error) {
+    console.warn('[Sync] Pull failed:', error instanceof Error ? error.message : String(error));
     return null;
   }
 }
 
-export async function pushState(data: SyncState): Promise<boolean> {
+export async function pushState(data: SyncPayload): Promise<boolean> {
   try {
     const res = await fetch('/api/sync/state', {
       method: 'PUT',
@@ -100,8 +111,8 @@ export async function pushState(data: SyncState): Promise<boolean> {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return true;
-  } catch (err) {
-    console.warn('[Sync] Push failed (server may be offline):', (err as Error).message);
+  } catch (error) {
+    console.warn('[Sync] Push failed:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
@@ -115,7 +126,7 @@ export async function checkSyncHealth(): Promise<boolean> {
   }
 }
 
-export function extractSyncPayload(storeState: any): SyncState {
+export function extractSyncPayload(storeState: any): SyncPayload {
   return {
     state: {
       symbol: storeState.symbol,

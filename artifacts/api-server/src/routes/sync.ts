@@ -85,9 +85,9 @@ router.get("/sync/state", async (req, res) => {
       })),
       pctDiffDonCrossAlerts: [],
     });
-  } catch (err: any) {
-    req.log.error({ err }, "Failed to get sync state");
-    res.status(500).json({ error: err.message });
+  } catch (error: any) {
+    req.log.error({ error }, "Failed to get sync state");
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -96,125 +96,119 @@ router.put("/sync/state", async (req, res) => {
     const { state, trendlines, indicators, alerts, alertLogs, fibonacciDrawings,
       indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts, pctDiffDonCrossAlerts } = req.body;
 
-    if (state) {
-      await db.delete(chartStateTable);
-      await db.insert(chartStateTable).values({
-        id: 'default',
-        symbol: state.symbol,
-        timeframe: state.timeframe,
-        marketType: state.marketType,
-        chartFontSize: toNum(state.chartFontSize, 11),
-        drawingDefaults: state.drawingDefaults || {},
-      });
-    }
-
-    if (trendlines) {
-      await db.delete(trendlinesTable);
-      for (const t of trendlines) {
-        await db.insert(trendlinesTable).values({
-          id: t.id, symbol: t.symbol, timeframe: t.timeframe,
-          startTime: toNum(t.startTime), startPrice: String(toNum(t.startPrice)),
-          endTime: toNum(t.endTime), endPrice: String(toNum(t.endPrice)),
-          color: t.color || '#2962FF', thickness: toNum(t.thickness, 1),
-          lineStyle: t.lineStyle || 'solid', createdAt: toNum(t.createdAt),
+    await db.transaction(async (tx) => {
+      if (state) {
+        await tx.delete(chartStateTable);
+        await tx.insert(chartStateTable).values({
+          id: 'default',
+          symbol: state.symbol,
+          timeframe: state.timeframe,
+          marketType: state.marketType,
+          chartFontSize: toNum(state.chartFontSize, 11),
+          drawingDefaults: state.drawingDefaults || {},
         });
       }
-    }
-
-    if (indicators) {
-      await db.delete(chartIndicatorsTable);
-      for (const i of indicators) {
-        await db.insert(chartIndicatorsTable).values({
-          id: i.id, type: i.type, period: toNum(i.period, 20),
-          color: i.color || '#2962FF', visible: i.visible !== false,
-          lineWidth: toNum(i.lineWidth, 1), lineStyle: i.lineStyle || 'solid',
-          kPeriod: i.kPeriod || null, dPeriod: i.dPeriod || null,
-          color2: i.color2 || null, stdDev: i.stdDev === null || i.stdDev === undefined ? null : String(toNum(i.stdDev)),
-          multiplier: i.multiplier === null || i.multiplier === undefined ? null : String(toNum(i.multiplier)),
-        });
+      if (trendlines) {
+        await tx.delete(trendlinesTable);
+        for (const t of trendlines) {
+          await tx.insert(trendlinesTable).values({
+            id: t.id, symbol: t.symbol, timeframe: t.timeframe,
+            startTime: toNum(t.startTime), startPrice: String(toNum(t.startPrice)),
+            endTime: toNum(t.endTime), endPrice: String(toNum(t.endPrice)),
+            color: t.color || '#2962FF', thickness: toNum(t.thickness, 1),
+            lineStyle: t.lineStyle || 'solid', createdAt: toNum(t.createdAt),
+          });
+        }
       }
-    }
-
-    if (alerts) {
-      await db.delete(chartAlertsTable);
-      for (const a of alerts) {
-        await db.insert(chartAlertsTable).values({
-          id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-          trendlineId: a.trendlineId || null, condition: a.condition,
-          active: a.active !== false, triggered: a.triggered || false,
-          triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-          createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
-        });
+      if (indicators) {
+        await tx.delete(chartIndicatorsTable);
+        for (const i of indicators) {
+          await tx.insert(chartIndicatorsTable).values({
+            id: i.id, type: i.type, period: toNum(i.period, 20),
+            color: i.color || '#2962FF', visible: i.visible !== false,
+            lineWidth: toNum(i.lineWidth, 1), lineStyle: i.lineStyle || 'solid',
+            kPeriod: i.kPeriod || null, dPeriod: i.dPeriod || null,
+            color2: i.color2 || null, stdDev: i.stdDev === null || i.stdDev === undefined ? null : String(toNum(i.stdDev)),
+            multiplier: i.multiplier === null || i.multiplier === undefined ? null : String(toNum(i.multiplier)),
+          });
+        }
       }
-    }
-
-    if (alertLogs) {
-      await db.delete(chartAlertLogsTable);
-      for (const l of alertLogs) {
-        await db.insert(chartAlertLogsTable).values({
-          id: l.id, alertId: l.alertId || null, symbol: l.symbol,
-          message: l.message, timestamp: toNum(l.timestamp), price: String(toNum(l.price)),
-        });
+      if (alerts) {
+        await tx.delete(chartAlertsTable);
+        for (const a of alerts) {
+          await tx.insert(chartAlertsTable).values({
+            id: a.id, symbol: a.symbol, timeframe: a.timeframe,
+            trendlineId: a.trendlineId || null, condition: a.condition,
+            active: a.active !== false, triggered: a.triggered || false,
+            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
+            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+          });
+        }
       }
-    }
-
-    if (fibonacciDrawings) {
-      await db.delete(fibonacciDrawingsTable);
-      for (const f of fibonacciDrawings) {
-        await db.insert(fibonacciDrawingsTable).values({
-          id: f.id, symbol: f.symbol, timeframe: f.timeframe,
-          startTime: toNum(f.startTime), startPrice: String(toNum(f.startPrice)),
-          endTime: toNum(f.endTime), endPrice: String(toNum(f.endPrice)), createdAt: toNum(f.createdAt),
-        });
+      if (alertLogs) {
+        await tx.delete(chartAlertLogsTable);
+        for (const l of alertLogs) {
+          await tx.insert(chartAlertLogsTable).values({
+            id: l.id, alertId: l.alertId || null, symbol: l.symbol,
+            message: l.message, timestamp: toNum(l.timestamp), price: String(toNum(l.price)),
+          });
+        }
       }
-    }
-
-    if (indicatorCrossAlerts) {
-      await db.delete(indicatorCrossAlertsTable);
-      for (const a of indicatorCrossAlerts) {
-        await db.insert(indicatorCrossAlertsTable).values({
-          id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-          indicatorId1: a.indicatorId1, indicatorId2: a.indicatorId2,
-          condition: a.condition, active: a.active !== false, triggered: a.triggered || false,
-          triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-          createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
-        });
+      if (fibonacciDrawings) {
+        await tx.delete(fibonacciDrawingsTable);
+        for (const f of fibonacciDrawings) {
+          await tx.insert(fibonacciDrawingsTable).values({
+            id: f.id, symbol: f.symbol, timeframe: f.timeframe,
+            startTime: toNum(f.startTime), startPrice: String(toNum(f.startPrice)),
+            endTime: toNum(f.endTime), endPrice: String(toNum(f.endPrice)), createdAt: toNum(f.createdAt),
+          });
+        }
       }
-    }
-
-    if (indicatorThresholdAlerts) {
-      await db.delete(indicatorThresholdAlertsTable);
-      for (const a of indicatorThresholdAlerts) {
-        await db.insert(indicatorThresholdAlertsTable).values({
-          id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-          indicatorId: a.indicatorId, condition: a.condition,
-          threshold: String(toNum(a.threshold)), active: a.active !== false, triggered: a.triggered || false,
-          triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-          createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
-        });
+      if (indicatorCrossAlerts) {
+        await tx.delete(indicatorCrossAlertsTable);
+        for (const a of indicatorCrossAlerts) {
+          await tx.insert(indicatorCrossAlertsTable).values({
+            id: a.id, symbol: a.symbol, timeframe: a.timeframe,
+            indicatorId1: a.indicatorId1, indicatorId2: a.indicatorId2,
+            condition: a.condition, active: a.active !== false, triggered: a.triggered || false,
+            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
+            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+          });
+        }
       }
-    }
-
-    if (stochRSICrossAlerts) {
-      await db.delete(stochRSICrossAlertsTable);
-      for (const a of stochRSICrossAlerts) {
-        await db.insert(stochRSICrossAlertsTable).values({
-          id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-          indicatorId: a.indicatorId, condition: a.condition,
-          active: a.active !== false, triggered: a.triggered || false,
-          triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-          createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
-        });
+      if (indicatorThresholdAlerts) {
+        await tx.delete(indicatorThresholdAlertsTable);
+        for (const a of indicatorThresholdAlerts) {
+          await tx.insert(indicatorThresholdAlertsTable).values({
+            id: a.id, symbol: a.symbol, timeframe: a.timeframe,
+            indicatorId: a.indicatorId, condition: a.condition,
+            threshold: String(toNum(a.threshold)), active: a.active !== false, triggered: a.triggered || false,
+            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
+            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+          });
+        }
       }
-    }
-
-    if (pctDiffDonCrossAlerts) {
-    }
+      if (stochRSICrossAlerts) {
+        await tx.delete(stochRSICrossAlertsTable);
+        for (const a of stochRSICrossAlerts) {
+          await tx.insert(stochRSICrossAlertsTable).values({
+            id: a.id, symbol: a.symbol, timeframe: a.timeframe,
+            indicatorId: a.indicatorId, condition: a.condition,
+            active: a.active !== false, triggered: a.triggered || false,
+            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
+            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+          });
+        }
+      }
+      if (pctDiffDonCrossAlerts) {
+        await tx.delete(indicatorCrossAlertsTable);
+      }
+    });
 
     res.json({ success: true });
-  } catch (err: any) {
-    req.log.error({ err }, "Failed to put sync state");
-    res.status(500).json({ error: err.message });
+  } catch (error: any) {
+    req.log.error({ error }, "Failed to put sync state");
+    res.status(500).json({ error: error.message });
   }
 });
 
