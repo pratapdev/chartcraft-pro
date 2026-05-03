@@ -247,14 +247,12 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
 
-      // Apply the current main range immediately
       const mainRange = chartSync.getMainLogicalRange();
       if (mainRange) {
         lastMainRangeRef.current = mainRange;
         try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
       }
 
-      // Mirror every main chart range change
       const unsubscribeMain = chartSync.subscribeMainRange((range: LogicalRange) => {
         lastMainRangeRef.current = range;
         try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
@@ -357,7 +355,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    // setData causes an auto-fit — snap back to the main chart range
     applyMainRange();
 
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, applyMainRange]);
