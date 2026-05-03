@@ -224,8 +224,10 @@ export const CandlestickChart: React.FC = () => {
       chartSync.registerChart('main', chart);
       // Let indicator panes forward events here
       chartSync.setMainContainer(containerRef.current);
-      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (range) chartSync.syncRange('main', range);
+      // Use time-based sync so panes with fewer data points (RSI warmup, etc.)
+      // align correctly — logical index sync would cause misalignment.
+      chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
+        if (range) chartSync.broadcastTimeRange(range as { from: Time; to: Time });
       });
     }
 

@@ -6,14 +6,13 @@ import {
   LineData,
   HistogramData,
   Time,
-  LogicalRange,
   LineSeries,
   HistogramSeries,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig, LineStyleType } from '@/types/trading';
 import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
-import { useChartSync } from './ChartSyncContext';
+import { useChartSync, TimeRange } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
 const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
@@ -30,16 +29,16 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
-  const lastMainRangeRef = useRef<LogicalRange | null>(null);
+  const lastMainRangeRef = useRef<TimeRange | null>(null);
 
-  // Apply the main chart's logical range to this pane
+  // Apply the main chart's time range to this pane
   const applyMainRange = useCallback(() => {
     if (!chartRef.current || !chartSync) return;
-    const range = chartSync.getMainLogicalRange() ?? lastMainRangeRef.current;
+    const range = chartSync.getMainTimeRange() ?? lastMainRangeRef.current;
     if (!range) return;
     lastMainRangeRef.current = range;
     try {
-      chartRef.current.timeScale().setVisibleLogicalRange(range);
+      chartRef.current.timeScale().setVisibleRange(range);
     } catch {}
   }, [chartSync]);
 
@@ -247,15 +246,17 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     if (chartSync) {
       chartSync.registerChart(chartId, chart);
 
-      const mainRange = chartSync.getMainLogicalRange();
+      // Apply current main time range immediately
+      const mainRange = chartSync.getMainTimeRange();
       if (mainRange) {
         lastMainRangeRef.current = mainRange;
-        try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
+        try { chart.timeScale().setVisibleRange(mainRange); } catch {}
       }
 
-      const unsubscribeMain = chartSync.subscribeMainRange((range: LogicalRange) => {
+      // Mirror every main chart time range change
+      const unsubscribeMain = chartSync.subscribeMainTimeRange((range: TimeRange) => {
         lastMainRangeRef.current = range;
-        try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
+        try { chart.timeScale().setVisibleRange(range); } catch {}
       });
 
       return () => {

@@ -1,13 +1,18 @@
 import React, { createContext, useContext, useRef, useCallback } from 'react';
-import { IChartApi, LogicalRange } from 'lightweight-charts';
+import { IChartApi, Time } from 'lightweight-charts';
+
+export interface TimeRange {
+  from: Time;
+  to: Time;
+}
 
 interface ChartSyncContextValue {
   registerChart: (id: string, chart: IChartApi) => void;
   unregisterChart: (id: string) => void;
-  syncRange: (sourceId: string, range: LogicalRange) => void;
-  getMainLogicalRange: () => LogicalRange | null;
+  broadcastTimeRange: (range: TimeRange) => void;
+  getMainTimeRange: () => TimeRange | null;
   getMainChart: () => IChartApi | null;
-  subscribeMainRange: (handler: (range: LogicalRange) => void) => () => void;
+  subscribeMainTimeRange: (handler: (range: TimeRange) => void) => () => void;
   setMainContainer: (el: HTMLElement | null) => void;
   getMainContainer: () => HTMLElement | null;
 }
@@ -18,7 +23,8 @@ export const useChartSync = () => useContext(ChartSyncContext);
 
 export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const chartsRef = useRef<Map<string, IChartApi>>(new Map());
-  const mainRangeListeners = useRef<Set<(range: LogicalRange) => void>>(new Set());
+  const timeRangeListeners = useRef<Set<(range: TimeRange) => void>>(new Set());
+  const lastTimeRangeRef = useRef<TimeRange | null>(null);
   const isSyncing = useRef(false);
   const mainContainerRef = useRef<HTMLElement | null>(null);
 
@@ -30,32 +36,22 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     chartsRef.current.delete(id);
   }, []);
 
-  const syncRange = useCallback((sourceId: string, range: LogicalRange) => {
+  const broadcastTimeRange = useCallback((range: TimeRange) => {
     if (isSyncing.current) return;
+    lastTimeRangeRef.current = range;
     isSyncing.current = true;
-
-    chartsRef.current.forEach((chart, id) => {
-      if (id !== sourceId) {
-        try {
-          chart.timeScale().setVisibleLogicalRange(range);
-        } catch {}
-      }
+    timeRangeListeners.current.forEach((fn) => {
+      try { fn(range); } catch {}
     });
-
-    if (sourceId === 'main') {
-      mainRangeListeners.current.forEach((fn) => {
-        try { fn(range); } catch {}
-      });
-    }
-
     isSyncing.current = false;
   }, []);
 
-  const getMainLogicalRange = useCallback((): LogicalRange | null => {
+  const getMainTimeRange = useCallback((): TimeRange | null => {
+    if (lastTimeRangeRef.current) return lastTimeRangeRef.current;
     const mainChart = chartsRef.current.get('main');
     if (!mainChart) return null;
     try {
-      return mainChart.timeScale().getVisibleLogicalRange();
+      return mainChart.timeScale().getVisibleRange() as TimeRange | null;
     } catch {
       return null;
     }
@@ -65,10 +61,10 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return chartsRef.current.get('main') ?? null;
   }, []);
 
-  const subscribeMainRange = useCallback((handler: (range: LogicalRange) => void) => {
-    mainRangeListeners.current.add(handler);
+  const subscribeMainTimeRange = useCallback((handler: (range: TimeRange) => void) => {
+    timeRangeListeners.current.add(handler);
     return () => {
-      mainRangeListeners.current.delete(handler);
+      timeRangeListeners.current.delete(handler);
     };
   }, []);
 
@@ -84,10 +80,10 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     <ChartSyncContext.Provider value={{
       registerChart,
       unregisterChart,
-      syncRange,
-      getMainLogicalRange,
+      broadcastTimeRange,
+      getMainTimeRange,
       getMainChart,
-      subscribeMainRange,
+      subscribeMainTimeRange,
       setMainContainer,
       getMainContainer,
     }}>
