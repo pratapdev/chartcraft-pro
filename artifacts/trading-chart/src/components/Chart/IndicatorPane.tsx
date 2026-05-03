@@ -243,7 +243,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
       // Mirror every main chart time range change
       const unsubscribeMain = chartSync.subscribeMainTimeRange((range: TimeRange) => {
-        if (lastMainRangeRef.current && lastMainRangeRef.current.from === range.from && lastMainRangeRef.current.to === range.to) return;
         lastMainRangeRef.current = range;
         try { chart.timeScale().setVisibleRange(range); } catch {}
       });
