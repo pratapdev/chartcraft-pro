@@ -116,16 +116,17 @@ export const FootprintChart: React.FC = () => {
 
     if (!fpCandles.length) return;
 
-    const candleWidth = Math.max(60, 120 * zoom);
+    const candleWidth = Math.max(18, Math.min(42, 28 * zoom));
     const gap = 4;
     // Price range across all visible candles
     const rightEdge = W - 60; // space for price axis
     const bottomEdge = H - 30; // space for time axis
 
     // Determine visible candle range based on offset
-    const startPx = offsetX;
-    const visibleStart = Math.max(0, Math.floor(-startPx / (candleWidth + gap)));
-    const visibleEnd = Math.min(fpCandles.length, Math.ceil((W - startPx) / (candleWidth + gap)) + 1);
+    const totalWidth = fpCandles.length * (candleWidth + gap);
+    const startPx = Math.min(0, W - totalWidth - 72) + offsetX;
+    const visibleStart = Math.max(0, Math.floor(-startPx / (candleWidth + gap)) - 1);
+    const visibleEnd = Math.min(fpCandles.length, Math.ceil((W - startPx) / (candleWidth + gap)) + 2);
 
     const visibleCandles = fpCandles.slice(visibleStart, visibleEnd);
 
@@ -143,12 +144,12 @@ export const FootprintChart: React.FC = () => {
     if (minPrice === Infinity) return;
 
     const tickSize = visibleCandles[0].tickSize;
-    const priceRange = Math.max(tickSize * 2, maxPrice - minPrice + tickSize * 2);
+    const priceRange = Math.max(tickSize * 3, maxPrice - minPrice + tickSize * 4);
     const chartTop = 20;
     const chartHeight = bottomEdge - chartTop;
 
-    const priceToY = (p: number) => chartTop + ((maxPrice + tickSize - p) / priceRange) * chartHeight;
-    const rowHeight = Math.max(12, chartHeight / Math.max(1, ((maxPrice - minPrice) / tickSize + 1)));
+    const priceToY = (p: number) => chartTop + ((maxPrice + tickSize * 2 - p) / priceRange) * chartHeight;
+    const rowHeight = Math.max(10, chartHeight / Math.max(1, ((maxPrice - minPrice) / tickSize + 1)));
 
     // Find max volume at any level for color intensity scaling
     let maxLevelVol = 1;
@@ -321,7 +322,7 @@ export const FootprintChart: React.FC = () => {
   useEffect(() => {
     if (!containerRef.current || !fpCandles.length || isDragging.current) return;
     const W = containerRef.current.getBoundingClientRect().width;
-    const candleWidth = Math.max(60, 120 * zoom);
+    const candleWidth = Math.max(18, Math.min(42, 28 * zoom));
     const gap = 4;
     const totalWidth = fpCandles.length * (candleWidth + gap);
     // Show the right edge with some padding
