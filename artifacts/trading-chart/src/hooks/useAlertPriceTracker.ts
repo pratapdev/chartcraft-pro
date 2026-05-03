@@ -15,6 +15,7 @@ export function useAlertPriceTracker() {
   const indicatorCrossAlerts = useChartStore((s) => s.indicatorCrossAlerts);
   const indicatorThresholdAlerts = useChartStore((s) => s.indicatorThresholdAlerts);
   const stochRSICrossAlerts = useChartStore((s) => s.stochRSICrossAlerts);
+  const smartMoneyAlerts = useChartStore((s) => s.smartMoneyAlerts);
   const currentSymbol = useChartStore((s) => s.symbol);
   const currentTimeframe = useChartStore((s) => s.timeframe);
   const marketType = useChartStore((s) => s.marketType);
@@ -89,6 +90,7 @@ export function useAlertPriceTracker() {
       ...indicatorCrossAlerts.filter((a) => a.active && !a.triggered),
       ...(indicatorThresholdAlerts ?? []).filter((a) => a.active && !a.triggered),
       ...(stochRSICrossAlerts ?? []).filter((a) => a.active && !a.triggered),
+      ...(smartMoneyAlerts ?? []).filter((a) => a.active),
     ];
 
     for (const alert of allAlerts) {
@@ -157,7 +159,7 @@ export function useAlertPriceTracker() {
           }
         });
     }
-  }, [alerts, indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts, currentSymbol, currentTimeframe, marketType]);
+  }, [alerts, indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts, smartMoneyAlerts, currentSymbol, currentTimeframe, marketType]);
 
   // Keep current chart candles synced to alertCandles
   const candles = useChartStore((s) => s.candles);

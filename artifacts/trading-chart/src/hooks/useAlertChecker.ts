@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
 import { Candle, IndicatorConfig, PctDiffDonLine } from '@/types/trading';
+import { computeFVG, computeMarketStructure } from '@/lib/smartMoney';
 
 // Shared AudioContext, unlocked on first user gesture
 let sharedCtx: AudioContext | null = null;
@@ -145,12 +146,18 @@ export function useAlertChecker() {
   const indicatorThresholdAlerts = useChartStore((s) => s.indicatorThresholdAlerts);
   const stochRSICrossAlerts = useChartStore((s) => s.stochRSICrossAlerts);
   const pctDiffDonCrossAlerts = useChartStore((s) => s.pctDiffDonCrossAlerts);
+  const smartMoneyAlerts = useChartStore((s) => s.smartMoneyAlerts);
 
   const triggeredSetRef = useRef<Set<string>>(new Set());
   const crossTriggeredRef = useRef<Set<string>>(new Set());
   const thresholdTriggeredRef = useRef<Set<string>>(new Set());
   const stochTriggeredRef = useRef<Set<string>>(new Set());
   const pctDiffTriggeredRef = useRef<Set<string>>(new Set());
+  // Tracks last candle time each smart money alert fired (allows re-firing on new candles)
+  const smartMoneyLastFiredRef = useRef<Map<string, number>>(new Map());
+  // For FVG alerts: tracks which zone ids (type:bottom:top) price is currently inside
+  // Allows edge detection (outside→inside transition only) to avoid noisy repeated alerts
+  const fvgInZoneRef = useRef<Map<string, Set<string>>>(new Map());
 
   // Trendline alerts — check per-symbol candles
   useEffect(() => {
@@ -332,6 +339,100 @@ export function useAlertChecker() {
       useChartStore.getState().addStochRSICrossAlert({ ...alert, triggered: true, triggeredAt: Date.now() });
     }
   }, [alertCandles, stochRSICrossAlerts, indicators]);
+
+  // Smart Money alerts: FVG entry, BOS/CHOCH cross, Liquidity sweep
+  useEffect(() => {
+    const active = (smartMoneyAlerts ?? []).filter((a) => a.active);
+    if (active.length === 0) return;
+
+    for (const alert of active) {
+      const candles = getCandlesForAlert(alert.symbol, alert.timeframe);
+      if (candles.length < 20) continue;
+
+      const curr = candles[candles.length - 1];
+      const lastFired = smartMoneyLastFiredRef.current.get(alert.id);
+      if (lastFired === curr.time) continue;
+
+      let fired = false;
+      let message = '';
+
+      if (alert.condition === 'fvg_bull_entry' || alert.condition === 'fvg_bear_entry') {
+        const fvgType = alert.condition === 'fvg_bull_entry' ? 'bullish' : 'bearish';
+        const fvgZones = computeFVG(candles, 0.1);
+        const unmitigated = fvgZones.filter((z) => z.type === fvgType && !z.mitigated);
+
+        // Edge detection: get the set of zones we're currently tracking as "in-zone"
+        if (!fvgInZoneRef.current.has(alert.id)) fvgInZoneRef.current.set(alert.id, new Set());
+        const inZoneSet = fvgInZoneRef.current.get(alert.id)!;
+
+        // Build set of currently overlapping zones
+        const nowInZone = new Set<string>();
+        for (const zone of unmitigated) {
+          const zoneId = `${zone.type}:${zone.bottom.toFixed(4)}:${zone.top.toFixed(4)}`;
+          const inside = curr.low <= zone.top && curr.high >= zone.bottom;
+          if (inside) {
+            nowInZone.add(zoneId);
+            // Only fire on transition: price was NOT in this zone last candle
+            if (!inZoneSet.has(zoneId) && !fired) {
+              const label = fvgType === 'bullish' ? 'Bullish' : 'Bearish';
+              message = `${alert.symbol} price entered ${label} FVG zone [${zone.bottom.toFixed(2)}–${zone.top.toFixed(2)}]`;
+              fired = true;
+            }
+          }
+        }
+        // Update in-zone tracking (reset zones price has exited)
+        fvgInZoneRef.current.set(alert.id, nowInZone);
+      } else if (alert.condition === 'bos_cross' || alert.condition === 'choch_cross') {
+        const ms = computeMarketStructure(candles, 5);
+        const targetKind = alert.condition === 'bos_cross' ? 'BOS' : 'CHOCH';
+        const prev = candles[candles.length - 2];
+        // Scope to the most recent 20 labels to avoid firing on old distant levels
+        const recentLabels = ms.labels.filter((l) => l.kind === targetKind).slice(-20);
+        for (const label of recentLabels) {
+          const lvl = label.price;
+          const crossedUp = prev.close < lvl && curr.close >= lvl;
+          const crossedDown = prev.close > lvl && curr.close <= lvl;
+          if (crossedUp || crossedDown) {
+            const dir = crossedUp ? '↑' : '↓';
+            message = `${alert.symbol} ${dir} crossed ${targetKind} level at ${lvl.toFixed(2)}`;
+            fired = true;
+            break;
+          }
+        }
+      } else if (alert.condition === 'liquidity_sweep') {
+        // A sweep at candle[ci] is confirmed by candle[ci+1].
+        // When the confirmation candle is `curr` (the latest), the sweep wick
+        // candle is `prev` (second-to-last). So we look for sweeps whose
+        // sweepCandleTime matches prev.time — that sweep was just confirmed.
+        const prev = candles[candles.length - 2];
+        const ms = computeMarketStructure(candles, 5);
+        const latestSweep = ms.sweeps.find((s) => s.sweepCandleTime === prev.time);
+        if (latestSweep) {
+          const dir = latestSweep.direction === 'bull_sweep' ? '⚡ Bull sweep' : '⚡ Bear sweep';
+          message = `${alert.symbol} ${dir} at ${latestSweep.sweptPrice.toFixed(2)}`;
+          fired = true;
+        }
+      }
+
+      if (!fired) continue;
+
+      smartMoneyLastFiredRef.current.set(alert.id, curr.time);
+      useChartStore.getState().updateSmartMoneyAlert(alert.id, {
+        triggered: true,
+        triggeredAt: Date.now(),
+        lastFiredCandleTime: curr.time,
+      });
+      fireAlert({
+        message,
+        symbol: alert.symbol,
+        alertId: alert.id,
+        price: curr.close,
+        direction: 'any',
+        telegramEnabled: alert.telegramEnabled,
+        time: curr.time,
+      });
+    }
+  }, [alertCandles, smartMoneyAlerts]);
 
   // PctDiffDon line crossover alerts
   useEffect(() => {

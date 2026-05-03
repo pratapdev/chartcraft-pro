@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import {
   X, Trash2, Eye, EyeOff, Plus, Bell, Send, ArrowRightLeft,
-  RefreshCw, CloudOff, Cloud, TrendingUp, BarChart2, Settings,
+  RefreshCw, CloudOff, Cloud, TrendingUp, BarChart2, Settings, Zap,
 } from 'lucide-react';
 import {
   IndicatorType, IndicatorConfig, AlertCondition, LineStyleType,
   ThresholdCondition, PctDiffDonLine, MarketType, Timeframe,
+  SmartMoneyAlertCondition, SmartMoneyAlert,
 } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
 import { pushState, pullState, checkSyncHealth, extractSyncPayload } from '@/lib/syncService';
@@ -133,6 +134,120 @@ const IndicatorThresholdAlertForm: React.FC = () => {
       {open && (
         <div className="px-2 pb-2 text-muted-foreground text-[10px]">
           Alert when an indicator (RSI, ADX, etc.) crosses above or below a threshold value.
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SMART_MONEY_CONDITIONS: { value: SmartMoneyAlertCondition; label: string; description: string }[] = [
+  { value: 'fvg_bull_entry', label: 'Price enters Bull FVG', description: 'Fires when a candle touches an unmitigated bullish FVG zone' },
+  { value: 'fvg_bear_entry', label: 'Price enters Bear FVG', description: 'Fires when a candle touches an unmitigated bearish FVG zone' },
+  { value: 'bos_cross', label: 'BOS level crossed', description: 'Fires when price closes on the other side of a Break of Structure level' },
+  { value: 'choch_cross', label: 'CHOCH level crossed', description: 'Fires when price closes on the other side of a Change of Character level' },
+  { value: 'liquidity_sweep', label: 'Liquidity sweep detected', description: 'Fires when a candle wicks through a swing and closes back below/above it' },
+];
+
+const SmartMoneyAlertForm: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const { symbol, timeframe, smartMoneyAlerts, addSmartMoneyAlert, removeSmartMoneyAlert } = useChartStore();
+  const [condition, setCondition] = useState<SmartMoneyAlertCondition>('fvg_bull_entry');
+  const [telegramEnabled, setTelegramEnabled] = useState(true);
+
+  const handleAdd = () => {
+    const alert: SmartMoneyAlert = {
+      id: crypto.randomUUID(),
+      symbol,
+      timeframe,
+      condition,
+      active: true,
+      triggered: false,
+      createdAt: Date.now(),
+      telegramEnabled,
+    };
+    addSmartMoneyAlert(alert);
+  };
+
+  const activeAlerts = (smartMoneyAlerts ?? []).filter((a) => a.active);
+
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5">
+          <Zap size={10} className="text-yellow-400" /> Smart Money Alert
+          {activeAlerts.length > 0 && (
+            <span className="bg-yellow-400/15 text-yellow-400 text-[9px] px-1.5 py-0.5 rounded-full">{activeAlerts.length}</span>
+          )}
+        </span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-2">
+          <div>
+            <label className="text-[10px] text-muted-foreground block mb-1">Condition</label>
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value as SmartMoneyAlertCondition)}
+              className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+            >
+              {SMART_MONEY_CONDITIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <p className="text-[9px] text-muted-foreground mt-1">
+              {SMART_MONEY_CONDITIONS.find((c) => c.value === condition)?.description}
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">{symbol} · {timeframe}</span>
+            <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+              <Send size={9} className={telegramEnabled ? 'text-primary' : 'text-muted-foreground'} />
+              <input
+                type="checkbox"
+                checked={telegramEnabled}
+                onChange={(e) => setTelegramEnabled(e.target.checked)}
+                className="w-3 h-3 accent-primary"
+              />
+              Telegram
+            </label>
+          </div>
+          <button
+            onClick={handleAdd}
+            className="w-full py-1.5 rounded bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25 transition-colors text-xs font-medium border border-yellow-500/20"
+          >
+            <Zap size={10} className="inline mr-1" />Add Alert
+          </button>
+          {activeAlerts.length > 0 && (
+            <div className="space-y-1 mt-1">
+              {activeAlerts.map((a) => (
+                <div key={a.id} className="flex items-center justify-between bg-accent/30 rounded px-2 py-1">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] text-foreground truncate">
+                      {SMART_MONEY_CONDITIONS.find((c) => c.value === a.condition)?.label}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground">{a.symbol} · {a.timeframe}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                    {a.triggered && (
+                      <span className="text-[9px] text-yellow-400">✓ Fired</span>
+                    )}
+                    <button
+                      onClick={() => {
+                        useChartStore.getState().updateSmartMoneyAlert(a.id, { telegramEnabled: !(a.telegramEnabled ?? true) });
+                      }}
+                      className={`transition-colors ${(a.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(a.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    >
+                      <Send size={9} />
+                    </button>
+                    <button onClick={() => removeSmartMoneyAlert(a.id)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -374,6 +489,7 @@ export const RightSidebar: React.FC = () => {
     setChartFontSize,
     timezone,
     setTimezone,
+    smartMoneyAlerts,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -586,6 +702,7 @@ export const RightSidebar: React.FC = () => {
         {rightPanelTab === 'alerts' && (
           <div className="space-y-2">
             <QuickPriceAlert />
+            <SmartMoneyAlertForm />
             <CompoundAlertForm />
             <IndicatorCrossAlertForm />
             <StochRSICrossAlertForm />
@@ -599,11 +716,12 @@ export const RightSidebar: React.FC = () => {
                   const total = alerts.length
                     + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length
                     + (indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).length
-                    + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length;
+                    + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length
+                    + (smartMoneyAlerts ?? []).filter(a => a.active).length;
                   return total === 0 ? 'No alerts set.' : `${total} active alert(s)`;
                 })()}
               </p>
-              {(alerts.length > 0 || indicatorCrossAlerts.length > 0 || (indicatorThresholdAlerts ?? []).length > 0 || (stochRSICrossAlerts ?? []).length > 0) && (
+              {(alerts.length > 0 || indicatorCrossAlerts.length > 0 || (indicatorThresholdAlerts ?? []).length > 0 || (stochRSICrossAlerts ?? []).length > 0 || (smartMoneyAlerts ?? []).length > 0) && (
                 <button onClick={clearAllAlerts} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">
                   Delete All
                 </button>

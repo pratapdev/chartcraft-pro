@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, PctDiffDonCrossAlert, LineStyleType, RiskRewardDrawing } from '@/types/trading';
+import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorConfig, MarketType, FibonacciDrawing, IndicatorCrossAlert, IndicatorThresholdAlert, StochRSICrossAlert, PctDiffDonCrossAlert, LineStyleType, RiskRewardDrawing, SmartMoneyAlert } from '@/types/trading';
 import { CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
 import { HTFOverlayState, HTFLayerConfig, DEFAULT_LAYERS } from '@/types/htfOverlay';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
@@ -92,6 +92,12 @@ interface ChartStore {
   pctDiffDonCrossAlerts: PctDiffDonCrossAlert[];
   addPctDiffDonCrossAlert: (alert: PctDiffDonCrossAlert) => void;
   removePctDiffDonCrossAlert: (id: string) => void;
+
+  // Smart Money alerts
+  smartMoneyAlerts: SmartMoneyAlert[];
+  addSmartMoneyAlert: (alert: SmartMoneyAlert) => void;
+  removeSmartMoneyAlert: (id: string) => void;
+  updateSmartMoneyAlert: (id: string, updates: Partial<SmartMoneyAlert>) => void;
 
   // Indicators
   selectedIndicatorId: string | null;
@@ -325,6 +331,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
       indicatorThresholdAlerts: [],
       stochRSICrossAlerts: [],
       pctDiffDonCrossAlerts: [],
+      smartMoneyAlerts: [],
       trendlines: s.trendlines.filter((t) => !alertTrendlineIds.has(t.id)),
       selectedTrendlineId: alertTrendlineIds.has(s.selectedTrendlineId ?? '') ? null : s.selectedTrendlineId,
     });
@@ -348,6 +355,11 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   pctDiffDonCrossAlerts: [],
   addPctDiffDonCrossAlert: (alert) => set((s) => ({ pctDiffDonCrossAlerts: [...s.pctDiffDonCrossAlerts, alert] })),
   removePctDiffDonCrossAlert: (id) => set((s) => ({ pctDiffDonCrossAlerts: s.pctDiffDonCrossAlerts.filter((a) => a.id !== id) })),
+
+  smartMoneyAlerts: [],
+  addSmartMoneyAlert: (alert) => set((s) => ({ smartMoneyAlerts: [...s.smartMoneyAlerts, alert] })),
+  removeSmartMoneyAlert: (id) => set((s) => ({ smartMoneyAlerts: s.smartMoneyAlerts.filter((a) => a.id !== id) })),
+  updateSmartMoneyAlert: (id, updates) => set((s) => ({ smartMoneyAlerts: s.smartMoneyAlerts.map((a) => a.id === id ? { ...a, ...updates } : a) })),
 
   selectedIndicatorId: null,
   setSelectedIndicatorId: (id) => set({ selectedIndicatorId: id }),
@@ -496,6 +508,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
     indicatorThresholdAlerts: state.indicatorThresholdAlerts,
     stochRSICrossAlerts: state.stochRSICrossAlerts,
     pctDiffDonCrossAlerts: state.pctDiffDonCrossAlerts,
+    smartMoneyAlerts: state.smartMoneyAlerts,
     fibonacciDrawings: state.fibonacciDrawings,
     riskRewardDrawings: state.riskRewardDrawings,
     symbol: state.symbol,
