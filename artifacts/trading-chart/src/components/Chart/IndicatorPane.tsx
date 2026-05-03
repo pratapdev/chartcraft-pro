@@ -31,17 +31,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const chartSync = useChartSync();
   const lastMainRangeRef = useRef<TimeRange | null>(null);
 
-  // Apply the main chart's time range to this pane
-  const applyMainRange = useCallback(() => {
-    if (!chartRef.current || !chartSync) return;
-    const range = chartSync.getMainTimeRange() ?? lastMainRangeRef.current;
-    if (!range) return;
-    lastMainRangeRef.current = range;
-    try {
-      chartRef.current.timeScale().setVisibleRange(range);
-    } catch {}
-  }, [chartSync]);
-
   // Forward pointer/wheel events from pane overlay → main chart container
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -255,9 +244,9 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
       // Mirror every main chart time range change
       const unsubscribeMain = chartSync.subscribeMainTimeRange((range: TimeRange) => {
+        if (lastMainRangeRef.current && lastMainRangeRef.current.from === range.from && lastMainRangeRef.current.to === range.to) return;
         lastMainRangeRef.current = range;
         try { chart.timeScale().setVisibleRange(range); } catch {}
-        try { chart.timeScale().applyOptions({ rightOffset: 50 }); } catch {}
       });
 
       return () => {
@@ -278,7 +267,6 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     };
   }, [indicator.type, indicator.id, indicator.color, indicator.color2, indicator.lineWidth, indicator.lineStyle, chartFontSize]);
 
-  // Data loading — re-apply main range after setData resets autoscale
   useEffect(() => {
     if (!chartRef.current || seriesRefs.current.length === 0 || candles.length === 0) return;
 
@@ -357,9 +345,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    applyMainRange();
-
-  }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, applyMainRange]);
+  }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
