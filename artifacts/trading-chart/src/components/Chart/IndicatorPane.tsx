@@ -24,15 +24,15 @@ interface IndicatorPaneProps {
 
 export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<ISeriesApi<'Line' | 'Histogram'>[]>([]);
   const { candles, removeIndicator, chartFontSize } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
   const lastMainRangeRef = useRef<LogicalRange | null>(null);
-  const pendingRangeRef = useRef<LogicalRange | null>(null);
 
-  // Helper: apply the main chart's current logical range to this pane
+  // Apply the main chart's logical range to this pane
   const applyMainRange = useCallback(() => {
     if (!chartRef.current || !chartSync) return;
     const range = chartSync.getMainLogicalRange() ?? lastMainRangeRef.current;
@@ -43,7 +43,100 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     } catch {}
   }, [chartSync]);
 
-  // --- Chart creation / destruction ---
+  // Forward pointer/wheel events from pane overlay → main chart container
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || !chartSync) return;
+
+    const forward = (e: Event) => {
+      const mainEl = chartSync.getMainContainer();
+      if (!mainEl) return;
+      const cloned = new (e.constructor as typeof Event)(e.type, e as EventInit);
+      mainEl.dispatchEvent(cloned);
+    };
+
+    const forwardWheel = (e: WheelEvent) => {
+      const mainEl = chartSync.getMainContainer();
+      if (!mainEl) return;
+      e.preventDefault();
+      const cloned = new WheelEvent('wheel', {
+        bubbles: true,
+        cancelable: true,
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaZ: e.deltaZ,
+        deltaMode: e.deltaMode,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        metaKey: e.metaKey,
+      });
+      mainEl.dispatchEvent(cloned);
+    };
+
+    // Track pointer state for drag forwarding
+    let dragging = false;
+    let lastX = 0;
+
+    const onPointerDown = (e: PointerEvent) => {
+      dragging = true;
+      lastX = e.clientX;
+      overlay.setPointerCapture(e.pointerId);
+      const mainEl = chartSync.getMainContainer();
+      if (!mainEl) return;
+      mainEl.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true,
+        clientX: e.clientX, clientY: e.clientY,
+        pointerId: e.pointerId, pointerType: e.pointerType,
+        button: e.button, buttons: e.buttons,
+        ctrlKey: e.ctrlKey, shiftKey: e.shiftKey,
+      }));
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      const mainEl = chartSync.getMainContainer();
+      if (!mainEl) return;
+      mainEl.dispatchEvent(new PointerEvent('pointermove', {
+        bubbles: true, cancelable: true,
+        clientX: e.clientX, clientY: e.clientY,
+        movementX: e.clientX - lastX, movementY: 0,
+        pointerId: e.pointerId, pointerType: e.pointerType,
+        button: e.button, buttons: e.buttons,
+      }));
+      lastX = e.clientX;
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      dragging = false;
+      const mainEl = chartSync.getMainContainer();
+      if (!mainEl) return;
+      mainEl.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true, cancelable: true,
+        clientX: e.clientX, clientY: e.clientY,
+        pointerId: e.pointerId, pointerType: e.pointerType,
+        button: e.button, buttons: e.buttons,
+      }));
+    };
+
+    overlay.addEventListener('wheel', forwardWheel, { passive: false });
+    overlay.addEventListener('pointerdown', onPointerDown);
+    overlay.addEventListener('pointermove', onPointerMove);
+    overlay.addEventListener('pointerup', onPointerUp);
+    overlay.addEventListener('pointercancel', onPointerUp);
+
+    return () => {
+      overlay.removeEventListener('wheel', forwardWheel);
+      overlay.removeEventListener('pointerdown', onPointerDown);
+      overlay.removeEventListener('pointermove', onPointerMove);
+      overlay.removeEventListener('pointerup', onPointerUp);
+      overlay.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [chartSync]);
+
+  // Chart creation
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -78,12 +171,15 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       },
       timeScale: {
         borderColor: '#1c2333',
-        timeVisible: true,
+        timeVisible: false,
         secondsVisible: false,
+        visible: false,
         rightOffset: 50,
         shiftVisibleRangeOnNewBar: false,
       },
-      handleScroll: { vertTouchDrag: false },
+      // CRITICAL: disable all user interaction so pane cannot be dragged independently
+      handleScroll: false,
+      handleScale: false,
     });
 
     chartRef.current = chart;
@@ -149,31 +245,26 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     ro.observe(containerRef.current);
 
     if (chartSync) {
-      // Register so syncRange can push the main chart's range here
       chartSync.registerChart(chartId, chart);
 
-      // When the main chart pans/zooms, mirror it here (FIX #1 & #2: now actually fires, uses logical range)
+      // Apply the current main range immediately
+      const mainRange = chartSync.getMainLogicalRange();
+      if (mainRange) {
+        lastMainRangeRef.current = mainRange;
+        try { chart.timeScale().setVisibleLogicalRange(mainRange); } catch {}
+      }
+
+      // Mirror every main chart range change
       const unsubscribeMain = chartSync.subscribeMainRange((range: LogicalRange) => {
         lastMainRangeRef.current = range;
-        pendingRangeRef.current = range;
-        if (seriesRefs.current.length > 0) {
-          try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
-          pendingRangeRef.current = null;
-        }
+        try { chart.timeScale().setVisibleLogicalRange(range); } catch {}
       });
-
-      const onPaneRange = (range: LogicalRange | null) => {
-        if (!range) return;
-        lastMainRangeRef.current = range;
-      };
-      chart.timeScale().subscribeVisibleLogicalRangeChange(onPaneRange);
 
       return () => {
         ro.disconnect();
         unsubscribeMain();
-        try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(onPaneRange); } catch {}
         chartSync.unregisterChart(chartId);
-        chart.remove();
+        try { chart.remove(); } catch {}
         chartRef.current = null;
         seriesRefs.current = [];
       };
@@ -181,14 +272,13 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
     return () => {
       ro.disconnect();
-      chart.remove();
+      try { chart.remove(); } catch {}
       chartRef.current = null;
       seriesRefs.current = [];
     };
   }, [indicator.type, indicator.id, indicator.color, indicator.color2, indicator.lineWidth, indicator.lineStyle, chartFontSize]);
 
-  // --- Data loading ---
-  // FIX #3: after setData (which resets the view to fit-all), re-apply the main range
+  // Data loading — re-apply main range after setData resets autoscale
   useEffect(() => {
     if (!chartRef.current || seriesRefs.current.length === 0 || candles.length === 0) return;
 
@@ -267,14 +357,8 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-    // After setData the chart auto-fits to all data — snap back to the main chart's range
+    // setData causes an auto-fit — snap back to the main chart range
     applyMainRange();
-    if (pendingRangeRef.current) {
-      try {
-        chartRef.current.timeScale().setVisibleLogicalRange(pendingRangeRef.current);
-      } catch {}
-      pendingRangeRef.current = null;
-    }
 
   }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, applyMainRange]);
 
@@ -291,6 +375,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     isDragging.current = true;
     startY.current = e.clientY;
     startHeight.current = height;
@@ -311,11 +396,13 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
   return (
     <div className="relative" style={{ height }}>
+      {/* Resize handle — sits at top, above the overlay */}
       <div
         onMouseDown={handleResizeStart}
-        className="absolute top-0 left-0 right-0 h-1 cursor-row-resize z-20 border-t border-border hover:border-primary hover:bg-primary/10 transition-colors"
+        className="absolute top-0 left-0 right-0 h-1 cursor-row-resize z-30 border-t border-border hover:border-primary hover:bg-primary/10 transition-colors"
       />
-      <div className="absolute top-1 left-2 z-10 flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground pointer-events-auto">
+      {/* Label + close button */}
+      <div className="absolute top-1 left-2 z-30 flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground pointer-events-auto">
         <span style={{ color: indicator.color }}>{label}</span>
         <button
           onClick={() => {
@@ -329,7 +416,18 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
           <X size={10} />
         </button>
       </div>
+      {/* The lightweight-charts canvas */}
       <div ref={containerRef} className="w-full h-full" />
+      {/*
+        Transparent overlay that captures ALL pointer/wheel events and re-dispatches
+        them to the main chart container, making the pane act as a passive mirror.
+        z-index 20 = above chart canvas (z-0) but below resize handle (z-30) and label (z-30).
+      */}
+      <div
+        ref={overlayRef}
+        className="absolute inset-0 z-20"
+        style={{ cursor: 'crosshair' }}
+      />
     </div>
   );
 };

@@ -31,6 +31,7 @@ export const CandlestickChart: React.FC = () => {
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const chartSync = useChartSync();
+
   const hasDragged = useRef(false);
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -221,6 +222,8 @@ export const CandlestickChart: React.FC = () => {
     // Register with sync context
     if (chartSync) {
       chartSync.registerChart('main', chart);
+      // Let indicator panes forward events here
+      chartSync.setMainContainer(containerRef.current);
       chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
         if (range) chartSync.syncRange('main', range);
       });
@@ -229,7 +232,10 @@ export const CandlestickChart: React.FC = () => {
     const containerEl = containerRef.current;
     return () => {
       ro.disconnect();
-      if (chartSync) chartSync.unregisterChart('main');
+      if (chartSync) {
+        chartSync.unregisterChart('main');
+        chartSync.setMainContainer(null);
+      }
       containerEl?.removeEventListener('mousedown', onMouseDown);
       containerEl?.removeEventListener('mouseup', onMouseUp);
       chart.remove();

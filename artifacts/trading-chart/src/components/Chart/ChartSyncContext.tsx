@@ -8,6 +8,8 @@ interface ChartSyncContextValue {
   getMainLogicalRange: () => LogicalRange | null;
   getMainChart: () => IChartApi | null;
   subscribeMainRange: (handler: (range: LogicalRange) => void) => () => void;
+  setMainContainer: (el: HTMLElement | null) => void;
+  getMainContainer: () => HTMLElement | null;
 }
 
 const ChartSyncContext = createContext<ChartSyncContextValue | null>(null);
@@ -18,6 +20,7 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const chartsRef = useRef<Map<string, IChartApi>>(new Map());
   const mainRangeListeners = useRef<Set<(range: LogicalRange) => void>>(new Set());
   const isSyncing = useRef(false);
+  const mainContainerRef = useRef<HTMLElement | null>(null);
 
   const registerChart = useCallback((id: string, chart: IChartApi) => {
     chartsRef.current.set(id, chart);
@@ -69,8 +72,25 @@ export const ChartSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, []);
 
+  const setMainContainer = useCallback((el: HTMLElement | null) => {
+    mainContainerRef.current = el;
+  }, []);
+
+  const getMainContainer = useCallback((): HTMLElement | null => {
+    return mainContainerRef.current;
+  }, []);
+
   return (
-    <ChartSyncContext.Provider value={{ registerChart, unregisterChart, syncRange, getMainLogicalRange, getMainChart, subscribeMainRange }}>
+    <ChartSyncContext.Provider value={{
+      registerChart,
+      unregisterChart,
+      syncRange,
+      getMainLogicalRange,
+      getMainChart,
+      subscribeMainRange,
+      setMainContainer,
+      getMainContainer,
+    }}>
       {children}
     </ChartSyncContext.Provider>
   );
