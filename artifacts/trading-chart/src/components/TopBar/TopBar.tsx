@@ -338,8 +338,6 @@ export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
 
       <div className="w-px h-5 bg-border" />
 
-      <SyncStatusIndicator />
-
       <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
         {marketType === 'crypto' ? (
           multiTfMode ? (
@@ -354,71 +352,73 @@ export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
         )}
       </div>
 
-      <button
-        onClick={() => navigate('/screener')}
-        className={`trading-btn flex items-center gap-1 ${location.pathname === '/screener' ? 'text-primary' : ''}`}
-        title="Crypto Screener"
-      >
-        <ScanSearch size={14} />
-        <span className="hidden sm:inline">Screener</span>
-      </button>
-
-      <button
-        onClick={() => setMultiTfMode(!multiTfMode)}
-        className={`trading-btn flex items-center gap-1 ${multiTfMode ? 'text-primary' : ''}`}
-        title="Multi-timeframe view"
-      >
-        <LayoutGrid size={14} />
-        <span className="hidden sm:inline">Multi-TF</span>
-      </button>
-
-      <button
-        onClick={() => setRightPanelTab('watchlist')}
-        className="trading-btn flex items-center gap-1"
-        title="Watchlist"
-      >
-        <List size={14} />
-        <span className="hidden sm:inline">Watch</span>
-      </button>
-
-      <button
-        onClick={() => setRightPanelTab('heatmap')}
-        className="trading-btn flex items-center gap-1"
-        title="Heatmap"
-      >
-        <Grid3X3 size={14} />
-        <span className="hidden sm:inline">Heat</span>
-      </button>
-
-      <button
-        onClick={() => setRightPanelTab('indicators')}
-        className="trading-btn flex items-center gap-1"
-      >
-        <BarChart3 size={14} />
-        <span className="hidden sm:inline">Indicators</span>
-      </button>
-
-      <button
-        onClick={() => setRightPanelTab('alerts')}
-        className="trading-btn flex items-center gap-1 relative"
-      >
-        <Bell size={14} />
-        <span className="hidden sm:inline">Alerts</span>
-        {alertLogs.length > 0 && (
-          <span className="w-1.5 h-1.5 rounded-full bg-destructive absolute -top-0.5 -right-0.5" />
-        )}
-      </button>
-
-      {onToggleAI && (
+      <div className="ml-auto flex items-center gap-0.5">
         <button
-          onClick={onToggleAI}
-          className={`trading-btn flex items-center gap-1 ml-1 ${aiOpen ? 'text-blue-400 bg-blue-900/20' : ''}`}
-          title="AI Trading Sidekick"
+          onClick={() => navigate('/screener')}
+          className={`trading-btn flex items-center gap-1 ${location.pathname === '/screener' ? 'text-primary' : ''}`}
+          title="Crypto Screener"
         >
-          <Sparkles size={14} className={aiOpen ? 'text-blue-400' : ''} />
-          <span className="hidden sm:inline">AI</span>
+          <ScanSearch size={14} />
+          <span className="hidden sm:inline">Screener</span>
         </button>
-      )}
+
+        <button
+          onClick={() => setMultiTfMode(!multiTfMode)}
+          className={`trading-btn flex items-center gap-1 ${multiTfMode ? 'text-primary' : ''}`}
+          title="Multi-timeframe view"
+        >
+          <LayoutGrid size={14} />
+          <span className="hidden sm:inline">Multi-TF</span>
+        </button>
+
+        <button
+          onClick={() => setRightPanelTab('watchlist')}
+          className="trading-btn flex items-center gap-1"
+          title="Watchlist"
+        >
+          <List size={14} />
+          <span className="hidden sm:inline">Watch</span>
+        </button>
+
+        <button
+          onClick={() => setRightPanelTab('heatmap')}
+          className="trading-btn flex items-center gap-1"
+          title="Heatmap"
+        >
+          <Grid3X3 size={14} />
+          <span className="hidden sm:inline">Heat</span>
+        </button>
+
+        <button
+          onClick={() => setRightPanelTab('indicators')}
+          className="trading-btn flex items-center gap-1"
+        >
+          <BarChart3 size={14} />
+          <span className="hidden sm:inline">Indicators</span>
+        </button>
+
+        <button
+          onClick={() => setRightPanelTab('alerts')}
+          className="trading-btn flex items-center gap-1 relative"
+        >
+          <Bell size={14} />
+          <span className="hidden sm:inline">Alerts</span>
+          {alertLogs.length > 0 && (
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive absolute -top-0.5 -right-0.5" />
+          )}
+        </button>
+
+        {onToggleAI && (
+          <button
+            onClick={onToggleAI}
+            className={`trading-btn flex items-center gap-1 ml-1 ${aiOpen ? 'text-blue-400 bg-blue-900/20' : ''}`}
+            title="AI Trading Sidekick"
+          >
+            <Sparkles size={14} className={aiOpen ? 'text-blue-400' : ''} />
+            <span className="hidden sm:inline">AI</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };
