@@ -25,6 +25,7 @@ export const FootprintChart: React.FC = () => {
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
   const dragStartOffset = useRef(0);
+  const resizeRaf = useRef<number | null>(null);
 
   const { symbol, timeframe, candles: ohlcCandles } = useChartStore();
 
@@ -63,6 +64,7 @@ export const FootprintChart: React.FC = () => {
         const processed = processTradesIntoFootprint(trades, timeframe, tickSize);
         fpCandlesRef.current = processed;
         setFpCandles(processed);
+        setOffsetX(0);
         setLoading(false);
 
         // Start live subscription
@@ -104,7 +106,7 @@ export const FootprintChart: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const W = rect.width;
     const H = rect.height;
 
@@ -116,8 +118,6 @@ export const FootprintChart: React.FC = () => {
 
     const candleWidth = Math.max(60, 120 * zoom);
     const gap = 4;
-    const totalWidth = fpCandles.length * (candleWidth + gap);
-
     // Price range across all visible candles
     const rightEdge = W - 60; // space for price axis
     const bottomEdge = H - 30; // space for time axis
@@ -143,12 +143,12 @@ export const FootprintChart: React.FC = () => {
     if (minPrice === Infinity) return;
 
     const tickSize = visibleCandles[0].tickSize;
-    const priceRange = maxPrice - minPrice + tickSize * 2;
+    const priceRange = Math.max(tickSize * 2, maxPrice - minPrice + tickSize * 2);
     const chartTop = 20;
     const chartHeight = bottomEdge - chartTop;
 
     const priceToY = (p: number) => chartTop + ((maxPrice + tickSize - p) / priceRange) * chartHeight;
-    const rowHeight = Math.max(12, (chartHeight / ((maxPrice - minPrice) / tickSize + 1)));
+    const rowHeight = Math.max(12, chartHeight / Math.max(1, ((maxPrice - minPrice) / tickSize + 1)));
 
     // Find max volume at any level for color intensity scaling
     let maxLevelVol = 1;
@@ -174,7 +174,7 @@ export const FootprintChart: React.FC = () => {
 
         // Background based on delta
         const isPositiveDelta = level.delta >= 0;
-        const intensity = Math.min(0.4, (Math.abs(level.delta) / maxLevelVol) * 0.4);
+        const intensity = Math.min(0.4, Math.abs(level.delta) / Math.max(1, maxLevelVol) * 0.4);
         ctx.fillStyle = isPositiveDelta
           ? `rgba(34, 197, 94, ${intensity + 0.05})`
           : `rgba(239, 68, 68, ${intensity + 0.05})`;
@@ -282,11 +282,16 @@ export const FootprintChart: React.FC = () => {
     if (!container) return;
 
     const ro = new ResizeObserver(() => {
-      // Trigger re-render
-      setFpCandles((prev) => [...prev]);
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current);
+      resizeRaf.current = requestAnimationFrame(() => {
+        setFpCandles((prev) => [...prev]);
+      });
     });
     ro.observe(container);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current);
+    };
   }, []);
 
   // Mouse handlers for pan
