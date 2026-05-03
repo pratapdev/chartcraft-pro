@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db } from "@workspace/db";
 import {
   chartStateTable, trendlinesTable, chartAlertsTable,
@@ -8,30 +8,68 @@ import {
 
 const router: IRouter = Router();
 
-const toNum = (value: any, fallback = 0) => {
-  const n = typeof value === 'number' ? value : parseFloat(value);
+// ---- Typed helpers ----
+
+const toNum = (value: unknown, fallback = 0): number => {
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value));
   return Number.isFinite(n) ? n : fallback;
 };
 
-router.get("/sync/state", async (req, res) => {
-  try {
-    const state = await db.select().from(chartStateTable).limit(1);
-    const trendlines = await db.select().from(trendlinesTable);
-    const indicators = await db.select().from(chartIndicatorsTable);
-    const alerts = await db.select().from(chartAlertsTable);
-    const alertLogs = await db.select().from(chartAlertLogsTable).limit(100);
-    const fibonacci = await db.select().from(fibonacciDrawingsTable);
-    const indicatorCrossAlerts = await db.select().from(indicatorCrossAlertsTable);
-    const indicatorThresholdAlerts = await db.select().from(indicatorThresholdAlertsTable);
-    const stochRSICrossAlerts = await db.select().from(stochRSICrossAlertsTable);
+const toStr = (value: unknown, fallback = ''): string =>
+  typeof value === 'string' ? value : fallback;
 
+const toBool = (value: unknown, fallback = false): boolean =>
+  typeof value === 'boolean' ? value : fallback;
+
+const toOptNum = (value: unknown): number | null =>
+  value === null || value === undefined ? null : toNum(value);
+
+const errMsg = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e);
+
+// ---- Simple API-key guard (localhost-only deployments) ----
+// If SYNC_API_KEY env var is set, all /api/sync/* requests must supply
+// the matching X-Sync-Key header. If the env var is unset, requests are
+// allowed through (development convenience).
+
+const syncAuthMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+  const requiredKey = process.env.SYNC_API_KEY;
+  if (!requiredKey) { next(); return; }
+  const provided = req.headers['x-sync-key'];
+  if (!provided || provided !== requiredKey) {
+    res.status(401).json({ error: 'Unauthorized: missing or invalid X-Sync-Key header' });
+    return;
+  }
+  next();
+};
+
+router.use('/sync', syncAuthMiddleware);
+
+// ---- GET /api/sync/state ----
+
+router.get("/sync/state", async (req: Request, res: Response) => {
+  try {
+    const [stateRows, trendlines, indicators, alerts, alertLogs, fibonacci,
+      indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts] = await Promise.all([
+      db.select().from(chartStateTable).limit(1),
+      db.select().from(trendlinesTable),
+      db.select().from(chartIndicatorsTable),
+      db.select().from(chartAlertsTable),
+      db.select().from(chartAlertLogsTable).limit(100),
+      db.select().from(fibonacciDrawingsTable),
+      db.select().from(indicatorCrossAlertsTable),
+      db.select().from(indicatorThresholdAlertsTable),
+      db.select().from(stochRSICrossAlertsTable),
+    ]);
+
+    const s = stateRows[0];
     res.json({
-      state: state[0] ? {
-        symbol: state[0].symbol,
-        timeframe: state[0].timeframe,
-        marketType: state[0].marketType,
-        chartFontSize: toNum(state[0].chartFontSize, 11),
-        drawingDefaults: state[0].drawingDefaults,
+      state: s ? {
+        symbol: s.symbol,
+        timeframe: s.timeframe,
+        marketType: s.marketType,
+        chartFontSize: toNum(s.chartFontSize, 11),
+        drawingDefaults: s.drawingDefaults,
       } : null,
       trendlines: trendlines.map(t => ({
         id: t.id, symbol: t.symbol, timeframe: t.timeframe,
@@ -44,14 +82,15 @@ router.get("/sync/state", async (req, res) => {
         id: i.id, type: i.type, period: toNum(i.period, 20), color: i.color,
         visible: i.visible, lineWidth: toNum(i.lineWidth, 1), lineStyle: i.lineStyle,
         kPeriod: i.kPeriod, dPeriod: i.dPeriod, color2: i.color2,
-        stdDev: i.stdDev === null ? null : toNum(i.stdDev), multiplier: i.multiplier === null ? null : toNum(i.multiplier),
+        stdDev: i.stdDev === null ? null : toNum(i.stdDev),
+        multiplier: i.multiplier === null ? null : toNum(i.multiplier),
       })),
       alerts: alerts.map(a => ({
         id: a.id, symbol: a.symbol, timeframe: a.timeframe,
         trendlineId: a.trendlineId, condition: a.condition,
         active: a.active, triggered: a.triggered,
-        triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message,
-        createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
+        triggeredAt: a.triggeredAt !== null ? toNum(a.triggeredAt) : null,
+        message: a.message, createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
       })),
       alertLogs: alertLogs.map(l => ({
         id: l.id, alertId: l.alertId, symbol: l.symbol,
@@ -66,149 +105,200 @@ router.get("/sync/state", async (req, res) => {
         id: a.id, symbol: a.symbol, timeframe: a.timeframe,
         indicatorId1: a.indicatorId1, indicatorId2: a.indicatorId2,
         condition: a.condition, active: a.active, triggered: a.triggered,
-        triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message,
-        createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
+        triggeredAt: a.triggeredAt !== null ? toNum(a.triggeredAt) : null,
+        message: a.message, createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
       })),
       indicatorThresholdAlerts: indicatorThresholdAlerts.map(a => ({
         id: a.id, symbol: a.symbol, timeframe: a.timeframe,
         indicatorId: a.indicatorId, condition: a.condition,
         threshold: toNum(a.threshold), active: a.active, triggered: a.triggered,
-        triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message,
-        createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
+        triggeredAt: a.triggeredAt !== null ? toNum(a.triggeredAt) : null,
+        message: a.message, createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
       })),
       stochRSICrossAlerts: stochRSICrossAlerts.map(a => ({
         id: a.id, symbol: a.symbol, timeframe: a.timeframe,
         indicatorId: a.indicatorId, condition: a.condition,
         active: a.active, triggered: a.triggered,
-        triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message,
-        createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
+        triggeredAt: a.triggeredAt !== null ? toNum(a.triggeredAt) : null,
+        message: a.message, createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled,
       })),
+      // pctDiffDonCrossAlerts are localStorage-only (no DB table) — always return []
       pctDiffDonCrossAlerts: [],
     });
-  } catch (error: any) {
-    req.log.error({ error }, "Failed to get sync state");
-    res.status(500).json({ error: error.message });
+  } catch (e: unknown) {
+    req.log.error({ error: errMsg(e) }, "Failed to get sync state");
+    res.status(500).json({ error: errMsg(e) });
   }
 });
 
-router.put("/sync/state", async (req, res) => {
-  try {
-    const { state, trendlines, indicators, alerts, alertLogs, fibonacciDrawings,
-      indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts, pctDiffDonCrossAlerts } = req.body;
+// ---- Typed request body ----
 
+interface SyncStateItem {
+  id: string;
+  symbol: string;
+  timeframe: string;
+  [key: string]: unknown;
+}
+
+interface SyncBody {
+  state?: {
+    symbol?: unknown;
+    timeframe?: unknown;
+    marketType?: unknown;
+    chartFontSize?: unknown;
+    drawingDefaults?: Record<string, unknown>;
+  };
+  trendlines?: SyncStateItem[];
+  indicators?: SyncStateItem[];
+  alerts?: SyncStateItem[];
+  alertLogs?: SyncStateItem[];
+  fibonacciDrawings?: SyncStateItem[];
+  indicatorCrossAlerts?: SyncStateItem[];
+  indicatorThresholdAlerts?: SyncStateItem[];
+  stochRSICrossAlerts?: SyncStateItem[];
+  pctDiffDonCrossAlerts?: SyncStateItem[]; // accepted but not stored (no DB table)
+}
+
+// ---- PUT /api/sync/state ----
+
+router.put("/sync/state", async (req: Request<object, object, SyncBody>, res: Response) => {
+  const { state, trendlines, indicators, alerts, alertLogs, fibonacciDrawings,
+    indicatorCrossAlerts, indicatorThresholdAlerts, stochRSICrossAlerts } = req.body;
+
+  try {
     await db.transaction(async (tx) => {
+
       if (state) {
         await tx.delete(chartStateTable);
         await tx.insert(chartStateTable).values({
           id: 'default',
-          symbol: state.symbol,
-          timeframe: state.timeframe,
-          marketType: state.marketType,
+          symbol: toStr(state.symbol, 'BTC/USD'),
+          timeframe: toStr(state.timeframe, '1h'),
+          marketType: toStr(state.marketType, 'crypto'),
           chartFontSize: toNum(state.chartFontSize, 11),
-          drawingDefaults: state.drawingDefaults || {},
+          drawingDefaults: state.drawingDefaults ?? {},
         });
       }
-      if (trendlines) {
+
+      if (Array.isArray(trendlines)) {
         await tx.delete(trendlinesTable);
         for (const t of trendlines) {
           await tx.insert(trendlinesTable).values({
             id: t.id, symbol: t.symbol, timeframe: t.timeframe,
             startTime: toNum(t.startTime), startPrice: String(toNum(t.startPrice)),
             endTime: toNum(t.endTime), endPrice: String(toNum(t.endPrice)),
-            color: t.color || '#2962FF', thickness: toNum(t.thickness, 1),
-            lineStyle: t.lineStyle || 'solid', createdAt: toNum(t.createdAt),
+            color: toStr(t.color, '#2962FF'), thickness: toNum(t.thickness as unknown, 1),
+            lineStyle: toStr(t.lineStyle as unknown, 'solid'), createdAt: toNum(t.createdAt as unknown),
           });
         }
       }
-      if (indicators) {
+
+      if (Array.isArray(indicators)) {
         await tx.delete(chartIndicatorsTable);
         for (const i of indicators) {
           await tx.insert(chartIndicatorsTable).values({
-            id: i.id, type: i.type, period: toNum(i.period, 20),
-            color: i.color || '#2962FF', visible: i.visible !== false,
-            lineWidth: toNum(i.lineWidth, 1), lineStyle: i.lineStyle || 'solid',
-            kPeriod: i.kPeriod || null, dPeriod: i.dPeriod || null,
-            color2: i.color2 || null, stdDev: i.stdDev === null || i.stdDev === undefined ? null : String(toNum(i.stdDev)),
-            multiplier: i.multiplier === null || i.multiplier === undefined ? null : String(toNum(i.multiplier)),
+            id: i.id, type: i.type, period: toNum(i.period as unknown, 20),
+            color: toStr(i.color as unknown, '#2962FF'), visible: toBool(i.visible as unknown, true),
+            lineWidth: toNum(i.lineWidth as unknown, 1), lineStyle: toStr(i.lineStyle as unknown, 'solid'),
+            kPeriod: toOptNum(i.kPeriod as unknown), dPeriod: toOptNum(i.dPeriod as unknown),
+            color2: i.color2 ? toStr(i.color2 as unknown) : null,
+            stdDev: i.stdDev !== null && i.stdDev !== undefined ? String(toNum(i.stdDev as unknown)) : null,
+            multiplier: i.multiplier !== null && i.multiplier !== undefined ? String(toNum(i.multiplier as unknown)) : null,
           });
         }
       }
-      if (alerts) {
+
+      if (Array.isArray(alerts)) {
         await tx.delete(chartAlertsTable);
         for (const a of alerts) {
           await tx.insert(chartAlertsTable).values({
             id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-            trendlineId: a.trendlineId || null, condition: a.condition,
-            active: a.active !== false, triggered: a.triggered || false,
-            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+            trendlineId: a.trendlineId ? toStr(a.trendlineId as unknown) : null,
+            condition: toStr(a.condition as unknown, 'cross_any'),
+            active: toBool(a.active as unknown, true), triggered: toBool(a.triggered as unknown),
+            triggeredAt: toOptNum(a.triggeredAt as unknown),
+            message: a.message ? toStr(a.message as unknown) : null,
+            createdAt: toNum(a.createdAt as unknown), telegramEnabled: toBool(a.telegramEnabled as unknown, true),
           });
         }
       }
-      if (alertLogs) {
+
+      if (Array.isArray(alertLogs)) {
         await tx.delete(chartAlertLogsTable);
         for (const l of alertLogs) {
           await tx.insert(chartAlertLogsTable).values({
-            id: l.id, alertId: l.alertId || null, symbol: l.symbol,
-            message: l.message, timestamp: toNum(l.timestamp), price: String(toNum(l.price)),
+            id: l.id, alertId: l.alertId ? toStr(l.alertId as unknown) : null, symbol: l.symbol,
+            message: toStr(l.message as unknown), timestamp: toNum(l.timestamp as unknown),
+            price: String(toNum(l.price as unknown)),
           });
         }
       }
-      if (fibonacciDrawings) {
+
+      if (Array.isArray(fibonacciDrawings)) {
         await tx.delete(fibonacciDrawingsTable);
         for (const f of fibonacciDrawings) {
           await tx.insert(fibonacciDrawingsTable).values({
             id: f.id, symbol: f.symbol, timeframe: f.timeframe,
-            startTime: toNum(f.startTime), startPrice: String(toNum(f.startPrice)),
-            endTime: toNum(f.endTime), endPrice: String(toNum(f.endPrice)), createdAt: toNum(f.createdAt),
+            startTime: toNum(f.startTime as unknown), startPrice: String(toNum(f.startPrice as unknown)),
+            endTime: toNum(f.endTime as unknown), endPrice: String(toNum(f.endPrice as unknown)),
+            createdAt: toNum(f.createdAt as unknown),
           });
         }
       }
-      if (indicatorCrossAlerts) {
+
+      if (Array.isArray(indicatorCrossAlerts)) {
         await tx.delete(indicatorCrossAlertsTable);
         for (const a of indicatorCrossAlerts) {
           await tx.insert(indicatorCrossAlertsTable).values({
             id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-            indicatorId1: a.indicatorId1, indicatorId2: a.indicatorId2,
-            condition: a.condition, active: a.active !== false, triggered: a.triggered || false,
-            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+            indicatorId1: toStr(a.indicatorId1 as unknown), indicatorId2: toStr(a.indicatorId2 as unknown),
+            condition: toStr(a.condition as unknown, 'cross_any'),
+            active: toBool(a.active as unknown, true), triggered: toBool(a.triggered as unknown),
+            triggeredAt: toOptNum(a.triggeredAt as unknown),
+            message: a.message ? toStr(a.message as unknown) : null,
+            createdAt: toNum(a.createdAt as unknown), telegramEnabled: toBool(a.telegramEnabled as unknown, true),
           });
         }
       }
-      if (indicatorThresholdAlerts) {
+
+      if (Array.isArray(indicatorThresholdAlerts)) {
         await tx.delete(indicatorThresholdAlertsTable);
         for (const a of indicatorThresholdAlerts) {
           await tx.insert(indicatorThresholdAlertsTable).values({
             id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-            indicatorId: a.indicatorId, condition: a.condition,
-            threshold: String(toNum(a.threshold)), active: a.active !== false, triggered: a.triggered || false,
-            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+            indicatorId: toStr(a.indicatorId as unknown),
+            condition: toStr(a.condition as unknown, 'above'),
+            threshold: String(toNum(a.threshold as unknown)),
+            active: toBool(a.active as unknown, true), triggered: toBool(a.triggered as unknown),
+            triggeredAt: toOptNum(a.triggeredAt as unknown),
+            message: a.message ? toStr(a.message as unknown) : null,
+            createdAt: toNum(a.createdAt as unknown), telegramEnabled: toBool(a.telegramEnabled as unknown, true),
           });
         }
       }
-      if (stochRSICrossAlerts) {
+
+      if (Array.isArray(stochRSICrossAlerts)) {
         await tx.delete(stochRSICrossAlertsTable);
         for (const a of stochRSICrossAlerts) {
           await tx.insert(stochRSICrossAlertsTable).values({
             id: a.id, symbol: a.symbol, timeframe: a.timeframe,
-            indicatorId: a.indicatorId, condition: a.condition,
-            active: a.active !== false, triggered: a.triggered || false,
-            triggeredAt: a.triggeredAt ? toNum(a.triggeredAt) : null, message: a.message || null,
-            createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+            indicatorId: toStr(a.indicatorId as unknown),
+            condition: toStr(a.condition as unknown, 'cross_any'),
+            active: toBool(a.active as unknown, true), triggered: toBool(a.triggered as unknown),
+            triggeredAt: toOptNum(a.triggeredAt as unknown),
+            message: a.message ? toStr(a.message as unknown) : null,
+            createdAt: toNum(a.createdAt as unknown), telegramEnabled: toBool(a.telegramEnabled as unknown, true),
           });
         }
       }
-      if (pctDiffDonCrossAlerts) {
-        await tx.delete(indicatorCrossAlertsTable);
-      }
+
+      // pctDiffDonCrossAlerts: no DB table — these are localStorage-only, intentionally skipped.
     });
 
     res.json({ success: true });
-  } catch (error: any) {
-    req.log.error({ error }, "Failed to put sync state");
-    res.status(500).json({ error: error.message });
+  } catch (e: unknown) {
+    req.log.error({ error: errMsg(e) }, "Failed to put sync state");
+    res.status(500).json({ error: errMsg(e) });
   }
 });
 
