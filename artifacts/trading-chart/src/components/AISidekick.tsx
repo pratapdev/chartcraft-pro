@@ -63,6 +63,7 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [chartShot, setChartShot] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { symbol, timeframe, indicators, candles, marketType } = useChartStore();
@@ -70,6 +71,11 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#chart-screenshot-source');
+    setChartShot(canvas?.toDataURL('image/png') ?? null);
+  }, []);
 
   const getContext = useCallback(() => {
     const recentCandles = candles.slice(-50).map(c => ({
@@ -163,6 +169,14 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </button>
         </div>
       </div>
+
+      {chartShot && (
+        <div className="px-3 pt-3">
+          <div className="rounded-lg overflow-hidden border border-[#1c2333] bg-[#161b27]">
+            <img src={chartShot} alt="Current chart screenshot" className="w-full h-auto block" />
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-0">

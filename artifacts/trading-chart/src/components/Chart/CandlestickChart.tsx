@@ -319,7 +319,7 @@ export const CandlestickChart: React.FC = () => {
 
   return (
     <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
-      <div ref={containerRef} className="w-full h-full" />
+      <div ref={containerRef} id="chart-screenshot-source" className="w-full h-full" />
       <CrosshairLegend />
       <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
