@@ -155,11 +155,48 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   candles: [],
   loading: false,
   connected: false,
-  loadCandles: async () => {},
-  updateLastCandle: () => {},
+  loadCandles: async () => {
+    const { symbol, timeframe, marketType } = get();
+    set({ loading: true });
+    try {
+      let candles: Candle[];
+      if (marketType === 'indian') {
+        const instrumentKey = getInstrumentKey(symbol);
+        candles = await fetchUpstoxCandles(instrumentKey, timeframe);
+      } else {
+        candles = await fetchCandles(symbol, timeframe);
+      }
+      set({ candles, loading: false });
+    } catch {
+      set({ loading: false });
+    }
+  },
+  updateLastCandle: (candle: Candle) => set((s) => {
+    const candles = [...s.candles];
+    const last = candles[candles.length - 1];
+    if (last && last.time === candle.time) {
+      candles[candles.length - 1] = candle;
+    } else {
+      candles.push(candle);
+    }
+    return { candles };
+  }),
   unsubscribe: null,
-  startLiveUpdates: () => {},
-  stopLiveUpdates: () => {},
+  startLiveUpdates: () => {
+    const { symbol, timeframe, marketType } = get();
+    if (marketType !== 'crypto') return;
+    const existing = get().unsubscribe;
+    if (existing) existing();
+    const unsub = subscribeToCandles(symbol, timeframe, (candle: Candle) => {
+      get().updateLastCandle(candle);
+    });
+    set({ unsubscribe: unsub, connected: true });
+  },
+  stopLiveUpdates: () => {
+    const unsub = get().unsubscribe;
+    if (unsub) unsub();
+    set({ unsubscribe: null, connected: false });
+  },
   activeTool: 'cursor',
   setActiveTool: (activeTool) => set({ activeTool }),
   trendlines: [],
