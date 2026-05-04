@@ -296,8 +296,10 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     }
 
     if (indicator.type === 'PCT_DIFF_DON') {
+      const sourceCandles = useHtf ? (htfCandles ?? []) : candles;
+      if (sourceCandles.length === 0) return;
       const { pctDiff, emaLine, basis, upper, lower, upperNew, lowerNew } = computePctDiffDonchian(
-        candles, indicator.period, indicator.lookbackWindow ?? 10,
+        sourceCandles, indicator.period, indicator.lookbackWindow ?? 10,
         indicator.emaSmoothing ?? 5, indicator.donchianLength ?? 20, indicator.donLineDiff ?? 0.2,
       );
       if (pctDiff.length > 0) {
@@ -312,7 +314,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-  }, [candles, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, indicator.id]);
+  }, [candles, htfCandles, useHtf, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, indicator.timeframe, indicator.id]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
