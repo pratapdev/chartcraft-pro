@@ -6,7 +6,7 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "dev": "cd artifacts/trading-chart && PORT=${PORT:-21852} BASE_PATH=${BASE_PATH:-/} ./node_modules/.bin/vite --config vite.config.ts --host 0.0.0.0",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "build:dev": "cd artifacts/trading-chart && BASE_PATH=${BASE_PATH:-/} ./node_modules/.bin/vite build --mode development --config vite.config.ts",
+    "build:dev": "cd artifacts/trading-chart && PORT=${PORT:-21852} BASE_PATH=${BASE_PATH:-/} ./node_modules/.bin/vite build --mode development --config vite.config.ts",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
