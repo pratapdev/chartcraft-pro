@@ -686,6 +686,64 @@ export const RightSidebar: React.FC = () => {
                     </div>
                   </div>
                 )}
+                {/* Inline settings panel for PCT_DIFF_DON */}
+                {ind.type === 'PCT_DIFF_DON' && expandedSettingsId === ind.id && (
+                  <div className="mt-2 pt-2 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Timeframe</label>
+                      <select
+                        value={ind.timeframe ?? ''}
+                        onChange={(e) => updateIndicator(ind.id, { timeframe: (e.target.value || undefined) as Timeframe | undefined })}
+                        className="bg-accent text-foreground text-[10px] rounded px-1.5 py-0.5 border border-border"
+                      >
+                        <option value="">Chart TF</option>
+                        {(['1m','3m','5m','15m','1h','4h','1D','1W'] as Timeframe[]).map(tf => (
+                          <option key={tf} value={tf}>{tf}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Period</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { period: Math.max(2, (ind.period ?? 20) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{ind.period ?? 20}</span>
+                        <button onClick={() => updateIndicator(ind.id, { period: (ind.period ?? 20) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Lookback</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { lookbackWindow: Math.max(2, (ind.lookbackWindow ?? 50) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{ind.lookbackWindow ?? 50}</span>
+                        <button onClick={() => updateIndicator(ind.id, { lookbackWindow: (ind.lookbackWindow ?? 50) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">EMA Smoothing</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { emaSmoothing: Math.max(1, (ind.emaSmoothing ?? 9) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{ind.emaSmoothing ?? 9}</span>
+                        <button onClick={() => updateIndicator(ind.id, { emaSmoothing: (ind.emaSmoothing ?? 9) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Donchian Length</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { donchianLength: Math.max(2, (ind.donchianLength ?? 20) - 1) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-8 text-center text-[11px] tabular-nums">{ind.donchianLength ?? 20}</span>
+                        <button onClick={() => updateIndicator(ind.id, { donchianLength: (ind.donchianLength ?? 20) + 1 })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] text-muted-foreground">Don Line Diff</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateIndicator(ind.id, { donLineDiff: Math.max(0.01, Number(((ind.donLineDiff ?? 0.1) - 0.05).toFixed(2))) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">−</button>
+                        <span className="w-10 text-center text-[11px] tabular-nums">{(ind.donLineDiff ?? 0.1).toFixed(2)}</span>
+                        <button onClick={() => updateIndicator(ind.id, { donLineDiff: Number(((ind.donLineDiff ?? 0.1) + 0.05).toFixed(2)) })} className="w-5 h-5 rounded bg-accent hover:bg-accent/80 text-xs flex items-center justify-center">+</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Inline settings panel for MARKET_STRUCTURE */}
                 {ind.type === 'MARKET_STRUCTURE' && expandedSettingsId === ind.id && (
                   <div className="mt-2 pt-2 border-t border-border space-y-2">
