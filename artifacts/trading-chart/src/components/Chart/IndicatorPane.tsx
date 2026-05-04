@@ -10,8 +10,8 @@ import {
   HistogramSeries,
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { IndicatorConfig, LineStyleType } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian } from '@/lib/marketData';
+import { IndicatorConfig, LineStyleType, Candle } from '@/types/trading';
+import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian, fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
