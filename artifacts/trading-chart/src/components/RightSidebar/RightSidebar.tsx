@@ -587,7 +587,7 @@ export const RightSidebar: React.FC = () => {
                     {ind.period > 1 && <span className="text-muted-foreground shrink-0">({ind.period})</span>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE' || ind.type === 'PATTERN' || ind.type === 'ANCHORED_VWAP' || ind.type === 'SESSION_VWAP' || ind.type === 'SUPPLY_DEMAND') && (
+                    {(ind.type === 'FVG' || ind.type === 'MARKET_STRUCTURE' || ind.type === 'PATTERN' || ind.type === 'ANCHORED_VWAP' || ind.type === 'SESSION_VWAP' || ind.type === 'SUPPLY_DEMAND' || ind.type === 'PCT_DIFF_DON') && (
                       <button
                         onClick={() => setExpandedSettingsId(expandedSettingsId === ind.id ? null : ind.id)}
                         className={`p-0.5 transition-colors ${expandedSettingsId === ind.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
