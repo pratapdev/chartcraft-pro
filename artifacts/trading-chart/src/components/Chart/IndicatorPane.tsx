@@ -26,10 +26,52 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<ISeriesApi<'Line' | 'Histogram'>[]>([]);
-  const { candles, removeIndicator, chartFontSize } = useChartStore();
+  const { candles, removeIndicator, chartFontSize, symbol, timeframe, marketType } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
   const paneMode = indicator.paneMode ?? 'mirror';
+
+  // HTF candles (only used when indicator has its own timeframe distinct from chart's)
+  const [htfCandles, setHtfCandles] = useState<Candle[] | null>(null);
+  const indTf = indicator.timeframe;
+  const useHtf = indicator.type === 'PCT_DIFF_DON' && !!indTf && indTf !== timeframe;
+
+  useEffect(() => {
+    if (!useHtf || !indTf) {
+      setHtfCandles(null);
+      return;
+    }
+    let alive = true;
+    let unsub: (() => void) | null = null;
+    // Only crypto path supports the per-indicator timeframe via Binance
+    if (marketType !== 'crypto') {
+      setHtfCandles(null);
+      return;
+    }
+    (async () => {
+      try {
+        const data = await fetchCandles(symbol, indTf);
+        if (!alive) return;
+        setHtfCandles(data);
+        unsub = subscribeToCandles(symbol, indTf, (candle: Candle) => {
+          setHtfCandles((prev) => {
+            if (!prev) return prev;
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.time === candle.time) next[next.length - 1] = candle;
+            else if (!last || candle.time > last.time) next.push(candle);
+            return next;
+          });
+        });
+      } catch {
+        if (alive) setHtfCandles(null);
+      }
+    })();
+    return () => {
+      alive = false;
+      if (unsub) unsub();
+    };
+  }, [useHtf, indTf, symbol, marketType]);
 
   // Forward pointer/wheel events from pane overlay → main chart container
   useEffect(() => {
