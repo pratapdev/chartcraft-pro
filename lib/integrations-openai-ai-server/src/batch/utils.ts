@@ -74,7 +74,7 @@ export async function batchProcess<T, R>(
             if (isRateLimitError(error)) {
               throw error;
             }
-            throw new pRetry.AbortError(
+            throw new AbortError(
               error instanceof Error ? error : new Error(String(error))
             );
           }
