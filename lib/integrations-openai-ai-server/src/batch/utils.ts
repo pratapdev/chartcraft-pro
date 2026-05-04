@@ -114,7 +114,7 @@ export async function batchProcessWithSSE<T, R>(
           factor: 2,
           onFailedAttempt: (error) => {
             if (!isRateLimitError(error)) {
-              throw new pRetry.AbortError(
+              throw new AbortError(
                 error instanceof Error ? error : new Error(String(error))
               );
             }
