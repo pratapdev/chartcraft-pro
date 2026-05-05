@@ -166,8 +166,12 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
   }, [symbol, timeframe]);
 
   return (
-    <div className="flex flex-col h-full border-r border-border last:border-r-0">
+    <div
+      onMouseDown={onActivate}
+      className={`flex flex-col h-full border-r border-border last:border-r-0 ${isActive ? 'ring-2 ring-primary ring-inset' : ''}`}
+    >
       <div className="flex items-center gap-2 px-2 py-1 border-b border-border bg-card text-xs">
+        {isActive && <span className="text-[9px] font-bold text-primary uppercase">Active</span>}
         {onTimeframeChange ? (
           <select
             value={timeframe}
@@ -197,8 +201,12 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
       </div>
       <div className="relative flex-1 min-h-0">
         <div ref={containerRef} className="w-full h-full" />
-        <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-        <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+        {isActive && (
+          <>
+            <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} paneSymbol={symbol} paneTimeframe={timeframe} />
+            <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+          </>
+        )}
       </div>
     </div>
   );
