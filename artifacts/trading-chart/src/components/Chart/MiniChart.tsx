@@ -159,6 +159,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
+      candleSeriesRef.current = null;
     };
   }, [symbol, timeframe]);
 
