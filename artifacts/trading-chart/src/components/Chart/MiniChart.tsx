@@ -193,7 +193,11 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
           <span className="text-muted-foreground">{symbol}</span>
         )}
       </div>
-      <div ref={containerRef} className="flex-1" />
+      <div ref={containerRef} className="flex-1 relative">
+        <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+        <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+        <RiskRewardToolbar />
+      </div>
     </div>
   );
 };
