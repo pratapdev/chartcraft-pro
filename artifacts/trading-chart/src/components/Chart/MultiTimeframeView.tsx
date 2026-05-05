@@ -14,6 +14,7 @@ export const MultiTimeframeView: React.FC = () => {
   const globalSymbol = useChartStore((s) => s.symbol);
   const [syncTime, setSyncTime] = useState<number | null>(null);
   const [gridMode, setGridMode] = useState<GridMode>(4);
+  const [activeIdx, setActiveIdx] = useState<number>(0);
   const [twoTf, setTwoTf] = useState<Timeframe[]>([...DEFAULT_TWO]);
   const [fourTf, setFourTf] = useState<Timeframe[]>([...DEFAULT_FOUR]);
   const [twoSymbols, setTwoSymbols] = useState<string[]>([globalSymbol, globalSymbol]);
