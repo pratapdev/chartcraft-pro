@@ -77,6 +77,8 @@ export const MultiTimeframeView: React.FC = () => {
             onTimeframeChange={(newTf) => handleTimeframeChange(idx, newTf)}
             onSymbolChange={(newSymbol) => handleSymbolChange(idx, newSymbol)}
             availableSymbols={CRYPTO_SYMBOLS}
+            isActive={activeIdx === idx}
+            onActivate={() => setActiveIdx(idx)}
           />
         ))}
       </div>
