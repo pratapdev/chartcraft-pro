@@ -99,6 +99,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     });
 
     chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
 
     // Crosshair sync
     chart.subscribeCrosshairMove((param: MouseEventParams) => {
