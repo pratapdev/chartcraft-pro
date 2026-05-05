@@ -999,7 +999,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
   }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor';
+  const shouldCapture = interactive && (activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor');
 
   return (
     <>
