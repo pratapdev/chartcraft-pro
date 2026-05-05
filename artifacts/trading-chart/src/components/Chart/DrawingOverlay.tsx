@@ -53,7 +53,7 @@ const FIB_COLORS: Record<number, string> = {
   1: '#787b86',
 };
 
-export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
+export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbol, paneTimeframe }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventLayerRef = useRef<HTMLDivElement>(null);
   const drawRef = useRef(EMPTY_DRAW);
