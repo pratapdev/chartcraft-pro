@@ -24,7 +24,7 @@ const Index: React.FC = () => {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <TopBar aiOpen={aiOpen} onToggleAI={() => setAiOpen(v => !v)} />
       <div className="flex flex-1 min-h-0">
-        {!multiTfMode && <LeftToolbar />}
+        <LeftToolbar />
         <ResizablePanelGroup direction="horizontal" className="flex-1">
           <ResizablePanel defaultSize={rightPanelOpen && !multiTfMode ? 75 : 100} minSize={40}>
             <div className="flex flex-col h-full min-w-0">
