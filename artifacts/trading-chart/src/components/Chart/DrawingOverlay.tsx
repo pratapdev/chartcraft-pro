@@ -6,6 +6,8 @@ import { Trendline, FibonacciDrawing, AlertCondition, RiskRewardDrawing } from '
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
   seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>;
+  paneSymbol?: string;
+  paneTimeframe?: string;
 }
 
 type DrawPhase = 'idle' | 'drawing';
