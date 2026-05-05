@@ -8,6 +8,7 @@ interface Props {
   seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>;
   paneSymbol?: string;
   paneTimeframe?: string;
+  interactive?: boolean;
 }
 
 type DrawPhase = 'idle' | 'drawing';
