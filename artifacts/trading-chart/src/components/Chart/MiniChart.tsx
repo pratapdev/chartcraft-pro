@@ -201,12 +201,14 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
       </div>
       <div className="relative flex-1 min-h-0">
         <div ref={containerRef} className="w-full h-full" />
-        {isActive && (
-          <>
-            <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} paneSymbol={symbol} paneTimeframe={timeframe} />
-            <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
-          </>
-        )}
+        <DrawingOverlay
+          chartRef={chartRef}
+          seriesRef={candleSeriesRef}
+          paneSymbol={symbol}
+          paneTimeframe={timeframe}
+          interactive={!!isActive}
+        />
+        {isActive && <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />}
       </div>
     </div>
   );
