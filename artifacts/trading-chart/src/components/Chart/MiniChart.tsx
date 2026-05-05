@@ -32,9 +32,11 @@ interface MiniChartProps {
   onTimeframeChange?: (tf: Timeframe) => void;
   onSymbolChange?: (symbol: string) => void;
   availableSymbols?: string[];
+  isActive?: boolean;
+  onActivate?: () => void;
 }
 
-export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols }) => {
+export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols, isActive, onActivate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
