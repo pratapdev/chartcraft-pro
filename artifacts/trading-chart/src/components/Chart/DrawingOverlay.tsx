@@ -6,6 +6,9 @@ import { Trendline, FibonacciDrawing, AlertCondition, RiskRewardDrawing } from '
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
   seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>;
+  paneSymbol?: string;
+  paneTimeframe?: string;
+  interactive?: boolean;
 }
 
 type DrawPhase = 'idle' | 'drawing';
@@ -51,7 +54,7 @@ const FIB_COLORS: Record<number, string> = {
   1: '#787b86',
 };
 
-export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
+export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbol, paneTimeframe, interactive = true }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const eventLayerRef = useRef<HTMLDivElement>(null);
   const drawRef = useRef(EMPTY_DRAW);
@@ -79,6 +82,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
   const rrRef = useRef<RRDrawState>(EMPTY_RR);
 
+  const store = useChartStore();
   const {
     activeTool,
     setActiveTool,
@@ -88,8 +92,6 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     removeTrendline,
     selectedTrendlineId,
     setSelectedTrendlineId,
-    symbol,
-    timeframe,
     fibonacciDrawings,
     addFibonacci,
     removeFibonacci,
@@ -98,7 +100,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
     addRiskReward,
     removeRiskReward,
     setSelectedRiskRewardId,
-  } = useChartStore();
+  } = store;
+  const symbol = paneSymbol ?? store.symbol;
+  const timeframe = (paneTimeframe ?? store.timeframe) as typeof store.timeframe;
 
   // ---- Coordinate helpers ----
   const pixelToCoords = useCallback(
@@ -995,7 +999,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef }) => {
   }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
-  const shouldCapture = activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor';
+  const shouldCapture = interactive && (activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor');
 
   return (
     <>
