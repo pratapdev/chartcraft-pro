@@ -81,6 +81,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
   const rrRef = useRef<RRDrawState>(EMPTY_RR);
 
+  const store = useChartStore();
   const {
     activeTool,
     setActiveTool,
@@ -90,8 +91,6 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
     removeTrendline,
     selectedTrendlineId,
     setSelectedTrendlineId,
-    symbol,
-    timeframe,
     fibonacciDrawings,
     addFibonacci,
     removeFibonacci,
@@ -100,7 +99,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
     addRiskReward,
     removeRiskReward,
     setSelectedRiskRewardId,
-  } = useChartStore();
+  } = store;
+  const symbol = paneSymbol ?? store.symbol;
+  const timeframe = (paneTimeframe ?? store.timeframe) as typeof store.timeframe;
 
   // ---- Coordinate helpers ----
   const pixelToCoords = useCallback(
