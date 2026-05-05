@@ -37,6 +37,7 @@ interface MiniChartProps {
 export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const candlesRef = useRef<Candle[]>([]);
   const chartFontSize = useChartStore((s) => s.chartFontSize);
 
@@ -46,6 +47,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
+      candleSeriesRef.current = null;
     }
 
     const chart = createChart(containerRef.current, {
