@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   IChartApi,
+  ISeriesApi,
   CandlestickData,
   HistogramData,
   LineData,
@@ -15,6 +16,9 @@ import { Candle, Timeframe } from '@/types/trading';
 import { fetchCandles } from '@/lib/marketData';
 import { computeEMA } from '@/lib/marketData';
 import { useChartStore } from '@/stores/chartStore';
+import { DrawingOverlay } from './DrawingOverlay';
+import { TrendlineToolbar } from './TrendlineToolbar';
+import { RiskRewardToolbar } from './RiskRewardToolbar';
 
 const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
@@ -33,6 +37,7 @@ interface MiniChartProps {
 export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const candlesRef = useRef<Candle[]>([]);
   const chartFontSize = useChartStore((s) => s.chartFontSize);
 
@@ -42,6 +47,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
+      candleSeriesRef.current = null;
     }
 
     const chart = createChart(containerRef.current, {
@@ -93,6 +99,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     });
 
     chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
 
     // Crosshair sync
     chart.subscribeCrosshairMove((param: MouseEventParams) => {
@@ -152,6 +159,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
+      candleSeriesRef.current = null;
     };
   }, [symbol, timeframe]);
 
@@ -185,7 +193,11 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
           <span className="text-muted-foreground">{symbol}</span>
         )}
       </div>
-      <div ref={containerRef} className="flex-1" />
+      <div className="relative flex-1 min-h-0">
+        <div ref={containerRef} className="w-full h-full" />
+        <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+        <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+      </div>
     </div>
   );
 };
