@@ -1,6 +1,6 @@
 import { useEffect, useRef, MutableRefObject, useCallback } from 'react';
 import { IChartApi, ISeriesApi, LineData, Time, LineSeries, createSeriesMarkers } from 'lightweight-charts';
-import { computeEMA, computeSMA, computeBollingerBands, computeVWAP, computeSupertrend, computePivotHighLow, computeMsbOb } from '@/lib/marketData';
+import { computeEMA, computeSMA, computeBollingerBands, computeVWAP, computeSupertrend, computePivotHighLow, computeMsbOb, computeDeltaDivergence } from '@/lib/marketData';
 import { LineStyleType } from '@/types/trading';
 
 const toLWLineStyle = (s?: LineStyleType) => s === 'dashed' ? 2 : s === 'dotted' ? 1 : 0;
@@ -288,6 +288,64 @@ export function useIndicatorRenderer(
           midSeries.applyOptions({ title: zone.type });
           lineSeriesRefs.current.set(ind.id + `-zone-mid-${zi}`, midSeries);
         }
+      }
+
+      if (ind.type === 'DELTA_DIV') {
+        const dd = computeDeltaDivergence(
+          candles,
+          ind.pivotLeft ?? 5,
+          ind.pivotRight ?? 5,
+          ind.minDeltaDiff ?? 0,
+        );
+
+        // Bearish divergence lines (red)
+        for (let li = 0; li < dd.bearishLines.length; li++) {
+          const ln = dd.bearishLines[li];
+          const s = chartRef.current.addSeries(LineSeries, {
+            color: '#FF3B3B',
+            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          s.setData([
+            { time: ln.time1 as Time, value: ln.price1 },
+            { time: ln.time2 as Time, value: ln.price2 },
+          ] as LineData[]);
+          lineSeriesRefs.current.set(ind.id + `-bear-${li}`, s);
+        }
+
+        // Bullish divergence lines (green)
+        for (let li = 0; li < dd.bullishLines.length; li++) {
+          const ln = dd.bullishLines[li];
+          const s = chartRef.current.addSeries(LineSeries, {
+            color: '#00C076',
+            lineWidth: (ind.lineWidth ?? 2) as 1 | 2 | 3 | 4,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+          });
+          s.setData([
+            { time: ln.time1 as Time, value: ln.price1 },
+            { time: ln.time2 as Time, value: ln.price2 },
+          ] as LineData[]);
+          lineSeriesRefs.current.set(ind.id + `-bull-${li}`, s);
+        }
+
+        allMarkers.push(...dd.bearishPivots.map((p: any) => ({
+          time: p.time as Time,
+          position: 'aboveBar' as const,
+          color: '#FF3B3B',
+          shape: 'arrowDown' as const,
+          text: `D:${p.currDelta.toFixed(0)}`,
+        })));
+        allMarkers.push(...dd.bullishPivots.map((p: any) => ({
+          time: p.time as Time,
+          position: 'belowBar' as const,
+          color: '#00C076',
+          shape: 'arrowUp' as const,
+          text: `D:${p.currDelta.toFixed(0)}`,
+        })));
       }
     }
 
