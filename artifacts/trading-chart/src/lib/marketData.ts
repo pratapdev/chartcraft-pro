@@ -865,3 +865,100 @@ export function computeMsbOb(candles: Candle[], zigzagLen: number, fibFactor: nu
   result.zones = zones.filter(z => !z.broken);
   return result;
 }
+
+// ============= Delta Divergence Detector =============
+
+export interface DeltaDivergenceResult {
+  delta: { time: number; value: number }[];
+  bearishPivots: { time: number; price: number; prevDelta: number; currDelta: number }[];
+  bullishPivots: { time: number; price: number; prevDelta: number; currDelta: number }[];
+  bearishLines: { time1: number; price1: number; time2: number; price2: number }[];
+  bullishLines: { time1: number; price1: number; time2: number; price2: number }[];
+}
+
+/**
+ * Computes per-bar delta (proxy: (close-open)/(high-low) * volume) and detects
+ * bearish/bullish divergences at pivot highs/lows.
+ *  - Bearish: higher pivot high in price + lower pivot delta
+ *  - Bullish: lower pivot low in price + higher pivot delta
+ */
+export function computeDeltaDivergence(
+  candles: Candle[],
+  pivotLeft: number = 5,
+  pivotRight: number = 5,
+  minDeltaDiff: number = 0,
+): DeltaDivergenceResult {
+  const result: DeltaDivergenceResult = {
+    delta: [], bearishPivots: [], bullishPivots: [], bearishLines: [], bullishLines: [],
+  };
+  if (candles.length === 0) return result;
+
+  // Per-bar delta proxy
+  const delta: number[] = candles.map((c) => {
+    const range = c.high - c.low;
+    if (range === 0) return 0;
+    return ((c.close - c.open) / range) * c.volume;
+  });
+  result.delta = candles.map((c, i) => ({ time: c.time, value: delta[i] }));
+
+  let prevPhPrice: number | null = null;
+  let prevPhDelta = 0;
+  let prevPhTime = 0;
+  let prevPlPrice: number | null = null;
+  let prevPlDelta = 0;
+  let prevPlTime = 0;
+
+  for (let i = pivotLeft; i < candles.length - pivotRight; i++) {
+    const c = candles[i];
+
+    // Pivot High
+    let isHigh = true;
+    for (let j = i - pivotLeft; j <= i + pivotRight; j++) {
+      if (j === i) continue;
+      if (candles[j].high > c.high) { isHigh = false; break; }
+    }
+    if (isHigh) {
+      const currPhDelta = delta[i];
+      if (prevPhPrice !== null) {
+        const hh = c.high > prevPhPrice;
+        const lhDelta = currPhDelta < prevPhDelta;
+        const diffOk = Math.abs(currPhDelta - prevPhDelta) >= minDeltaDiff;
+        if (hh && lhDelta && diffOk) {
+          result.bearishPivots.push({ time: c.time, price: c.high, prevDelta: prevPhDelta, currDelta: currPhDelta });
+          result.bearishLines.push({ time1: prevPhTime, price1: prevPhPrice, time2: c.time, price2: c.high });
+        }
+      }
+      prevPhPrice = c.high;
+      prevPhDelta = currPhDelta;
+      prevPhTime = c.time;
+    }
+
+    // Pivot Low
+    let isLow = true;
+    for (let j = i - pivotLeft; j <= i + pivotRight; j++) {
+      if (j === i) continue;
+      if (candles[j].low < c.low) { isLow = false; break; }
+    }
+    if (isLow) {
+      const currPlDelta = delta[i];
+      if (prevPlPrice !== null) {
+        const ll = c.low < prevPlPrice;
+        const hlDelta = currPlDelta > prevPlDelta;
+        const diffOk = Math.abs(currPlDelta - prevPlDelta) >= minDeltaDiff;
+        if (ll && hlDelta && diffOk) {
+          result.bullishPivots.push({ time: c.time, price: c.low, prevDelta: prevPlDelta, currDelta: currPlDelta });
+          result.bullishLines.push({ time1: prevPlTime, price1: prevPlPrice, time2: c.time, price2: c.low });
+        }
+      }
+      prevPlPrice = c.low;
+      prevPlDelta = currPlDelta;
+      prevPlTime = c.time;
+    }
+  }
+
+  // Keep last 5 of each (matches PineScript behavior)
+  if (result.bearishLines.length > 5) result.bearishLines = result.bearishLines.slice(-5);
+  if (result.bullishLines.length > 5) result.bullishLines = result.bullishLines.slice(-5);
+
+  return result;
+}
