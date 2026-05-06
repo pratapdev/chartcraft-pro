@@ -164,7 +164,7 @@ export interface SmartMoneyAlert {
   telegramEnabled?: boolean;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE' | 'PATTERN' | 'ANCHORED_VWAP' | 'SESSION_VWAP' | 'SUPPLY_DEMAND';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE' | 'PATTERN' | 'ANCHORED_VWAP' | 'SESSION_VWAP' | 'SUPPLY_DEMAND' | 'DELTA_DIV';
 
 export interface IndicatorConfig {
   id: string;
@@ -225,4 +225,10 @@ export interface IndicatorConfig {
   sdStrength?: number;
   /** SUPPLY_DEMAND: zone ATR multiplier for height */
   sdAtrMult?: number;
+  /** DELTA_DIV: pivot left lookback */
+  pivotLeft?: number;
+  /** DELTA_DIV: pivot right confirmation */
+  pivotRight?: number;
+  /** DELTA_DIV: minimum delta difference to qualify */
+  minDeltaDiff?: number;
 }

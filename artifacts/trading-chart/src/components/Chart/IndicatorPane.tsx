@@ -11,7 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
 import { IndicatorConfig, LineStyleType, Candle } from '@/types/trading';
-import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian, fetchCandles, subscribeToCandles } from '@/lib/marketData';
+import { computeRSI, computeStochRSI, computeMACD, computeADX, computeATR, computeOBV, computePctDiffDonchian, computeDeltaDivergence, fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { useChartSync } from './ChartSyncContext';
 import { X } from 'lucide-react';
 
@@ -206,6 +206,13 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       series.push(chart.addSeries(LineSeries, { color: 'rgba(107,114,128,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
     }
 
+    if (indicator.type === 'DELTA_DIV') {
+      const hist = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' });
+      hist.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
+      series.push(hist);
+      series.push(chart.addSeries(LineSeries, { color: 'rgba(107,114,128,0.4)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
+    }
+
     seriesRefs.current = series;
 
     const ro = new ResizeObserver((entries) => {
@@ -314,12 +321,31 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       }
     }
 
-  }, [candles, htfCandles, useHtf, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, indicator.timeframe, indicator.id]);
+    if (indicator.type === 'DELTA_DIV') {
+      const dd = computeDeltaDivergence(
+        candles,
+        indicator.pivotLeft ?? 5,
+        indicator.pivotRight ?? 5,
+        indicator.minDeltaDiff ?? 0,
+      );
+      const bearTimes = new Set(dd.bearishPivots.map((p) => p.time));
+      const bullTimes = new Set(dd.bullishPivots.map((p) => p.time));
+      const histData: HistogramData[] = dd.delta.map((d) => {
+        const highlight = bearTimes.has(d.time) || bullTimes.has(d.time);
+        const color = highlight ? '#FFD700' : (d.value >= 0 ? 'rgba(0,192,118,0.7)' : 'rgba(255,59,59,0.7)');
+        return { time: d.time as Time, value: d.value, color };
+      });
+      seriesRefs.current[0]?.setData(histData);
+      seriesRefs.current[1]?.setData(dd.delta.map((d) => ({ time: d.time as Time, value: 0 })) as LineData[]);
+    }
+
+  }, [candles, htfCandles, useHtf, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, indicator.timeframe, indicator.pivotLeft, indicator.pivotRight, indicator.minDeltaDiff, indicator.id]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
     indicator.type === 'MACD' ? 'MACD(12,26,9)' :
     indicator.type === 'ADX' ? `ADX(${indicator.period})` :
     indicator.type === 'PCT_DIFF_DON' ? `%Diff Don(${indicator.period},${indicator.lookbackWindow ?? 10})${indicator.timeframe ? ` · ${indicator.timeframe}` : ''}` :
+    indicator.type === 'DELTA_DIV' ? `Delta Div(${indicator.pivotLeft ?? 5},${indicator.pivotRight ?? 5})` :
     `${indicator.type}(${indicator.period})`;
 
   const [height, setHeight] = useState(120);

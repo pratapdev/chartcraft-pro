@@ -66,6 +66,7 @@ const INDICATOR_PRESETS: {
   { type: 'ANCHORED_VWAP', label: 'Anchored VWAP', description: 'VWAP anchored to a specific bar with ±1σ/2σ bands', group: 'Smart Money', defaults: { period: 1, color: '#a855f7' } },
   { type: 'SESSION_VWAP', label: 'Session VWAP', description: 'Daily-reset VWAP with standard deviation bands', group: 'Smart Money', defaults: { period: 1, color: '#f59e0b' } },
   { type: 'SUPPLY_DEMAND', label: 'Supply & Demand', description: 'Auto supply (red) and demand (green) zone detection', group: 'Smart Money', defaults: { period: 5, color: '#f97316', threshold: 0.4 } },
+  { type: 'DELTA_DIV', label: 'Delta Divergence', description: 'Pivot-based price/delta divergence detector', group: 'Smart Money', defaults: { period: 1, color: '#FFD700' } },
 ];
 
 // Group presets
