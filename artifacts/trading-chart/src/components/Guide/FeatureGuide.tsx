@@ -120,6 +120,28 @@ const GUIDE_SECTIONS: Section[] = [
     ],
   },
   {
+    title: 'Delta Divergence',
+    icon: '📊',
+    color: 'text-amber-400',
+    items: [
+      {
+        name: 'What it shows',
+        how: 'Add → Smart Money → "Delta Divergence". A sub-pane plots a per-bar delta proxy: (close−open)/(high−low) × volume. Gold histogram bars highlight confirmed pivots; red/green lines connect divergent pivot pairs on price.',
+        tip: 'Bearish divergence = price prints a Higher High while delta prints a Lower High (weakening buyers). Bullish = price Lower Low + delta Higher Low (weakening sellers).',
+      },
+      {
+        name: 'How to read signals',
+        how: 'Red lines on the price chart connect two highs where price rose but delta fell — potential reversal down. Green lines connect two lows where price fell but delta rose — potential reversal up. Up/down arrow markers show the delta value at each pivot.',
+        tip: 'Wait for a confirmation candle after the second pivot before entering. Combine with FVG, Supply/Demand, or CHOCH for higher-probability reversals.',
+      },
+      {
+        name: 'Settings (gear icon)',
+        how: 'Pivot Left = bars to the left required to qualify a pivot (default 5). Pivot Right = bars to the right required to confirm (default 5, signal lags by this many bars). Min Delta Diff = minimum absolute delta separation between two pivots to count as a divergence.',
+        tip: 'Increase Pivot Left/Right on higher timeframes (e.g. 8/8 on 4h) for fewer, cleaner signals. Raise Min Delta Diff to filter out weak divergences in low-volume periods.',
+      },
+    ],
+  },
+  {
     title: 'Fibonacci & Drawing Tools',
     icon: '📏',
     color: 'text-cyan-400',
