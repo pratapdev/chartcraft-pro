@@ -24,6 +24,7 @@ import { HTFOverlay } from './HTFOverlay';
 import { PatternOverlay } from './PatternOverlay';
 import { AnchoredVWAPOverlay } from './AnchoredVWAPOverlay';
 import { SmartMoneyOverlay } from './SmartMoneyOverlay';
+import { LiquidationsOverlay } from './LiquidationsOverlay';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
