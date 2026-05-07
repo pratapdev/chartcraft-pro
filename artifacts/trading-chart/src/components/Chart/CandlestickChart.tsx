@@ -24,6 +24,7 @@ import { HTFOverlay } from './HTFOverlay';
 import { PatternOverlay } from './PatternOverlay';
 import { AnchoredVWAPOverlay } from './AnchoredVWAPOverlay';
 import { SmartMoneyOverlay } from './SmartMoneyOverlay';
+import { LiquidationsOverlay } from './LiquidationsOverlay';
 
 export const CandlestickChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -332,6 +333,7 @@ export const CandlestickChart: React.FC = () => {
       <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <SmartMoneyOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <LiquidationsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <AnchoredVWAPOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <PatternOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <HTFOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
