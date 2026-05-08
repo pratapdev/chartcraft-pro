@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { subscribeLiquidations, Liquidation } from '@/lib/liquidationData';
+import { subscribeLiquidations, subscribeLiquidationStatus, Liquidation } from '@/lib/liquidationData';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -21,6 +21,7 @@ export const LiquidationsOverlay: React.FC<Props> = ({ chartRef, seriesRef }) =>
   const [liqs, setLiqs] = useState<Liquidation[]>([]);
   const liqsRef = useRef<Liquidation[]>([]);
   const [hover, setHover] = useState<{ x: number; y: number; liq: Liquidation } | null>(null);
+  const [connected, setConnected] = useState(false);
 
   // Subscribe to live liquidations
   useEffect(() => {
@@ -32,7 +33,8 @@ export const LiquidationsOverlay: React.FC<Props> = ({ chartRef, seriesRef }) =>
       liqsRef.current = [...liqsRef.current, liq].slice(-MAX_LIQS);
       setLiqs(liqsRef.current);
     });
-    return unsub;
+    const unsubStatus = subscribeLiquidationStatus(setConnected);
+    return () => { unsub(); unsubStatus(); };
   }, [symbol, marketType, liqInd]);
 
   const render = useCallback(() => {
@@ -139,9 +141,10 @@ export const LiquidationsOverlay: React.FC<Props> = ({ chartRef, seriesRef }) =>
       />
       {/* Stats badge */}
       <div className="absolute top-2 right-20 z-[10] flex items-center gap-2 bg-card/90 border border-border rounded px-2 py-1 text-[10px]">
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-yellow-500 animate-pulse'}`} title={connected ? 'Live' : 'Connecting…'} />
         <span className="text-red-400">L: ${(liqs.filter(l => l.side === 'SELL').reduce((s, l) => s + l.usd, 0) / 1000).toFixed(1)}k</span>
         <span className="text-green-400">S: ${(liqs.filter(l => l.side === 'BUY').reduce((s, l) => s + l.usd, 0) / 1000).toFixed(1)}k</span>
-        <span className="text-muted-foreground">≥${(minUsd / 1000).toFixed(0)}k</span>
+        <span className="text-muted-foreground">{liqs.length} • ≥${(minUsd / 1000).toFixed(0)}k</span>
       </div>
       {hover && (
         <div

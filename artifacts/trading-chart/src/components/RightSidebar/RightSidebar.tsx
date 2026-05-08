@@ -38,6 +38,8 @@ const INDICATOR_PRESETS: {
     fibFactor?: number;
     threshold?: number;
     minStack?: number;
+    volMult?: number;
+    maxBodyAtr?: number;
   };
 }[] = [
   // Trend
@@ -68,6 +70,7 @@ const INDICATOR_PRESETS: {
   { type: 'SUPPLY_DEMAND', label: 'Supply & Demand', description: 'Auto supply (red) and demand (green) zone detection', group: 'Smart Money', defaults: { period: 5, color: '#f97316', threshold: 0.4 } },
   { type: 'DELTA_DIV', label: 'Delta Divergence', description: 'Pivot-based price/delta divergence detector', group: 'Smart Money', defaults: { period: 1, color: '#FFD700' } },
   { type: 'LIQUIDATIONS', label: 'Liquidations', description: 'Live Binance Futures liquidation bubbles (red=longs, green=shorts)', group: 'Volatility', defaults: { period: 1, color: '#ef4444', threshold: 10000 } },
+  { type: 'ABSORPTION', label: 'Iceberg / Absorption', description: 'Tags bars where heavy volume failed to move price (passive iceberg orders)', group: 'Smart Money', defaults: { period: 20, color: '#eab308', volMult: 2.5, maxBodyAtr: 0.35 } },
 ];
 
 // Group presets
@@ -525,6 +528,8 @@ export const RightSidebar: React.FC = () => {
       fibFactor: preset.defaults.fibFactor,
       threshold: preset.defaults.threshold,
       minStack: preset.defaults.minStack,
+      volMult: (preset.defaults as any).volMult,
+      maxBodyAtr: (preset.defaults as any).maxBodyAtr,
     });
     setShowAdd(false);
     setSearchQuery('');
