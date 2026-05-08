@@ -526,6 +526,8 @@ export const RightSidebar: React.FC = () => {
       fibFactor: preset.defaults.fibFactor,
       threshold: preset.defaults.threshold,
       minStack: preset.defaults.minStack,
+      volMult: (preset.defaults as any).volMult,
+      maxBodyAtr: (preset.defaults as any).maxBodyAtr,
     });
     setShowAdd(false);
     setSearchQuery('');
