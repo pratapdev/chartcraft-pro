@@ -38,6 +38,8 @@ const INDICATOR_PRESETS: {
     fibFactor?: number;
     threshold?: number;
     minStack?: number;
+    volMult?: number;
+    maxBodyAtr?: number;
   };
 }[] = [
   // Trend
