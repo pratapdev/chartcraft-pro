@@ -164,7 +164,7 @@ export interface SmartMoneyAlert {
   telegramEnabled?: boolean;
 }
 
-export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE' | 'PATTERN' | 'ANCHORED_VWAP' | 'SESSION_VWAP' | 'SUPPLY_DEMAND' | 'DELTA_DIV' | 'LIQUIDATIONS' | 'ABSORPTION';
+export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'SESSION_VPVR' | 'COMPOSITE_VPVR' | 'NAKED_LEVELS' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE' | 'PATTERN' | 'ANCHORED_VWAP' | 'SESSION_VWAP' | 'SUPPLY_DEMAND' | 'DELTA_DIV' | 'LIQUIDATIONS' | 'ABSORPTION';
 
 export interface IndicatorConfig {
   id: string;
