@@ -59,6 +59,9 @@ const INDICATOR_PRESETS: {
   { type: 'PIVOT_HL', label: 'Pivot H/L', description: 'Pivot highs and lows', group: 'Volatility', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
   { type: 'PCT_DIFF_DON', label: 'PctDiff Don', description: 'Pct diff with Donchian', group: 'Volatility', defaults: { period: 20, color: '#06b6d4', lookbackWindow: 50, emaSmoothing: 9, donchianLength: 20, donLineDiff: 0.1 } },
   { type: 'VPVR', label: 'VPVR', description: 'Volume Profile Visible Range', group: 'Volatility', defaults: { period: 1, color: '#6b7280' } },
+  { type: 'SESSION_VPVR', label: 'Session Volume Profile', description: 'Per-day volume profile drawn at the right edge of each session (POC highlighted)', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
+  { type: 'COMPOSITE_VPVR', label: 'Composite VPVR', description: 'Aggregated profile across ALL loaded candles with VAH/VAL/POC labels', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
+  { type: 'NAKED_LEVELS', label: 'Naked POC / VAH / VAL', description: 'Untouched per-session POC, VAH and VAL extended right until price tags them', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
   { type: 'IMBALANCE', label: 'Volume Imbalance', description: 'Stacked volume imbalance zones', group: 'Volatility', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
   // Smart Money
   { type: 'MSB_OB', label: 'MSB + Order Blocks', description: 'Market Structure Break & Order Blocks (ZigZag)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', zigzagLength: 9, fibFactor: 0.33 } },
