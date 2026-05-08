@@ -335,6 +335,9 @@ export const CandlestickChart: React.FC = () => {
       <div ref={containerRef} id="chart-screenshot-source" className="w-full h-full" />
       <CrosshairLegend />
       <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <SessionProfileOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <CompositeVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+      <NakedLevelsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <SmartMoneyOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
       <LiquidationsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
