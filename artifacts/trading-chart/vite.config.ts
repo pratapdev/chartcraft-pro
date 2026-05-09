@@ -4,6 +4,7 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
+import { aiChatPlugin } from "./src/devPlugins/aiChatPlugin";
 
 const rawPort = process.env.PORT;
 
@@ -31,6 +32,7 @@ export default defineConfig({
   base: basePath,
   plugins: [
     react(),
+    aiChatPlugin(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
