@@ -188,7 +188,7 @@ router.post("/ai/chat", async (req: Request<object, object, AIChatBody>, res: Re
         ? "claude-3-5-sonnet-latest"
         : selectedProvider === "google"
           ? "gemini-1.5-pro"
-          : "gpt-5.1");
+          : "gpt-5-mini");
 
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: systemPrompt },
