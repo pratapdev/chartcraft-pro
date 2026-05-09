@@ -1,7 +1,7 @@
 import { Candle, MarketType } from '@/types/trading';
 import { computePatterns, PATTERN_LABELS } from './patternDetection';
 import { computeMarketStructure } from './smartMoney';
-import { SYMBOL_MAP } from './liquidationData';
+import { toFuturesSymbol } from './liquidationData';
 
 export interface AIPatternSummary {
   kind: string;
