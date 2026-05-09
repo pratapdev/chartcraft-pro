@@ -74,6 +74,37 @@ function buildSystemPrompt(ctx?: ChartContext): string {
         `  Avg volume: ${avgVol}`,
       );
     }
+
+    if (ctx.patterns && ctx.patterns.length > 0) {
+      parts.push(`\nDetected chart patterns (most recent first):`);
+      for (const p of ctx.patterns) {
+        parts.push(`  - ${p.label} | bias=${p.bias} | strength=${p.strength}${p.apexPrice ? ` | apex=${p.apexPrice.toFixed(2)}` : ''}`);
+      }
+    }
+
+    if (ctx.structure) {
+      const labels = ctx.structure.labels ?? [];
+      const sweeps = ctx.structure.sweeps ?? [];
+      if (labels.length > 0) {
+        parts.push(`\nMarket structure events (recent):`);
+        for (const l of labels) parts.push(`  - ${l.kind} ${l.direction} @ ${l.price}`);
+      }
+      if (sweeps.length > 0) {
+        parts.push(`Liquidity sweeps (recent):`);
+        for (const s of sweeps) parts.push(`  - ${s.direction} swept ${s.sweptPrice}`);
+      }
+    }
+
+    if (ctx.marketStats) {
+      const m = ctx.marketStats;
+      const lines: string[] = [];
+      if (m.openInterest != null) lines.push(`OI=${m.openInterest.toFixed(0)}`);
+      if (m.openInterestChange24h != null) lines.push(`OI 24h=${m.openInterestChange24h.toFixed(2)}%`);
+      if (m.fundingRate != null) lines.push(`funding=${(m.fundingRate * 100).toFixed(4)}%`);
+      if (m.longShortRatio != null) lines.push(`L/S=${m.longShortRatio.toFixed(2)}`);
+      if (m.markPrice != null) lines.push(`mark=${m.markPrice}`);
+      if (lines.length > 0) parts.push(`\nDerivatives: ${lines.join(' | ')}`);
+    }
   }
 
   return parts.join("\n");
