@@ -67,7 +67,7 @@ export function summarizeStructure(candles: Candle[]) {
 /** Fetch open interest, funding, long/short ratio for crypto symbols (Binance Futures public). */
 export async function fetchMarketStats(symbol: string, marketType: MarketType): Promise<AIMarketStats> {
   if (marketType !== 'crypto') return {};
-  const fSymbol = SYMBOL_MAP[symbol];
+  const fSymbol = toFuturesSymbol(symbol);
   if (!fSymbol) return {};
   const upper = fSymbol.toUpperCase();
   const stats: AIMarketStats = {};
