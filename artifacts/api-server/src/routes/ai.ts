@@ -16,6 +16,18 @@ interface ChartContext {
     volume: number;
   }>;
   marketType?: string;
+  patterns?: Array<{ label: string; bias: string; strength: number; startTime: number; endTime: number; apexPrice?: number }>;
+  structure?: {
+    labels?: Array<{ kind: string; direction: string; price: number; breakTime: number }>;
+    sweeps?: Array<{ direction: string; sweptPrice: number; time: number }>;
+  };
+  marketStats?: {
+    openInterest?: number;
+    openInterestChange24h?: number;
+    fundingRate?: number;
+    longShortRatio?: number;
+    markPrice?: number;
+  };
 }
 
 interface AIChatBody {
