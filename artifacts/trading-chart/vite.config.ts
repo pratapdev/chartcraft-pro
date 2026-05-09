@@ -32,6 +32,7 @@ export default defineConfig({
   base: basePath,
   plugins: [
     react(),
+    aiChatPlugin(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
