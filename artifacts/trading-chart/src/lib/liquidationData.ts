@@ -12,13 +12,13 @@ export interface Liquidation {
   symbol: string;
 }
 
-const SYMBOL_MAP: Record<string, string> = {
+export const SYMBOL_MAP: Record<string, string> = {
   'BTC/USD': 'BTCUSDT', 'ETH/USD': 'ETHUSDT', 'SOL/USD': 'SOLUSDT',
   'BNB/USD': 'BNBUSDT', 'XRP/USD': 'XRPUSDT', 'ADA/USD': 'ADAUSDT',
   'DOGE/USD': 'DOGEUSDT', 'AVAX/USD': 'AVAXUSDT',
 };
 
-function toFuturesSymbol(symbol: string): string {
+export function toFuturesSymbol(symbol: string): string {
   if (SYMBOL_MAP[symbol]) return SYMBOL_MAP[symbol];
   return symbol.replace('/', '').replace('USD', 'USDT').toUpperCase();
 }
