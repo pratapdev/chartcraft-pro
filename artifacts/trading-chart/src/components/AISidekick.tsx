@@ -75,16 +75,22 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const getContext = useCallback(() => {
-    const recentCandles = candles.slice(-50).map(c => ({
+  const getContext = useCallback(async () => {
+    const recentCandles = candles.slice(-100).map(c => ({
       time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
     }));
+    const patterns = summarizePatterns(candles);
+    const structure = summarizeStructure(candles);
+    const marketStats = await fetchMarketStats(symbol, marketType);
     return {
       symbol,
       timeframe,
       marketType,
       indicators: indicators.filter(i => i.visible).map(i => ({ type: i.type, period: i.period })),
       recentCandles,
+      patterns,
+      structure,
+      marketStats,
     };
   }, [symbol, timeframe, marketType, indicators, candles]);
 
@@ -103,9 +109,10 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
 
     try {
+      const ctx = await getContext();
       await streamChat(
         text.trim(),
-        getContext(),
+        ctx,
         history,
         (chunk) => {
           setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + chunk } : m));
