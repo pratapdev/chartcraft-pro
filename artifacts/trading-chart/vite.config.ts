@@ -4,6 +4,7 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
+import { aiChatPlugin } from "./src/devPlugins/aiChatPlugin";
 
 const rawPort = process.env.PORT;
 
