@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, X, Send, Loader2, Sparkles, TrendingUp, Search, Lightbulb, RotateCcw } from 'lucide-react';
+import { Bot, X, Send, Loader2, Sparkles, TrendingUp, Search, Lightbulb, RotateCcw, Shapes, Newspaper, MapPin } from 'lucide-react';
 import { useChartStore } from '@/stores/chartStore';
+import { summarizePatterns, summarizeStructure, fetchMarketStats } from '@/lib/aiContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -12,6 +13,9 @@ const QUICK_ACTIONS = [
   { label: 'Analyze chart', icon: TrendingUp, prompt: 'Analyze the current chart and give me a summary of the price action, trend, and key levels.' },
   { label: 'Find setups', icon: Search, prompt: 'Look at the current chart context and identify the best trading setups or opportunities right now.' },
   { label: 'Refine strategy', icon: Lightbulb, prompt: 'Based on my active indicators and the current chart, how can I refine my trading strategy?' },
+  { label: 'Pattern scan', icon: Shapes, prompt: 'Scan the recent candles for chart patterns (head & shoulders, wedges, flags, triangles, channels). For each detected pattern: name it, give the bias, target/invalidation level, and a 1–2 sentence explanation. Use the "Detected chart patterns" list in context as the primary reference and cross-validate against the candle data.' },
+  { label: 'Why moving?', icon: Newspaper, prompt: 'Why is this market moving right now? Summarize the recent candle action, what the open interest and funding rate suggest about positioning, and the most likely narrative driving price. End with bias (bullish / bearish / neutral) and the key invalidation level.' },
+  { label: 'Annotate chart', icon: MapPin, prompt: 'Auto-annotate the chart. Using the BOS / CHoCH / liquidity sweep events in context, list each annotation as a bullet: "[KIND] [direction] @ [price] — [1-sentence explanation of what it means and how to trade it]". Then give a short summary of overall market structure (bullish / bearish / ranging).' },
 ];
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, '') ?? '';
