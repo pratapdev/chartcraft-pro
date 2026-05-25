@@ -321,17 +321,172 @@ const SmartMoneyAlertForm: React.FC = () => {
   );
 };
 
+const PCT_CROSS_PRESETS: {
+  label: string;
+  description: string;
+  line1: PctDiffDonLine;
+  line2: PctDiffDonLine;
+  condition: AlertCondition;
+  color: string;
+}[] = [
+  { label: 'Diff ✕ EMA — Bullish', description: '%Diff crosses above EMA (bullish momentum shift)', line1: 'main', line2: 'ema', condition: 'cross_above', color: 'text-green-400' },
+  { label: 'Diff ✕ EMA — Bearish', description: '%Diff crosses below EMA (bearish momentum shift)', line1: 'main', line2: 'ema', condition: 'cross_below', color: 'text-red-400' },
+  { label: 'Diff ✕ EMA — Any', description: '%Diff crosses EMA in either direction', line1: 'main', line2: 'ema', condition: 'cross_any', color: 'text-blue-400' },
+  { label: 'Diff ↑ from Lower Don', description: '%Diff crosses above lower Donchian band (bottom reversal)', line1: 'main', line2: 'lower', condition: 'cross_above', color: 'text-green-400' },
+  { label: 'Diff ↓ from Upper Don', description: '%Diff crosses below upper Donchian band (top reversal)', line1: 'main', line2: 'upper', condition: 'cross_below', color: 'text-red-400' },
+  { label: 'Diff ✕ Basis — Any', description: '%Diff crosses the Donchian basis (midline)', line1: 'main', line2: 'basis', condition: 'cross_any', color: 'text-blue-400' },
+  { label: 'EMA ↑ Lower Don', description: 'EMA crosses above lower Donchian (trend recovery)', line1: 'ema', line2: 'lower', condition: 'cross_above', color: 'text-green-400' },
+  { label: 'EMA ↓ Upper Don', description: 'EMA crosses below upper Donchian (trend weakening)', line1: 'ema', line2: 'upper', condition: 'cross_below', color: 'text-red-400' },
+];
+
 const PctDiffDonCrossAlertForm: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'preset' | 'custom'>('preset');
+  const [line1, setLine1] = useState<PctDiffDonLine>('main');
+  const [line2, setLine2] = useState<PctDiffDonLine>('ema');
+  const [condition, setCondition] = useState<AlertCondition>('cross_above');
+  const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
+  const symbol = useChartStore((s) => s.symbol);
+  const timeframe = useChartStore((s) => s.timeframe);
+  const indicators = useChartStore((s) => s.indicators);
+  const addAlert = useChartStore((s) => s.addPctDiffDonCrossAlert);
+  const activeAlerts = (useChartStore((s) => s.pctDiffDonCrossAlerts) ?? []).filter((a) => a.active && !a.triggered);
+
+  const pctDiffIndicators = indicators.filter((i) => i.type === 'PCT_DIFF_DON');
+  const [selectedIndId, setSelectedIndId] = useState('');
+
+  const LINE_LABELS: Record<PctDiffDonLine, string> = {
+    main: '%Diff', ema: 'EMA', basis: 'Basis', upper: 'Upper Don', lower: 'Lower Don', upperNew: 'Inner Upper', lowerNew: 'Inner Lower',
+  };
+
+  const handleAdd = (l1: PctDiffDonLine, l2: PctDiffDonLine, cond: AlertCondition) => {
+    const indId = selectedIndId || pctDiffIndicators[0]?.id;
+    if (!indId) return;
+    const condLabel = cond === 'cross_above' ? 'crosses above' : cond === 'cross_below' ? 'crosses below' : 'crosses';
+    addAlert({
+      id: crypto.randomUUID(),
+      symbol,
+      timeframe,
+      indicatorId: indId,
+      line1: l1,
+      line2: l2,
+      condition: cond,
+      active: true,
+      triggered: false,
+      message: `${LINE_LABELS[l1]} ${condLabel} ${LINE_LABELS[l2]}`,
+      createdAt: Date.now(),
+      telegramEnabled,
+      whatsappEnabled,
+    });
+  };
+
   return (
     <div className="panel-section rounded text-xs">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
-        <span className="font-medium flex items-center gap-1.5"><ArrowRightLeft size={10} className="text-accent-foreground" /> %Diff Donchian Cross</span>
+        <span className="font-medium flex items-center gap-1.5">
+          <ArrowRightLeft size={10} className="text-cyan-400" /> %Diff Donchian Cross
+          {activeAlerts.length > 0 && (
+            <span className="bg-cyan-400/15 text-cyan-400 text-[9px] px-1.5 py-0.5 rounded-full">{activeAlerts.length}</span>
+          )}
+        </span>
         <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div className="px-2 pb-2 text-muted-foreground text-[10px]">
-          Alert when the %Diff line crosses the Donchian upper/lower/basis bands.
+        <div className="px-2 pb-2 space-y-2">
+          {pctDiffIndicators.length === 0 ? (
+            <div className="text-muted-foreground text-[10px]">Add a PctDiff Don indicator first.</div>
+          ) : (
+            <>
+              {pctDiffIndicators.length > 1 && (
+                <select value={selectedIndId || pctDiffIndicators[0]?.id} onChange={(e) => setSelectedIndId(e.target.value)}
+                  className="w-full bg-input border border-border rounded px-1.5 py-1 text-[10px] text-foreground">
+                  {pctDiffIndicators.map((ind) => (
+                    <option key={ind.id} value={ind.id}>%Diff({ind.period},{ind.lookbackWindow ?? 10})</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Mode toggle */}
+              <div className="flex rounded overflow-hidden border border-border">
+                <button onClick={() => setMode('preset')}
+                  className={`flex-1 py-1 text-[10px] transition-colors ${mode === 'preset' ? 'bg-cyan-500/20 text-cyan-400' : 'text-muted-foreground hover:text-foreground'}`}>
+                  Quick Presets
+                </button>
+                <button onClick={() => setMode('custom')}
+                  className={`flex-1 py-1 text-[10px] transition-colors ${mode === 'custom' ? 'bg-cyan-500/20 text-cyan-400' : 'text-muted-foreground hover:text-foreground'}`}>
+                  Custom
+                </button>
+              </div>
+
+              {mode === 'preset' ? (
+                <div className="space-y-1">
+                  {PCT_CROSS_PRESETS.map((preset, idx) => (
+                    <button key={idx} onClick={() => handleAdd(preset.line1, preset.line2, preset.condition)}
+                      className="w-full text-left px-2 py-1.5 rounded hover:bg-accent/60 transition-colors group">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] font-medium ${preset.color}`}>{preset.label}</span>
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{preset.description}</p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1">
+                    <div className="flex-1">
+                      <label className="text-[9px] text-muted-foreground block mb-0.5">Line 1</label>
+                      <select value={line1} onChange={(e) => setLine1(e.target.value as PctDiffDonLine)}
+                        className="w-full bg-input border border-border rounded px-1.5 py-1 text-[10px] text-foreground">
+                        {(Object.keys(LINE_LABELS) as PctDiffDonLine[]).map((l) => (
+                          <option key={l} value={l}>{LINE_LABELS[l]}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[9px] text-muted-foreground block mb-0.5">Line 2</label>
+                      <select value={line2} onChange={(e) => setLine2(e.target.value as PctDiffDonLine)}
+                        className="w-full bg-input border border-border rounded px-1.5 py-1 text-[10px] text-foreground">
+                        {(Object.keys(LINE_LABELS) as PctDiffDonLine[]).filter(l => l !== line1).map((l) => (
+                          <option key={l} value={l}>{LINE_LABELS[l]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-muted-foreground block mb-0.5">Condition</label>
+                    <select value={condition} onChange={(e) => setCondition(e.target.value as AlertCondition)}
+                      className="w-full bg-input border border-border rounded px-1.5 py-1 text-[10px] text-foreground">
+                      <option value="cross_above">Crosses Above ↑</option>
+                      <option value="cross_below">Crosses Below ↓</option>
+                      <option value="cross_any">Crosses Either ↕</option>
+                    </select>
+                  </div>
+                  <button onClick={() => handleAdd(line1, line2, condition)}
+                    className="w-full py-1.5 rounded bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/25 transition-colors text-[10px] font-medium border border-cyan-500/20">
+                    <Plus size={10} className="inline mr-1" />Add {LINE_LABELS[line1]} ✕ {LINE_LABELS[line2]} Alert
+                  </button>
+                </div>
+              )}
+
+              {/* Notification toggles */}
+              <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                <span className="text-[9px] text-muted-foreground">{symbol} · {timeframe}</span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+                    <Send size={9} className={telegramEnabled ? 'text-primary' : 'text-muted-foreground'} />
+                    <input type="checkbox" checked={telegramEnabled} onChange={(e) => setTelegramEnabled(e.target.checked)} className="w-3 h-3 accent-primary" />
+                    TG
+                  </label>
+                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+                    <MessageSquare size={9} className={whatsappEnabled ? 'text-primary' : 'text-muted-foreground'} />
+                    <input type="checkbox" checked={whatsappEnabled} onChange={(e) => setWhatsappEnabled(e.target.checked)} className="w-3 h-3 accent-primary" />
+                    WA
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
