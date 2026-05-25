@@ -3,7 +3,7 @@ import { useChartStore } from '@/stores/chartStore';
 import { computeEMA, computeSMA, computeRSI, computeStochRSI, computeBollingerBands, computeVWAP } from '@/lib/marketData';
 import { X } from 'lucide-react';
 
-export const CrosshairLegend: React.FC = () => {
+export const CrosshairLegend: React.FC = React.memo(() => {
   const { crosshairData, candles, indicators, selectedIndicatorId, setSelectedIndicatorId, removeIndicator } = useChartStore();
 
   if (!crosshairData || candles.length === 0) return null;
@@ -128,7 +128,7 @@ export const CrosshairLegend: React.FC = () => {
       })}
     </div>
   );
-};
+});
 
 function formatVolume(v: number): string {
   if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';

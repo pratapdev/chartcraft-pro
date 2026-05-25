@@ -426,7 +426,7 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   rightPanelOpen: true,
   rightPanelTab: 'indicators',
   setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
-  setRightPanelTab: (rightPanelTab) => set({ rightPanelTab }),
+  setRightPanelTab: (rightPanelTab) => set({ rightPanelTab, rightPanelOpen: true }),
   undoLastDeletion: () => {
     const entry = undoStack.pop();
     if (!entry) return;

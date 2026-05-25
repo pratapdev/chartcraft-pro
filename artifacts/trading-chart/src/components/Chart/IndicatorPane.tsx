@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   createChart,
   IChartApi,
@@ -21,11 +21,12 @@ interface IndicatorPaneProps {
   indicator: IndicatorConfig;
 }
 
-export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
+const IndicatorPaneInner: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<ISeriesApi<'Line' | 'Histogram'>[]>([]);
+  const isSyncing = useRef(false);
   const { candles, removeIndicator, chartFontSize, symbol, timeframe, marketType } = useChartStore();
   const chartId = `indicator-${indicator.id}`;
   const chartSync = useChartSync();
@@ -126,6 +127,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         textColor: '#6b7280',
         fontSize: chartFontSize - 1,
         fontFamily: "'JetBrains Mono', monospace",
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#1c2333' },
@@ -215,17 +217,75 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
 
     seriesRefs.current = series;
 
+    // Debounced ResizeObserver to avoid layout thrashing
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      chart.applyOptions({ width, height });
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const { width, height } = entries[0].contentRect;
+        chart.applyOptions({ width, height });
+      }, 16);
     });
     ro.observe(containerRef.current);
+
+    let unsubSync: (() => void) | null = null;
 
     if (chartSync && paneMode === 'mirror') {
       chartSync.registerChart(chartId, chart);
 
+      // Compute the logical-index offset between main chart and indicator.
+      // Indicator has fewer data points due to warmup (e.g. RSI(14) starts 14 bars late),
+      // so logical index 0 in the indicator != logical index 0 in the main chart.
+      // We find a common time point and compare its logical index in both charts.
+      const computeOffset = (): number => {
+        const mainChart = chartSync.getMainChart();
+        if (!mainChart) return 0;
+        const mainRange = mainChart.timeScale().getVisibleRange();
+        if (!mainRange) return 0;
+        // Use the end of visible range as reference — both charts have data here
+        const refTime = mainRange.to;
+        const mainX = mainChart.timeScale().timeToCoordinate(refTime);
+        const indX = chart.timeScale().timeToCoordinate(refTime);
+        if (mainX === null || indX === null) return 0;
+        const mainL = mainChart.timeScale().coordinateToLogical(mainX);
+        const indL = chart.timeScale().coordinateToLogical(indX);
+        if (mainL === null || indL === null) return 0;
+        return (mainL as number) - (indL as number);
+      };
+
+      // Single setVisibleLogicalRange call — no flicker, correct alignment, preserves right buffer.
+      // Mirror mode has handleScroll/handleScale disabled, so user events are forwarded
+      // to the main chart via the overlay — no broadcast-back needed from indicator.
+      unsubSync = chartSync.subscribeMainLogicalRange((mainRange) => {
+        if (isSyncing.current) return;
+        isSyncing.current = true;
+        try {
+          const offset = computeOffset();
+          chart.timeScale().setVisibleLogicalRange({
+            from: mainRange.from - offset,
+            to: mainRange.to - offset,
+          });
+        } catch {}
+        // Defer reset so any async change events from the chart are still guarded
+        requestAnimationFrame(() => { isSyncing.current = false; });
+      });
+
+      // Apply the current main chart range immediately on mount
+      const initialRange = chartSync.getMainLogicalRange();
+      if (initialRange) {
+        try {
+          const offset = computeOffset();
+          chart.timeScale().setVisibleLogicalRange({
+            from: initialRange.from - offset,
+            to: initialRange.to - offset,
+          });
+        } catch {}
+      }
+
       return () => {
+        if (resizeTimer) clearTimeout(resizeTimer);
         ro.disconnect();
+        if (unsubSync) unsubSync();
         chartSync.unregisterChart(chartId);
         try { chart.remove(); } catch {}
         chartRef.current = null;
@@ -234,6 +294,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
     }
 
     return () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
       ro.disconnect();
       try { chart.remove(); } catch {}
       chartRef.current = null;
@@ -339,6 +400,34 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       seriesRefs.current[1]?.setData(dd.delta.map((d) => ({ time: d.time as Time, value: 0 })) as LineData[]);
     }
 
+    // Re-sync with main chart after data is loaded.
+    // On initial mount, the sync fires before data exists so offset=0 and alignment is wrong.
+    // This deferred re-sync corrects it once data is available.
+    if (chartSync && paneMode === 'mirror') {
+      requestAnimationFrame(() => {
+        const mainChart = chartSync.getMainChart();
+        if (!mainChart || !chartRef.current) return;
+        const mainLogical = mainChart.timeScale().getVisibleLogicalRange();
+        if (!mainLogical) return;
+        const mainRange = mainChart.timeScale().getVisibleRange();
+        if (!mainRange) return;
+        const refTime = mainRange.to;
+        const mainX = mainChart.timeScale().timeToCoordinate(refTime);
+        const indX = chartRef.current.timeScale().timeToCoordinate(refTime);
+        if (mainX === null || indX === null) return;
+        const mainL = mainChart.timeScale().coordinateToLogical(mainX);
+        const indL = chartRef.current.timeScale().coordinateToLogical(indX);
+        if (mainL === null || indL === null) return;
+        const offset = (mainL as number) - (indL as number);
+        try {
+          chartRef.current.timeScale().setVisibleLogicalRange({
+            from: mainLogical.from - offset,
+            to: mainLogical.to - offset,
+          });
+        } catch {}
+      });
+    }
+
   }, [candles, htfCandles, useHtf, indicator.type, indicator.period, indicator.kPeriod, indicator.dPeriod, indicator.lookbackWindow, indicator.emaSmoothing, indicator.donchianLength, indicator.donLineDiff, indicator.timeframe, indicator.pivotLeft, indicator.pivotRight, indicator.minDeltaDiff, indicator.id]);
 
   const label = indicator.type === 'STOCH_RSI' ? `StochRSI(${indicator.period})` :
@@ -375,7 +464,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
   }, [height]);
 
   return (
-    <div className="relative" style={{ height }}>
+    <div className="relative" style={{ height, contain: 'strict', willChange: 'transform' }}>
       {/* Resize handle — sits at top, above the overlay */}
       <div
         onMouseDown={handleResizeStart}
@@ -397,7 +486,7 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
         </button>
       </div>
       {/* The lightweight-charts canvas */}
-      <div ref={containerRef} className="w-full h-full" />
+      <div ref={containerRef} className="w-full h-full" style={{ transform: 'translateZ(0)' }} />
       {/*
         Transparent overlay that captures ALL pointer/wheel events and re-dispatches
         them to the main chart container, making the pane act as a passive mirror.
@@ -406,8 +495,10 @@ export const IndicatorPane: React.FC<IndicatorPaneProps> = ({ indicator }) => {
       <div
         ref={overlayRef}
         className="absolute inset-0 z-20"
-        style={{ cursor: 'crosshair' }}
+        style={{ cursor: 'crosshair', pointerEvents: paneMode === 'mirror' ? 'auto' : 'auto' }}
       />
     </div>
   );
 };
+
+export const IndicatorPane = React.memo(IndicatorPaneInner);

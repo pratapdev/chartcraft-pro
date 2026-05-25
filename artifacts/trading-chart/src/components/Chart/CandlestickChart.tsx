@@ -68,6 +68,7 @@ export const CandlestickChart: React.FC = () => {
         textColor: '#6b7280',
         fontSize: chartFontSize,
         fontFamily: "'JetBrains Mono', monospace",
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#1c2333' },
@@ -116,7 +117,8 @@ export const CandlestickChart: React.FC = () => {
           });
         },
       },
-      handleScroll: { vertTouchDrag: false },
+      handleScroll: { vertTouchDrag: false, pressedMouseMove: true },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
     });
 
     // Track user drag to enable "Reset Chart"
@@ -198,30 +200,39 @@ export const CandlestickChart: React.FC = () => {
       store.setSelectedTrendlineId(hitId);
     });
 
-    // Subscribe to crosshair move for data legend
+    // Use rAF for crosshair data updates to avoid excessive re-renders
+    let crosshairRaf: number | null = null;
     chart.subscribeCrosshairMove((param: MouseEventParams) => {
-      if (!param.time || !param.seriesData) {
-        useChartStore.getState().setCrosshairData(null);
-        return;
-      }
-      const candleData = param.seriesData.get(candleSeries) as any;
-      if (candleData && candleData.open !== undefined) {
-        useChartStore.getState().setCrosshairData({
-          time: param.time as unknown as number,
-          open: candleData.open,
-          high: candleData.high,
-          low: candleData.low,
-          close: candleData.close,
-          volume: (param.seriesData.get(volumeSeries) as any)?.value ?? 0,
-        });
-      } else {
-        useChartStore.getState().setCrosshairData(null);
-      }
+      if (crosshairRaf) cancelAnimationFrame(crosshairRaf);
+      crosshairRaf = requestAnimationFrame(() => {
+        if (!param.time || !param.seriesData) {
+          useChartStore.getState().setCrosshairData(null);
+          return;
+        }
+        const candleData = param.seriesData.get(candleSeries) as any;
+        if (candleData && candleData.open !== undefined) {
+          useChartStore.getState().setCrosshairData({
+            time: param.time as unknown as number,
+            open: candleData.open,
+            high: candleData.high,
+            low: candleData.low,
+            close: candleData.close,
+            volume: (param.seriesData.get(volumeSeries) as any)?.value ?? 0,
+          });
+        } else {
+          useChartStore.getState().setCrosshairData(null);
+        }
+      });
     });
 
+    // Debounced ResizeObserver to avoid layout thrashing
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      chart.applyOptions({ width, height });
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const { width, height } = entries[0].contentRect;
+        chart.applyOptions({ width, height });
+      }, 16);
     });
     ro.observe(containerRef.current);
 
@@ -230,15 +241,20 @@ export const CandlestickChart: React.FC = () => {
       chartSync.registerChart('main', chart);
       // Let indicator panes forward events here
       chartSync.setMainContainer(containerRef.current);
-      // Use time-based sync so panes with fewer data points (RSI warmup, etc.)
-      // align correctly — logical index sync would cause misalignment.
+      // Broadcast time range for any consumers that need it
       chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
         if (range) chartSync.broadcastTimeRange(range as { from: Time; to: Time });
+      });
+      // Broadcast logical range — preserves rightOffset buffer for indicator panes
+      chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        if (range) chartSync.broadcastLogicalRange(range);
       });
     }
 
     const containerEl = containerRef.current;
     return () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      if (crosshairRaf) cancelAnimationFrame(crosshairRaf);
       ro.disconnect();
       if (chartSync) {
         chartSync.unregisterChart('main');
@@ -332,8 +348,8 @@ export const CandlestickChart: React.FC = () => {
 
 
   return (
-    <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
-      <div ref={containerRef} id="chart-screenshot-source" className="w-full h-full" />
+    <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)} style={{ contain: 'layout style', willChange: 'transform' }}>
+      <div ref={containerRef} id="chart-screenshot-source" className="w-full h-full" style={{ transform: 'translateZ(0)' }} />
       <CrosshairLegend />
       {!hideAllIndicators && (
         <>

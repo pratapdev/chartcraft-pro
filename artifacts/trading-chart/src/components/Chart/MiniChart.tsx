@@ -37,7 +37,7 @@ interface MiniChartProps {
   onActivate?: () => void;
 }
 
-export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols, isActive, onActivate }) => {
+const MiniChartInner: React.FC<MiniChartProps> = ({ symbol, timeframe, onCrosshairMove, syncTime, onTimeframeChange, onSymbolChange, availableSymbols, isActive, onActivate }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -61,6 +61,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
         textColor: '#6b7280',
         fontSize: chartFontSize - 1,
         fontFamily: "'JetBrains Mono', monospace",
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#1c2333' },
@@ -80,7 +81,8 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
         timeVisible: true,
         secondsVisible: false,
       },
-      handleScroll: { vertTouchDrag: false },
+      handleScroll: { vertTouchDrag: false, pressedMouseMove: true },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -104,10 +106,14 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
 
-    // Crosshair sync
+    // Crosshair sync with rAF
+    let crosshairRaf: number | null = null;
     chart.subscribeCrosshairMove((param: MouseEventParams) => {
       if (onCrosshairMove) {
-        onCrosshairMove(param.time ? (param.time as unknown as number) : null);
+        if (crosshairRaf) cancelAnimationFrame(crosshairRaf);
+        crosshairRaf = requestAnimationFrame(() => {
+          onCrosshairMove(param.time ? (param.time as unknown as number) : null);
+        });
       }
     });
 
@@ -151,14 +157,21 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     // Auto-refresh every 10 seconds for near-live updates
     const interval = setInterval(loadData, 10_000);
 
+    // Debounced ResizeObserver
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      chart.applyOptions({ width, height });
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const { width, height } = entries[0].contentRect;
+        chart.applyOptions({ width, height });
+      }, 16);
     });
     ro.observe(containerRef.current);
 
     return () => {
       clearInterval(interval);
+      if (resizeTimer) clearTimeout(resizeTimer);
+      if (crosshairRaf) cancelAnimationFrame(crosshairRaf);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -200,8 +213,8 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
           <span className="text-muted-foreground">{symbol}</span>
         )}
       </div>
-      <div className="relative flex-1 min-h-0">
-        <div ref={containerRef} className="w-full h-full" />
+      <div className="relative flex-1 min-h-0" style={{ contain: 'strict', willChange: 'transform' }}>
+        <div ref={containerRef} className="w-full h-full" style={{ transform: 'translateZ(0)' }} />
         <DrawingOverlay
           chartRef={chartRef}
           seriesRef={candleSeriesRef}
@@ -215,3 +228,5 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
     </div>
   );
 };
+
+export const MiniChart = React.memo(MiniChartInner);
