@@ -1,4 +1,6 @@
 import type { Alert, AlertLog, FibonacciDrawing, IndicatorConfig, IndicatorCrossAlert, IndicatorThresholdAlert, MarketType, PctDiffDonCrossAlert, StochRSICrossAlert, Timeframe, Trendline } from '@/types/trading';
+import type { SavedChartLayout } from './chartLayoutService';
+import type { TrackerSymbol, TrackedEntry } from '@/types/tracker';
 
 export interface SyncPayload {
   state: {
@@ -17,6 +19,13 @@ export interface SyncPayload {
   indicatorThresholdAlerts: IndicatorThresholdAlert[];
   stochRSICrossAlerts: StochRSICrossAlert[];
   pctDiffDonCrossAlerts: PctDiffDonCrossAlert[];
+  smartMoneyAlerts: any[]; // Use any[] or proper type if imported
+  layouts: SavedChartLayout[];
+  compoundAlerts: any[]; // Or proper type
+
+
+  trackerWatchlist: TrackerSymbol[];
+  trackerEntries: TrackedEntry[];
 }
 
 const toNum = (value: unknown, fallback = 0) => {
@@ -42,6 +51,13 @@ interface RawServerPayload {
   indicatorThresholdAlerts?: Record<string, unknown>[];
   stochRSICrossAlerts?: Record<string, unknown>[];
   pctDiffDonCrossAlerts?: Record<string, unknown>[];
+  smartMoneyAlerts?: Record<string, unknown>[];
+  layouts?: Record<string, unknown>[];
+  compoundAlerts?: Record<string, unknown>[];
+
+
+  trackerWatchlist?: Record<string, unknown>[];
+  trackerEntries?: Record<string, unknown>[];
 }
 
 const toStr = (v: unknown, fallback = ''): string =>
@@ -111,8 +127,9 @@ const normalizeSyncPayload = (data: RawServerPayload): SyncPayload => ({
     active: a.active !== false, triggered: Boolean(a.triggered),
     triggeredAt: toOptNum(a.triggeredAt),
     message: typeof a.message === 'string' ? a.message : undefined,
-    createdAt: toNum(a.createdAt),
+    createdAt: toNum(a.createdAt), 
     telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
   })),
   alertLogs: (data?.alertLogs ?? []).map((l) => ({
     id: toStr(l.id), alertId: toStr(l.alertId ?? ''), symbol: toStr(l.symbol),
@@ -130,7 +147,9 @@ const normalizeSyncPayload = (data: RawServerPayload): SyncPayload => ({
     active: a.active !== false, triggered: Boolean(a.triggered),
     triggeredAt: toOptNum(a.triggeredAt),
     message: typeof a.message === 'string' ? a.message : undefined,
-    createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+    createdAt: toNum(a.createdAt), 
+    telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
   })),
   indicatorThresholdAlerts: (data?.indicatorThresholdAlerts ?? []).map((a) => ({
     id: toStr(a.id), symbol: toStr(a.symbol), timeframe: a.timeframe as Timeframe,
@@ -139,7 +158,9 @@ const normalizeSyncPayload = (data: RawServerPayload): SyncPayload => ({
     active: a.active !== false, triggered: Boolean(a.triggered),
     triggeredAt: toOptNum(a.triggeredAt),
     message: typeof a.message === 'string' ? a.message : undefined,
-    createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+    createdAt: toNum(a.createdAt), 
+    telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
   })),
   stochRSICrossAlerts: (data?.stochRSICrossAlerts ?? []).map((a) => ({
     id: toStr(a.id), symbol: toStr(a.symbol), timeframe: a.timeframe as Timeframe,
@@ -147,7 +168,9 @@ const normalizeSyncPayload = (data: RawServerPayload): SyncPayload => ({
     active: a.active !== false, triggered: Boolean(a.triggered),
     triggeredAt: toOptNum(a.triggeredAt),
     message: typeof a.message === 'string' ? a.message : undefined,
-    createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+    createdAt: toNum(a.createdAt), 
+    telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
   })),
   // pctDiffDonCrossAlerts: server returns [] (no DB table); we accept [] from server
   pctDiffDonCrossAlerts: (data?.pctDiffDonCrossAlerts ?? []).map((a) => ({
@@ -159,8 +182,55 @@ const normalizeSyncPayload = (data: RawServerPayload): SyncPayload => ({
     active: a.active !== false, triggered: Boolean(a.triggered),
     triggeredAt: toOptNum(a.triggeredAt),
     message: typeof a.message === 'string' ? a.message : undefined,
-    createdAt: toNum(a.createdAt), telegramEnabled: a.telegramEnabled !== false,
+    createdAt: toNum(a.createdAt), 
+    telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
   })),
+  smartMoneyAlerts: (data?.smartMoneyAlerts ?? []).map((a) => ({
+    id: toStr(a.id), symbol: toStr(a.symbol), timeframe: a.timeframe as Timeframe,
+    condition: a.condition as any,
+    active: a.active !== false, triggered: Boolean(a.triggered),
+    triggeredAt: toOptNum(a.triggeredAt),
+    lastFiredCandleTime: toOptNum(a.lastFiredCandleTime),
+    message: typeof a.message === 'string' ? a.message : undefined,
+    createdAt: toNum(a.createdAt), 
+    telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
+  })),
+  compoundAlerts: (data?.compoundAlerts ?? []).map((a) => ({
+    id: toStr(a.id), symbol: toStr(a.symbol), timeframe: a.timeframe as Timeframe,
+    conditions: typeof a.conditions === 'string' ? JSON.parse(a.conditions) : a.conditions,
+    active: a.active !== false, triggered: Boolean(a.triggered),
+    triggeredAt: toOptNum(a.triggeredAt),
+    message: typeof a.message === 'string' ? a.message : undefined,
+    createdAt: toNum(a.createdAt), 
+    telegramEnabled: a.telegramEnabled !== false,
+    whatsappEnabled: a.whatsappEnabled !== false,
+  })),
+
+
+  layouts: (data?.layouts ?? []).map((l) => ({
+    id: toStr(l.id),
+    name: toStr(l.name, 'Untitled Layout'),
+    createdAt: toNum(l.createdAt),
+    updatedAt: toNum(l.updatedAt),
+    snapshot: (l.snapshot as any) ?? {},
+  })),
+  trackerWatchlist: (data?.trackerWatchlist ?? []).map((w) => ({
+    symbol: toStr(w.symbol),
+    timeframe: w.timeframe as Timeframe,
+    strategy: (w.strategy as any) ?? {},
+  })),
+  trackerEntries: (data?.trackerEntries ?? []).map((e) => ({
+    ...e,
+    id: toStr(e.id),
+    symbol: toStr(e.symbol),
+    timeframe: e.timeframe as Timeframe,
+    strategy: (e.strategy as any) ?? {},
+    entryPrice: toNum(e.entryPrice),
+    entryTime: toNum(e.entryTime),
+    active: e.active !== false,
+  }) as TrackedEntry),
 });
 
 // Include X-Sync-Key header when VITE_SYNC_API_KEY is configured so it
@@ -172,11 +242,19 @@ const syncHeaders = (): Record<string, string> => {
 
 export async function pullState(): Promise<SyncPayload | null> {
   try {
-    const res = await fetch('/api/sync/state', {
-      headers: { Accept: 'application/json', ...syncHeaders() },
+    const res = await fetch(`/api/sync/state?t=${Date.now()}`, {
+      headers: { 
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+        ...syncHeaders() 
+      },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return normalizeSyncPayload(await res.json() as RawServerPayload);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+    }
+    const json = await res.json();
+    return normalizeSyncPayload(json as RawServerPayload);
   } catch (error) {
     console.warn('[Sync] Pull failed:', error instanceof Error ? error.message : String(error));
     return null;
@@ -189,14 +267,20 @@ export async function pushState(data: SyncPayload): Promise<boolean> {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...syncHeaders() },
       body: JSON.stringify(data),
+      keepalive: true, // Ensure request finishes even if page closes
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`[Sync] Push failed with HTTP ${res.status}: ${text.slice(0, 200)}`);
+      return false;
+    }
     return true;
   } catch (error) {
-    console.warn('[Sync] Push failed:', error instanceof Error ? error.message : String(error));
+    console.warn('[Sync] Push network error:', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
+
 
 export async function checkSyncHealth(): Promise<boolean> {
   try {
@@ -222,9 +306,19 @@ interface StoreStateForSync {
   indicatorThresholdAlerts: IndicatorThresholdAlert[];
   stochRSICrossAlerts: StochRSICrossAlert[];
   pctDiffDonCrossAlerts: PctDiffDonCrossAlert[];
+  smartMoneyAlerts: any[];
+  layouts: SavedChartLayout[];
+  compoundAlerts: any[];
+
+
 }
 
-export function extractSyncPayload(storeState: StoreStateForSync): SyncPayload {
+interface TrackerStoreStateForSync {
+  watchlist: TrackerSymbol[];
+  entries: TrackedEntry[];
+}
+
+export function extractSyncPayload(storeState: StoreStateForSync, trackerState: TrackerStoreStateForSync): SyncPayload {
   return {
     state: {
       symbol: storeState.symbol,
@@ -242,5 +336,12 @@ export function extractSyncPayload(storeState: StoreStateForSync): SyncPayload {
     indicatorThresholdAlerts: storeState.indicatorThresholdAlerts || [],
     stochRSICrossAlerts: storeState.stochRSICrossAlerts || [],
     pctDiffDonCrossAlerts: storeState.pctDiffDonCrossAlerts || [],
+    smartMoneyAlerts: (storeState as any).smartMoneyAlerts || [],
+    layouts: storeState.layouts || [],
+    compoundAlerts: (storeState as any).compoundAlerts || [],
+
+    trackerWatchlist: trackerState.watchlist || [],
+    trackerEntries: trackerState.entries || [],
   };
 }
+

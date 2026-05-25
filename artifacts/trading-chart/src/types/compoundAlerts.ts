@@ -18,6 +18,7 @@ export interface CompoundAlert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
 }
 
 export interface AlertTemplate {

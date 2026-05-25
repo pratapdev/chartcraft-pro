@@ -1,4 +1,4 @@
-import { Candle, Timeframe } from '@/types/trading';
+import { Candle, Timeframe, MarketType } from '@/types/trading';
 import { fetchCandles, computeRSI, computeSMA, computeEMA, computeSupertrend, computeMACD as computeMACDFull, computeADX, computeStochRSI, computeBollingerBands, computeVWAP } from './marketData';
 
 export interface ScreenerRow {
@@ -34,6 +34,7 @@ export interface ScreenerRow {
 
 export interface ScreenerFilters {
   timeframe?: Timeframe;
+  marketType?: MarketType;
   // Price & Volume
   minPrice?: number;
   maxPrice?: number;
@@ -154,18 +155,64 @@ function last<T>(arr: { time: number; value: T }[]): T | null {
   return arr.length > 0 ? arr[arr.length - 1].value : null;
 }
 
-export async function fetchScreenerData(timeframe: Timeframe = '1D'): Promise<ScreenerRow[]> {
+import { FOREX_SYMBOLS } from './forexSymbols';
+import { INDIAN_STOCKS } from './upstoxData';
+
+export async function fetchScreenerData(timeframe: Timeframe = '1D', marketType: MarketType = 'crypto'): Promise<ScreenerRow[]> {
   const results: ScreenerRow[] = [];
+  const symbolList = marketType === 'crypto' ? CRYPTO_SYMBOLS 
+                   : marketType === 'indian' ? INDIAN_STOCKS.map(s => s.name)
+                   : FOREX_SYMBOLS;
 
   // Fetch all in parallel
-  const promises = CRYPTO_SYMBOLS.map(async (symbol) => {
+  const promises = symbolList.map(async (symbol) => {
     try {
       const binanceSymbol = symbol.replace('/', '').replace('USD', 'USDT');
-      const [candles, ticker24h] = await Promise.all([
+      const [candles, ticker24hRes] = await Promise.all([
         fetchCandles(symbol, timeframe, 200),
-        fetch24hTicker(binanceSymbol),
+        marketType === 'crypto' ? fetch24hTicker(binanceSymbol) : Promise.resolve(null),
       ]);
-      if (!candles || candles.length === 0 || !ticker24h) return null;
+      
+      if (!candles || candles.length === 0) return null;
+
+      let ticker24h = ticker24hRes;
+      
+      // Fallback for forex or if binance ticker fails: calculate from candles
+      if (!ticker24h) {
+          const lastPrice = candles[candles.length - 1].close;
+          
+          // Try to find candle from ~24h ago
+          const now = candles[candles.length - 1].time;
+          const ago24h = now - 86400;
+          let oldPrice = candles[0].close; // default to oldest
+          
+          for (let i = candles.length - 1; i >= 0; i--) {
+              if (candles[i].time <= ago24h) {
+                  oldPrice = candles[i].close;
+                  break;
+              }
+          }
+          
+          const priceChangePercent = ((lastPrice - oldPrice) / oldPrice) * 100;
+          let quoteVolume = 0;
+          
+          // Estimate 24h volume
+          for (let i = candles.length - 1; i >= 0; i--) {
+              if (candles[i].time > ago24h) {
+                  quoteVolume += candles[i].volume;
+              } else {
+                  break;
+              }
+          }
+
+          ticker24h = {
+              priceChangePercent,
+              lastPrice,
+              quoteVolume,
+          };
+      }
+
+      if (!ticker24h) return null; // Should never happen now
 
       const rsiData = computeRSI(candles, 14);
       const rsi = last(rsiData);

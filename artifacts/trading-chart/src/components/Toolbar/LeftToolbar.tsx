@@ -19,6 +19,7 @@ import {
   BarChart,
   Zap,
   Layers,
+  Square,
 } from 'lucide-react';
 import { HTFControls } from '@/components/Chart/HTFControls';
 
@@ -40,6 +41,7 @@ export const LeftToolbar: React.FC = () => {
     addIndicator,
     trendlines,
     fibonacciDrawings,
+    rectangleDrawings,
     clearAllDrawings,
     clearAllIndicators,
   } = useChartStore();
@@ -54,6 +56,7 @@ export const LeftToolbar: React.FC = () => {
     { id: 'trendline', icon: <TrendingUp size={18} />, label: 'Trendline' },
     { id: 'horizontal', icon: <Minus size={18} />, label: 'Horizontal Line' },
     { id: 'vertical', icon: <SeparatorVertical size={18} />, label: 'Vertical Line' },
+    { id: 'rectangle', icon: <Square size={18} />, label: 'Rectangle' },
     { id: 'fibonacci', icon: <GitFork size={18} />, label: 'Fibonacci Retracement' },
     { id: 'riskreward', icon: <Target size={18} />, label: 'Risk/Reward' },
     { id: 'measure', icon: <Ruler size={18} />, label: 'Measure' },
@@ -130,7 +133,7 @@ export const LeftToolbar: React.FC = () => {
   const hasPivotHL = indicators.some((i) => i.type === 'PIVOT_HL' && i.visible);
   const hasVPVR = indicators.some((i) => i.type === 'VPVR' && i.visible);
   const hasImbalance = indicators.some((i) => i.type === 'IMBALANCE' && i.visible);
-  const hasDrawings = trendlines.length > 0 || fibonacciDrawings.length > 0;
+  const hasDrawings = trendlines.length > 0 || fibonacciDrawings.length > 0 || rectangleDrawings.length > 0;
   const hasIndicators = indicators.length > 0;
 
   const actions: ToolButton[] = [

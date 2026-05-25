@@ -9,7 +9,7 @@ export interface Candle {
 
 export type Timeframe = '1m' | '3m' | '5m' | '15m' | '1h' | '4h' | '1D' | '1W';
 
-export type MarketType = 'crypto' | 'indian';
+export type MarketType = 'crypto' | 'indian' | 'forex';
 
 export type LineStyleType = 'solid' | 'dashed' | 'dotted';
 
@@ -27,7 +27,22 @@ export interface Trendline {
   createdAt: number;
 }
 
-export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'vertical' | 'ray' | 'measure' | 'fibonacci' | 'riskreward';
+export type DrawingTool = 'cursor' | 'trendline' | 'horizontal' | 'vertical' | 'ray' | 'measure' | 'fibonacci' | 'riskreward' | 'rectangle';
+
+export interface RectangleDrawing {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  startTime: number;
+  startPrice: number;
+  endTime: number;
+  endPrice: number;
+  color: string;
+  fillColor: string;
+  thickness: number;
+  lineStyle?: LineStyleType;
+  createdAt: number;
+}
 
 export interface RiskRewardDrawing {
   id: string;
@@ -66,8 +81,26 @@ export interface Alert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
+
 }
 
+export type RectangleAlertCondition = 'touches_box';
+
+export interface RectangleAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  rectangleId: string;
+  condition: RectangleAlertCondition;
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
+}
 export interface IndicatorCrossAlert {
   id: string;
   symbol: string;
@@ -81,6 +114,8 @@ export interface IndicatorCrossAlert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
+
 }
 
 export interface IndicatorThresholdAlert {
@@ -99,6 +134,7 @@ export interface IndicatorThresholdAlert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
 }
 
 export interface StochRSICrossAlert {
@@ -114,9 +150,34 @@ export interface StochRSICrossAlert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
 }
 
 export type PctDiffDonLine = 'main' | 'ema' | 'basis' | 'upper' | 'lower' | 'upperNew' | 'lowerNew';
+
+export type PctDiffStrategy =
+  | 'fail_first'
+  | 'squeeze_breakout'
+  | 'momentum_divergence'
+  | 'regime_mean_reversion'
+  | 'inner_band_warning';
+
+export interface PctDiffStrategyAlert {
+  id: string;
+  symbol: string;
+  timeframe: Timeframe;
+  indicatorId: string;
+  strategy: PctDiffStrategy;
+  direction: 'long' | 'short' | 'both';
+  active: boolean;
+  triggered: boolean;
+  triggeredAt?: number;
+  lastFiredCandleTime?: number;
+  message?: string;
+  createdAt: number;
+  telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
+}
 
 export interface PctDiffDonCrossAlert {
   id: string;
@@ -132,6 +193,7 @@ export interface PctDiffDonCrossAlert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
 }
 
 export interface AlertLog {
@@ -146,6 +208,8 @@ export interface AlertLog {
 export type SmartMoneyAlertCondition =
   | 'fvg_bull_entry'
   | 'fvg_bear_entry'
+  | 'supply_zone_entry'
+  | 'demand_zone_entry'
   | 'bos_cross'
   | 'choch_cross'
   | 'liquidity_sweep';
@@ -155,6 +219,7 @@ export interface SmartMoneyAlert {
   symbol: string;
   timeframe: Timeframe;
   condition: SmartMoneyAlertCondition;
+  zoneIndex?: 'any' | 1 | 2 | 3;
   active: boolean;
   triggered: boolean;
   triggeredAt?: number;
@@ -162,6 +227,8 @@ export interface SmartMoneyAlert {
   message?: string;
   createdAt: number;
   telegramEnabled?: boolean;
+  whatsappEnabled?: boolean;
+
 }
 
 export type IndicatorType = 'EMA' | 'SMA' | 'RSI' | 'STOCH_RSI' | 'MACD' | 'BBANDS' | 'VWAP' | 'SUPERTREND' | 'ADX' | 'ATR' | 'OBV' | 'PIVOT_HL' | 'PCT_DIFF_DON' | 'MSB_OB' | 'VPVR' | 'SESSION_VPVR' | 'COMPOSITE_VPVR' | 'NAKED_LEVELS' | 'IMBALANCE' | 'FVG' | 'MARKET_STRUCTURE' | 'PATTERN' | 'ANCHORED_VWAP' | 'SESSION_VWAP' | 'SUPPLY_DEMAND' | 'DELTA_DIV' | 'LIQUIDATIONS' | 'ABSORPTION';

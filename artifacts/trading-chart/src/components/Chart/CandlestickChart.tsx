@@ -16,6 +16,7 @@ import { useChartSync } from './ChartSyncContext';
 import { useIndicatorRenderer } from './useIndicatorRenderer';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
+import { RectangleToolbar } from './RectangleToolbar';
 import { CrosshairLegend } from './CrosshairLegend';
 import { VPVROverlay } from './VPVROverlay';
 import { SessionProfileOverlay } from './SessionProfileOverlay';
@@ -41,9 +42,9 @@ export const CandlestickChart: React.FC = () => {
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const { candles, indicators, chartFontSize, timezone, loadCandles, startLiveUpdates, stopLiveUpdates } = useChartStore();
+  const { candles, indicators, chartFontSize, timezone, loadCandles, startLiveUpdates, stopLiveUpdates, hideAllDrawings, hideAllIndicators, clearAllDrawings, clearAllIndicators } = useChartStore();
 
-  const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, indicators);
+  const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, hideAllIndicators ? [] : indicators);
 
   useEffect(() => {
     loadCandles().then(() => startLiveUpdates());
@@ -334,20 +335,29 @@ export const CandlestickChart: React.FC = () => {
     <div className="relative w-full h-full" onContextMenu={handleContextMenu} onClick={() => setContextMenu(null)}>
       <div ref={containerRef} id="chart-screenshot-source" className="w-full h-full" />
       <CrosshairLegend />
-      <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <SessionProfileOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <CompositeVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <NakedLevelsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <SmartMoneyOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <LiquidationsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <AbsorptionOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <AnchoredVWAPOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <PatternOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <HTFOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
-      <RiskRewardToolbar />
+      {!hideAllIndicators && (
+        <>
+          <VPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <SessionProfileOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <CompositeVPVROverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <NakedLevelsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <ImbalanceOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <SmartMoneyOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <LiquidationsOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <AbsorptionOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <AnchoredVWAPOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <PatternOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <HTFOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+        </>
+      )}
+      {!hideAllDrawings && (
+        <>
+          <DrawingOverlay chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <RectangleToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />
+          <RiskRewardToolbar />
+        </>
+      )}
       {contextMenu && (
         <div
           className="fixed z-[100] min-w-[160px] rounded-md border border-border bg-popover p-1 shadow-md"
@@ -369,6 +379,25 @@ export const CandlestickChart: React.FC = () => {
             }}
           >
             Go to Latest
+          </button>
+          <div className="my-1 h-px bg-border" />
+          <button
+            className="flex w-full items-center rounded-sm px-3 py-1.5 text-xs text-popover-foreground hover:bg-destructive/20 hover:text-destructive transition-colors"
+            onClick={() => {
+              clearAllDrawings();
+              setContextMenu(null);
+            }}
+          >
+            Delete All Drawings
+          </button>
+          <button
+            className="flex w-full items-center rounded-sm px-3 py-1.5 text-xs text-popover-foreground hover:bg-destructive/20 hover:text-destructive transition-colors"
+            onClick={() => {
+              clearAllIndicators();
+              setContextMenu(null);
+            }}
+          >
+            Delete All Indicators
           </button>
         </div>
       )}

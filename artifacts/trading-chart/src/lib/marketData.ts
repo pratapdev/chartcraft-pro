@@ -31,7 +31,10 @@ const INTERVAL_MAP: Record<Timeframe, string> = {
   '1W': '1w',
 };
 
-export async function fetchCandles(
+import { FOREX_SYMBOLS } from './forexSymbols';
+import { fetchTwelveDataCandles, subscribeToTwelveData } from './twelveData';
+
+async function fetchBinanceCandles(
   symbol: string,
   timeframe: Timeframe,
   limit: number = 500
@@ -60,8 +63,7 @@ export async function fetchCandles(
   }
 }
 
-// WebSocket for live candle updates
-export function subscribeToCandles(
+function subscribeToBinanceCandles(
   symbol: string,
   timeframe: Timeframe,
   onUpdate: (candle: Candle) => void
@@ -113,6 +115,49 @@ export function subscribeToCandles(
     clearTimeout(reconnectTimeout);
     ws?.close();
   };
+}
+
+import { INDIAN_STOCKS, fetchUpstoxCandles } from './upstoxData';
+
+export async function fetchCandles(
+  symbol: string,
+  timeframe: Timeframe,
+  limit: number = 500
+): Promise<Candle[]> {
+  if (FOREX_SYMBOLS.includes(symbol)) {
+    return fetchTwelveDataCandles(symbol, timeframe, limit);
+  }
+  const indianStock = INDIAN_STOCKS.find((s) => s.name === symbol);
+  if (indianStock) {
+    return fetchUpstoxCandles(indianStock.instrumentKey, timeframe, limit);
+  }
+  return fetchBinanceCandles(symbol, timeframe, limit);
+}
+
+export function subscribeToCandles(
+  symbol: string,
+  timeframe: Timeframe,
+  onUpdate: (candle: Candle) => void
+): () => void {
+  if (FOREX_SYMBOLS.includes(symbol)) {
+    return subscribeToTwelveData(symbol, timeframe, onUpdate);
+  }
+  const indianStock = INDIAN_STOCKS.find((s) => s.name === symbol);
+  if (indianStock) {
+    // Polling fallback since Upstox WebSockets are not implemented yet
+    const intervalId = setInterval(async () => {
+      try {
+        const candles = await fetchUpstoxCandles(indianStock.instrumentKey, timeframe, 2);
+        if (candles && candles.length > 0) {
+          onUpdate(candles[candles.length - 1]);
+        }
+      } catch (err) {
+        console.error('Polling error for Upstox:', err);
+      }
+    }, 15000); // Poll every 15 seconds
+    return () => clearInterval(intervalId);
+  }
+  return subscribeToBinanceCandles(symbol, timeframe, onUpdate);
 }
 
 // Fallback data generator
@@ -763,6 +808,9 @@ export function computeMsbOb(candles: Candle[], zigzagLen: number, fibFactor: nu
   for (const p of allPoints) {
     if (zigzag.length === 0) { zigzag.push(p); continue; }
     const last = zigzag[zigzag.length - 1];
+
+    if (last.index === p.index) continue; // Ensure unique index (time) for lightweight-charts
+
     if (last.type === p.type) {
       if (p.type === 'high' && p.price > last.price) zigzag[zigzag.length - 1] = p;
       if (p.type === 'low' && p.price < last.price) zigzag[zigzag.length - 1] = p;

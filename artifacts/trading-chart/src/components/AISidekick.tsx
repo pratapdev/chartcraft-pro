@@ -24,6 +24,10 @@ async function streamChat(
   message: string,
   context: object,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  provider: string,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (err: string) => void,
@@ -32,7 +36,7 @@ async function streamChat(
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, context, history }),
+    body: JSON.stringify({ message, context, history, provider, apiKey, model, baseUrl }),
   });
 
   if (!response.ok || !response.body) {
@@ -69,7 +73,7 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { symbol, timeframe, indicators, candles, marketType } = useChartStore();
+  const { symbol, timeframe, indicators, candles, marketType, aiProvider, aiApiKey, aiModel, aiBaseUrl } = useChartStore();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -114,6 +118,10 @@ export const AISidekick: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         text.trim(),
         ctx,
         history,
+        aiProvider,
+        aiApiKey,
+        aiModel,
+        aiBaseUrl,
         (chunk) => {
           setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + chunk } : m));
         },

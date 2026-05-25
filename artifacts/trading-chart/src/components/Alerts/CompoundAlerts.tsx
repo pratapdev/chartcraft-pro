@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
 import { AlertConditionRule, CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
-import { Plus, Trash2, Save, BookTemplate } from 'lucide-react';
+import { Plus, Trash2, Save, BookTemplate, Send, MessageSquare } from 'lucide-react';
+
 import { Timeframe } from '@/types/trading';
 
 const CONDITION_TYPES = [
@@ -18,7 +19,11 @@ const needsPeriod = (type: string) => type.startsWith('rsi') || type.startsWith(
 export const CompoundAlertForm: React.FC = () => {
   const { symbol, timeframe, addCompoundAlert } = useChartStore();
   const [conditions, setConditions] = useState<AlertConditionRule[]>([]);
+
   const [expanded, setExpanded] = useState(false);
+  const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
+
 
   const addCondition = () => {
     setConditions([...conditions, { type: 'price_above', value: 0, period: 14 }]);
@@ -42,7 +47,10 @@ export const CompoundAlertForm: React.FC = () => {
       active: true,
       triggered: false,
       createdAt: Date.now(),
+      telegramEnabled,
+      whatsappEnabled,
       message: conditions.map(c => `${c.type.replace('_', ' ')} ${c.value}${c.period ? ` (${c.period})` : ''}`).join(' AND '),
+
     };
     addCompoundAlert(alert);
     setConditions([]);
@@ -106,6 +114,30 @@ export const CompoundAlertForm: React.FC = () => {
         </button>
       </div>
 
+      <div className="flex items-center gap-3 pt-1">
+        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+          <Send size={9} className={telegramEnabled ? 'text-primary' : 'text-muted-foreground'} />
+          <input
+            type="checkbox"
+            checked={telegramEnabled}
+            onChange={(e) => setTelegramEnabled(e.target.checked)}
+            className="w-3 h-3 accent-primary"
+          />
+          TG
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+          <MessageSquare size={9} className={whatsappEnabled ? 'text-primary' : 'text-muted-foreground'} />
+          <input
+            type="checkbox"
+            checked={whatsappEnabled}
+            onChange={(e) => setWhatsappEnabled(e.target.checked)}
+            className="w-3 h-3 accent-primary"
+          />
+          WA
+        </label>
+      </div>
+
+
       <div className="flex gap-1.5 pt-1">
         <button
           onClick={handleCreate}
@@ -136,10 +168,32 @@ export const CompoundAlertsList: React.FC = () => {
       {active.map(alert => (
         <div key={alert.id} className="panel-section rounded p-2 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-foreground font-medium">{alert.symbol} · {alert.timeframe}</span>
-            <button onClick={() => removeCompoundAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
-              <Trash2 size={10} />
-            </button>
+            <span className="text-foreground font-medium">
+              {alert.symbol} · {alert.timeframe} · {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => useChartStore.getState().updateCompoundAlert(alert.id, { telegramEnabled: !(alert.telegramEnabled ?? true) })}
+                className={`transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+              >
+                <Send size={10} />
+              </button>
+
+              <button
+                onClick={() => useChartStore.getState().updateCompoundAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                className={`transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+              >
+                <MessageSquare size={10} />
+              </button>
+
+              <button onClick={() => removeCompoundAlert(alert.id)} className="text-muted-foreground hover:text-destructive">
+                <Trash2 size={10} />
+              </button>
+            </div>
+
           </div>
           <div className="text-muted-foreground mt-0.5 leading-relaxed">
             {alert.conditions.map((c, i) => (

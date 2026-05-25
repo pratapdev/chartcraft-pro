@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useChartStore } from '@/stores/chartStore';
-import { Timeframe } from '@/types/trading';
+import { Timeframe, MarketType } from '@/types/trading';
 import { ScreenerHeatmap } from '@/components/Screener/ScreenerHeatmap';
 import { MultiTimeframePanel } from '@/components/Screener/MultiTimeframePanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -230,7 +230,7 @@ export const Screener: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  const [filters, setFilters] = useState<ScreenerFilters>({ timeframe: '1D' });
+  const [filters, setFilters] = useState<ScreenerFilters>({ timeframe: '1D', marketType: 'crypto' });
   const [customFormula, setCustomFormula] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
 
@@ -340,7 +340,7 @@ export const Screener: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const result = await fetchScreenerData(filters.timeframe || '1D');
+      const result = await fetchScreenerData(filters.timeframe || '1D', filters.marketType || 'crypto');
       setData(result);
     } catch (err) {
       console.error('Failed to load screener data:', err);
@@ -351,7 +351,7 @@ export const Screener: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [filters.timeframe]);
+  }, [filters.timeframe, filters.marketType]);
 
   useEffect(() => {
     let result = applyFilters(data, filters);
@@ -421,13 +421,25 @@ export const Screener: React.FC = () => {
     <div className="flex flex-col h-screen bg-background">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Advanced Crypto Screener</h1>
+          <h1 className="text-xl font-semibold text-foreground">Advanced {filters.marketType === 'forex' ? 'Forex' : 'Crypto'} Screener</h1>
           <p className="text-xs text-muted-foreground">
             {filteredData.length} of {data.length} symbols • {filters.timeframe || '1D'} timeframe
             {showFavoritesOnly && ` • ★ Favorites only`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Market Type Toggle */}
+          <Select value={filters.marketType || 'crypto'} onValueChange={(val) => setFilters({ ...filters, marketType: val as MarketType })}>
+            <SelectTrigger className="w-[140px] h-8 text-xs bg-background border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="crypto">Crypto</SelectItem>
+              <SelectItem value="indian">Indian Stocks</SelectItem>
+              <SelectItem value="forex">Forex / Metals</SelectItem>
+            </SelectContent>
+          </Select>
+
           {/* View Mode Toggle */}
           <TooltipProvider>
             <div className="flex items-center border border-border rounded-md overflow-hidden">

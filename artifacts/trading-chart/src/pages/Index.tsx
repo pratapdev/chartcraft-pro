@@ -23,6 +23,8 @@ const Index: React.FC = () => {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <TopBar aiOpen={aiOpen} onToggleAI={() => setAiOpen(v => !v)} />
+
+
       <div className="flex flex-1 min-h-0">
         <LeftToolbar />
         <ResizablePanelGroup direction="horizontal" className="flex-1">

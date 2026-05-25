@@ -5,20 +5,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import { Screener } from "./pages/Screener";
+import { PctScreener } from "./pages/PctScreener";
 import { Tracker } from "./pages/Tracker";
 import NotFound from "./pages/NotFound";
+
+import { SyncManager } from "./components/SyncManager";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <SyncManager />
       <Toaster />
       <Sonner />
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/screener" element={<Screener />} />
+          <Route path="/pct_screener" element={<PctScreener />} />
           <Route path="/tracker" element={<Tracker />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
@@ -27,5 +32,6 @@ const App = () => (
     </TooltipProvider>
   </QueryClientProvider>
 );
+
 
 export default App;

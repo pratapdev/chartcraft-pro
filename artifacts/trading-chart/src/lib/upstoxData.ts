@@ -34,12 +34,12 @@ export const INDIAN_STOCKS: IndianStock[] = [
   { name: 'LT', label: 'Larsen & Toubro', instrumentKey: 'NSE_EQ|INE018A01030' },
 ];
 
-// Map timeframes to Upstox intervals
+// Map timeframes to valid Upstox intervals (1minute, 30minute, day, week, month)
 const UPSTOX_INTERVAL_MAP: Record<string, string> = {
   '1m': '1minute',
-  '3m': '1minute', // Upstox doesn't have 3m, use 1min
-  '5m': '5minute',
-  '15m': '15minute',
+  '3m': '1minute', 
+  '5m': '1minute',
+  '15m': '1minute',
   '1h': '30minute',
   '4h': '30minute',
   '1D': 'day',
@@ -48,6 +48,36 @@ const UPSTOX_INTERVAL_MAP: Record<string, string> = {
 
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
+}
+
+function aggregateCandles(candles: Candle[], timeframeStr: Timeframe): Candle[] {
+  const TF_SECONDS: Record<string, number> = {
+    '1m': 60, '3m': 180, '5m': 300, '15m': 900,
+    '1h': 3600, '4h': 14400, '1D': 86400, '1W': 604800,
+  };
+  const tfSec = TF_SECONDS[timeframeStr];
+  if (!tfSec) return candles;
+
+  const aggregated: Candle[] = [];
+  let currentBucket: Candle | null = null;
+
+  for (const c of candles) {
+    const bucketTime = Math.floor(c.time / tfSec) * tfSec;
+    if (!currentBucket) {
+      currentBucket = { ...c, time: bucketTime };
+    } else if (bucketTime === currentBucket.time) {
+      currentBucket.high = Math.max(currentBucket.high, c.high);
+      currentBucket.low = Math.min(currentBucket.low, c.low);
+      currentBucket.close = c.close;
+      currentBucket.volume += c.volume;
+    } else {
+      aggregated.push(currentBucket);
+      currentBucket = { ...c, time: bucketTime };
+    }
+  }
+  if (currentBucket) aggregated.push(currentBucket);
+  
+  return aggregated;
 }
 
 export async function fetchUpstoxCandles(
@@ -62,6 +92,7 @@ export async function fetchUpstoxCandles(
   // Calculate from date based on timeframe and limit
   switch (timeframe) {
     case '1m': fromDate.setHours(fromDate.getHours() - Math.ceil(limit / 60)); break;
+    case '3m': fromDate.setHours(fromDate.getHours() - Math.ceil(limit * 3 / 60)); break;
     case '5m': fromDate.setHours(fromDate.getHours() - Math.ceil(limit * 5 / 60)); break;
     case '15m': fromDate.setDate(fromDate.getDate() - Math.ceil(limit * 15 / 1440)); break;
     case '1h': fromDate.setDate(fromDate.getDate() - Math.ceil(limit / 24)); break;
@@ -79,6 +110,7 @@ export async function fetchUpstoxCandles(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Api-Version': '2.0'
     };
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -86,7 +118,10 @@ export async function fetchUpstoxCandles(
 
     const res = await fetch(url, { headers });
 
-    if (!res.ok) throw new Error(`Upstox API error: ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`Upstox API error: ${res.status} - ${errBody}`);
+    }
     const json = await res.json();
 
     if (json.status !== 'success' || !json.data?.candles) {
@@ -106,7 +141,11 @@ export async function fetchUpstoxCandles(
       }))
       .reverse();
 
-    return candles;
+    if (['3m', '5m', '15m', '1h', '4h'].includes(timeframe)) {
+      return aggregateCandles(candles, timeframe).slice(-limit);
+    }
+
+    return candles.slice(-limit);
   } catch (err) {
     console.error('Failed to fetch from Upstox:', err);
     return [];

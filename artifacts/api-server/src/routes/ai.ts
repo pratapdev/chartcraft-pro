@@ -135,6 +135,7 @@ async function streamWithFetch(params: {
             role: m.role === "system" ? "user" : m.role,
             content: m.role === "system" ? `System instructions:\n${m.content}` : m.content,
           })),
+          stream: true,
         }
       : {
           model,
@@ -142,13 +143,25 @@ async function streamWithFetch(params: {
           stream: true,
         };
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (apiKey) {
+    if (provider === "anthropic") {
+      headers["x-api-key"] = apiKey;
+    } else {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+  }
+
+  if (provider === "anthropic") {
+    headers["anthropic-version"] = "2023-06-01";
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-      ...(provider === "anthropic" ? { "anthropic-version": "2023-06-01" } : {}),
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -234,11 +247,12 @@ router.post("/ai/chat", async (req: Request<object, object, AIChatBody>, res: Re
             if (payload === "[DONE]") continue;
             try {
               const parsed = JSON.parse(payload);
-              const content =
-                parsed?.choices?.[0]?.delta?.content ||
-                parsed?.content?.[0]?.text ||
-                parsed?.content ||
-                "";
+              let content = "";
+              if (parsed?.choices?.[0]?.delta?.content) content = parsed.choices[0].delta.content;
+              else if (parsed?.delta?.text) content = parsed.delta.text;
+              else if (parsed?.content?.[0]?.text) content = parsed.content[0].text;
+              else if (typeof parsed?.content === "string") content = parsed.content;
+              
               if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
             } catch {}
           }

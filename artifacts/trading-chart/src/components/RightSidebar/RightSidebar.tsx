@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
+import { useTrackerStore } from '@/stores/trackerStore';
 import {
-  X, Trash2, Eye, EyeOff, Plus, Bell, Send, ArrowRightLeft,
-  RefreshCw, CloudOff, Cloud, TrendingUp, BarChart2, Settings, Zap,
+  X, Trash2, Eye, EyeOff, Plus, Bell, Send, ArrowRightLeft, PenTool,
+  RefreshCw, CloudOff, Cloud, TrendingUp, BarChart2, Settings, Zap, MessageSquare,
 } from 'lucide-react';
+
 import {
   IndicatorType, IndicatorConfig, AlertCondition, LineStyleType,
-  ThresholdCondition, PctDiffDonLine, MarketType, Timeframe,
+  ThresholdCondition, PctDiffDonLine, PctDiffStrategy, MarketType, Timeframe,
   SmartMoneyAlertCondition, SmartMoneyAlert,
 } from '@/types/trading';
 import { getTelegramCredentials, saveTelegramCredentials, testTelegramNotification } from '@/lib/telegram';
+import { getWhatsAppCredentials, saveWhatsAppCredentials, testWhatsAppNotification, WhatsAppProvider } from '@/lib/whatsapp';
+
 import { pushState, pullState, checkSyncHealth, extractSyncPayload } from '@/lib/syncService';
 import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/components/Alerts/CompoundAlerts';
 import { WatchlistPanel } from '@/components/Watchlist/WatchlistPanel';
@@ -42,39 +46,39 @@ const INDICATOR_PRESETS: {
     maxBodyAtr?: number;
   };
 }[] = [
-  // Trend
-  { type: 'EMA', label: 'EMA', description: 'Exponential Moving Average', group: 'Trend', defaults: { period: 20, color: '#2962FF' } },
-  { type: 'SMA', label: 'SMA', description: 'Simple Moving Average', group: 'Trend', defaults: { period: 20, color: '#FF6D00' } },
-  { type: 'VWAP', label: 'VWAP', description: 'Volume Weighted Average Price', group: 'Trend', defaults: { period: 1, color: '#9C27B0' } },
-  { type: 'SUPERTREND', label: 'Supertrend', description: 'ATR-based trend follower', group: 'Trend', defaults: { period: 10, color: '#22c55e', color2: '#ef4444', multiplier: 3 } },
-  { type: 'BBANDS', label: 'Bollinger Bands', description: 'Volatility bands', group: 'Trend', defaults: { period: 20, color: '#2962FF', stdDev: 2 } },
-  // Momentum
-  { type: 'RSI', label: 'RSI', description: 'Relative Strength Index', group: 'Momentum', defaults: { period: 14, color: '#9C27B0' } },
-  { type: 'STOCH_RSI', label: 'Stoch RSI', description: 'Stochastic RSI', group: 'Momentum', defaults: { period: 14, color: '#2962FF', color2: '#FF6D00', kPeriod: 3, dPeriod: 3 } },
-  { type: 'MACD', label: 'MACD', description: 'Moving Average Convergence Divergence', group: 'Momentum', defaults: { period: 12, color: '#2962FF' } },
-  { type: 'ADX', label: 'ADX', description: 'Average Directional Index', group: 'Momentum', defaults: { period: 14, color: '#FF6D00' } },
-  // Volatility / Other
-  { type: 'ATR', label: 'ATR', description: 'Average True Range', group: 'Volatility', defaults: { period: 14, color: '#6b7280' } },
-  { type: 'OBV', label: 'OBV', description: 'On-Balance Volume', group: 'Volatility', defaults: { period: 1, color: '#06b6d4' } },
-  { type: 'PIVOT_HL', label: 'Pivot H/L', description: 'Pivot highs and lows', group: 'Volatility', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
-  { type: 'PCT_DIFF_DON', label: 'PctDiff Don', description: 'Pct diff with Donchian', group: 'Volatility', defaults: { period: 20, color: '#06b6d4', lookbackWindow: 50, emaSmoothing: 9, donchianLength: 20, donLineDiff: 0.1 } },
-  { type: 'VPVR', label: 'VPVR', description: 'Volume Profile Visible Range', group: 'Volatility', defaults: { period: 1, color: '#6b7280' } },
-  { type: 'SESSION_VPVR', label: 'Session Volume Profile', description: 'Per-day volume profile drawn at the right edge of each session (POC highlighted)', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
-  { type: 'COMPOSITE_VPVR', label: 'Composite VPVR', description: 'Aggregated profile across ALL loaded candles with VAH/VAL/POC labels', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
-  { type: 'NAKED_LEVELS', label: 'Naked POC / VAH / VAL', description: 'Untouched per-session POC, VAH and VAL extended right until price tags them', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
-  { type: 'IMBALANCE', label: 'Volume Imbalance', description: 'Stacked volume imbalance zones', group: 'Volatility', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
-  // Smart Money
-  { type: 'MSB_OB', label: 'MSB + Order Blocks', description: 'Market Structure Break & Order Blocks (ZigZag)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', zigzagLength: 9, fibFactor: 0.33 } },
-  { type: 'FVG', label: 'Fair Value Gap', description: 'Bullish & bearish FVG / imbalance zones (3-candle)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', threshold: 0.1 } },
-  { type: 'MARKET_STRUCTURE', label: 'Market Structure', description: 'BOS, CHOCH & liquidity sweeps', group: 'Smart Money', defaults: { period: 5, color: '#22c55e' } },
-  { type: 'PATTERN', label: 'Pattern Detection', description: 'Auto-detect triangles, wedges & channels', group: 'Smart Money', defaults: { period: 5, color: '#facc15' } },
-  { type: 'ANCHORED_VWAP', label: 'Anchored VWAP', description: 'VWAP anchored to a specific bar with ±1σ/2σ bands', group: 'Smart Money', defaults: { period: 1, color: '#a855f7' } },
-  { type: 'SESSION_VWAP', label: 'Session VWAP', description: 'Daily-reset VWAP with standard deviation bands', group: 'Smart Money', defaults: { period: 1, color: '#f59e0b' } },
-  { type: 'SUPPLY_DEMAND', label: 'Supply & Demand', description: 'Auto supply (red) and demand (green) zone detection', group: 'Smart Money', defaults: { period: 5, color: '#f97316', threshold: 0.4 } },
-  { type: 'DELTA_DIV', label: 'Delta Divergence', description: 'Pivot-based price/delta divergence detector', group: 'Smart Money', defaults: { period: 1, color: '#FFD700' } },
-  { type: 'LIQUIDATIONS', label: 'Liquidations', description: 'Live Binance Futures liquidation bubbles (red=longs, green=shorts)', group: 'Volatility', defaults: { period: 1, color: '#ef4444', threshold: 10000 } },
-  { type: 'ABSORPTION', label: 'Iceberg / Absorption', description: 'Tags bars where heavy volume failed to move price (passive iceberg orders)', group: 'Smart Money', defaults: { period: 20, color: '#eab308', volMult: 2.5, maxBodyAtr: 0.35 } },
-];
+    // Trend
+    { type: 'EMA', label: 'EMA', description: 'Exponential Moving Average', group: 'Trend', defaults: { period: 20, color: '#2962FF' } },
+    { type: 'SMA', label: 'SMA', description: 'Simple Moving Average', group: 'Trend', defaults: { period: 20, color: '#FF6D00' } },
+    { type: 'VWAP', label: 'VWAP', description: 'Volume Weighted Average Price', group: 'Trend', defaults: { period: 1, color: '#9C27B0' } },
+    { type: 'SUPERTREND', label: 'Supertrend', description: 'ATR-based trend follower', group: 'Trend', defaults: { period: 10, color: '#22c55e', color2: '#ef4444', multiplier: 3 } },
+    { type: 'BBANDS', label: 'Bollinger Bands', description: 'Volatility bands', group: 'Trend', defaults: { period: 20, color: '#2962FF', stdDev: 2 } },
+    // Momentum
+    { type: 'RSI', label: 'RSI', description: 'Relative Strength Index', group: 'Momentum', defaults: { period: 14, color: '#9C27B0' } },
+    { type: 'STOCH_RSI', label: 'Stoch RSI', description: 'Stochastic RSI', group: 'Momentum', defaults: { period: 14, color: '#2962FF', color2: '#FF6D00', kPeriod: 3, dPeriod: 3 } },
+    { type: 'MACD', label: 'MACD', description: 'Moving Average Convergence Divergence', group: 'Momentum', defaults: { period: 12, color: '#2962FF' } },
+    { type: 'ADX', label: 'ADX', description: 'Average Directional Index', group: 'Momentum', defaults: { period: 14, color: '#FF6D00' } },
+    // Volatility / Other
+    { type: 'ATR', label: 'ATR', description: 'Average True Range', group: 'Volatility', defaults: { period: 14, color: '#6b7280' } },
+    { type: 'OBV', label: 'OBV', description: 'On-Balance Volume', group: 'Volatility', defaults: { period: 1, color: '#06b6d4' } },
+    { type: 'PIVOT_HL', label: 'Pivot H/L', description: 'Pivot highs and lows', group: 'Volatility', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
+    { type: 'PCT_DIFF_DON', label: 'PctDiff Don', description: 'Pct diff with Donchian', group: 'Volatility', defaults: { period: 20, color: '#06b6d4', lookbackWindow: 50, emaSmoothing: 9, donchianLength: 20, donLineDiff: 0.1 } },
+    { type: 'VPVR', label: 'VPVR', description: 'Volume Profile Visible Range', group: 'Volatility', defaults: { period: 1, color: '#6b7280' } },
+    { type: 'SESSION_VPVR', label: 'Session Volume Profile', description: 'Per-day volume profile drawn at the right edge of each session (POC highlighted)', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
+    { type: 'COMPOSITE_VPVR', label: 'Composite VPVR', description: 'Aggregated profile across ALL loaded candles with VAH/VAL/POC labels', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
+    { type: 'NAKED_LEVELS', label: 'Naked POC / VAH / VAL', description: 'Untouched per-session POC, VAH and VAL extended right until price tags them', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
+    { type: 'IMBALANCE', label: 'Volume Imbalance', description: 'Stacked volume imbalance zones', group: 'Volatility', defaults: { period: 1, color: '#0096FF', threshold: 3, minStack: 3 } },
+    // Smart Money
+    { type: 'MSB_OB', label: 'MSB + Order Blocks', description: 'Market Structure Break & Order Blocks (ZigZag)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', zigzagLength: 9, fibFactor: 0.33 } },
+    { type: 'FVG', label: 'Fair Value Gap', description: 'Bullish & bearish FVG / imbalance zones (3-candle)', group: 'Smart Money', defaults: { period: 1, color: '#22c55e', threshold: 0.1 } },
+    { type: 'MARKET_STRUCTURE', label: 'Market Structure', description: 'BOS, CHOCH & liquidity sweeps', group: 'Smart Money', defaults: { period: 5, color: '#22c55e' } },
+    { type: 'PATTERN', label: 'Pattern Detection', description: 'Auto-detect triangles, wedges & channels', group: 'Smart Money', defaults: { period: 5, color: '#facc15' } },
+    { type: 'ANCHORED_VWAP', label: 'Anchored VWAP', description: 'VWAP anchored to a specific bar with ±1σ/2σ bands', group: 'Smart Money', defaults: { period: 1, color: '#a855f7' } },
+    { type: 'SESSION_VWAP', label: 'Session VWAP', description: 'Daily-reset VWAP with standard deviation bands', group: 'Smart Money', defaults: { period: 1, color: '#f59e0b' } },
+    { type: 'SUPPLY_DEMAND', label: 'Supply & Demand', description: 'Auto supply (red) and demand (green) zone detection', group: 'Smart Money', defaults: { period: 5, color: '#f97316', threshold: 0.4 } },
+    { type: 'DELTA_DIV', label: 'Delta Divergence', description: 'Pivot-based price/delta divergence detector', group: 'Smart Money', defaults: { period: 1, color: '#FFD700' } },
+    { type: 'LIQUIDATIONS', label: 'Liquidations', description: 'Live Binance Futures liquidation bubbles (red=longs, green=shorts)', group: 'Volatility', defaults: { period: 1, color: '#ef4444', threshold: 10000 } },
+    { type: 'ABSORPTION', label: 'Iceberg / Absorption', description: 'Tags bars where heavy volume failed to move price (passive iceberg orders)', group: 'Smart Money', defaults: { period: 20, color: '#eab308', volMult: 2.5, maxBodyAtr: 0.35 } },
+  ];
 
 // Group presets
 const PRESET_GROUPS = ['Smart Money', 'Trend', 'Momentum', 'Volatility'];
@@ -154,6 +158,8 @@ const IndicatorThresholdAlertForm: React.FC = () => {
 const SMART_MONEY_CONDITIONS: { value: SmartMoneyAlertCondition; label: string; description: string }[] = [
   { value: 'fvg_bull_entry', label: 'Price enters Bull FVG', description: 'Fires when a candle touches an unmitigated bullish FVG zone' },
   { value: 'fvg_bear_entry', label: 'Price enters Bear FVG', description: 'Fires when a candle touches an unmitigated bearish FVG zone' },
+  { value: 'supply_zone_entry', label: 'Price enters Supply Zone', description: 'Fires when a candle touches an active Supply zone' },
+  { value: 'demand_zone_entry', label: 'Price enters Demand Zone', description: 'Fires when a candle touches an active Demand zone' },
   { value: 'bos_cross', label: 'BOS level crossed', description: 'Fires when price closes on the other side of a Break of Structure level' },
   { value: 'choch_cross', label: 'CHOCH level crossed', description: 'Fires when price closes on the other side of a Change of Character level' },
   { value: 'liquidity_sweep', label: 'Liquidity sweep detected', description: 'Fires when a candle wicks through a swing and closes back below/above it' },
@@ -163,7 +169,9 @@ const SmartMoneyAlertForm: React.FC = () => {
   const [open, setOpen] = useState(false);
   const { symbol, timeframe, smartMoneyAlerts, addSmartMoneyAlert, removeSmartMoneyAlert } = useChartStore();
   const [condition, setCondition] = useState<SmartMoneyAlertCondition>('fvg_bull_entry');
+  const [zoneIndex, setZoneIndex] = useState<'any' | 1 | 2 | 3>('any');
   const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
 
   const handleAdd = () => {
     const alert: SmartMoneyAlert = {
@@ -171,11 +179,14 @@ const SmartMoneyAlertForm: React.FC = () => {
       symbol,
       timeframe,
       condition,
+      zoneIndex,
       active: true,
       triggered: false,
       createdAt: Date.now(),
       telegramEnabled,
+      whatsappEnabled,
     };
+
     addSmartMoneyAlert(alert);
   };
 
@@ -209,19 +220,51 @@ const SmartMoneyAlertForm: React.FC = () => {
               {SMART_MONEY_CONDITIONS.find((c) => c.value === condition)?.description}
             </p>
           </div>
+
+          {(condition === 'supply_zone_entry' || condition === 'demand_zone_entry') && (
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-1">Target Zone</label>
+              <select
+                value={zoneIndex}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setZoneIndex(val === 'any' ? 'any' : parseInt(val) as 1 | 2 | 3);
+                }}
+                className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+              >
+                <option value="any">Any Active Zone</option>
+                <option value="1">1st Closest</option>
+                <option value="2">2nd Closest</option>
+                <option value="3">3rd Closest</option>
+              </select>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted-foreground">{symbol} · {timeframe}</span>
-            <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
-              <Send size={9} className={telegramEnabled ? 'text-primary' : 'text-muted-foreground'} />
-              <input
-                type="checkbox"
-                checked={telegramEnabled}
-                onChange={(e) => setTelegramEnabled(e.target.checked)}
-                className="w-3 h-3 accent-primary"
-              />
-              Telegram
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+                <Send size={9} className={telegramEnabled ? 'text-primary' : 'text-muted-foreground'} />
+                <input
+                  type="checkbox"
+                  checked={telegramEnabled}
+                  onChange={(e) => setTelegramEnabled(e.target.checked)}
+                  className="w-3 h-3 accent-primary"
+                />
+                TG
+              </label>
+              <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer">
+                <MessageSquare size={9} className={whatsappEnabled ? 'text-primary' : 'text-muted-foreground'} />
+                <input
+                  type="checkbox"
+                  checked={whatsappEnabled}
+                  onChange={(e) => setWhatsappEnabled(e.target.checked)}
+                  className="w-3 h-3 accent-primary"
+                />
+                WA
+              </label>
+            </div>
           </div>
+
           <button
             onClick={handleAdd}
             className="w-full py-1.5 rounded bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25 transition-colors text-xs font-medium border border-yellow-500/20"
@@ -236,7 +279,10 @@ const SmartMoneyAlertForm: React.FC = () => {
                     <span className="text-[10px] text-foreground truncate">
                       {SMART_MONEY_CONDITIONS.find((c) => c.value === a.condition)?.label}
                     </span>
-                    <span className="text-[9px] text-muted-foreground">{a.symbol} · {a.timeframe}</span>
+                    <span className="text-[9px] text-muted-foreground">
+                      {a.symbol} · {a.timeframe} · {new Date(a.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 ml-1">
                     {a.triggered && (
@@ -251,6 +297,16 @@ const SmartMoneyAlertForm: React.FC = () => {
                     >
                       <Send size={9} />
                     </button>
+                    <button
+                      onClick={() => {
+                        useChartStore.getState().updateSmartMoneyAlert(a.id, { whatsappEnabled: !(a.whatsappEnabled ?? true) });
+                      }}
+                      className={`transition-colors ${(a.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(a.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    >
+                      <MessageSquare size={9} />
+                    </button>
+
                     <button onClick={() => removeSmartMoneyAlert(a.id)} className="text-muted-foreground hover:text-destructive">
                       <Trash2 size={11} />
                     </button>
@@ -282,51 +338,117 @@ const PctDiffDonCrossAlertForm: React.FC = () => {
   );
 };
 
+const STRATEGY_LABELS: Record<PctDiffStrategy, string> = {
+  fail_first: 'Fail First',
+  squeeze_breakout: 'Squeeze Breakout',
+  momentum_divergence: 'Momentum Divergence',
+  regime_mean_reversion: 'Regime Mean Reversion',
+  inner_band_warning: 'Inner Band Warning',
+};
+
+const STRATEGY_DESCRIPTIONS: Record<PctDiffStrategy, string> = {
+  fail_first: 'Pullback fails near zero, trend resumes',
+  squeeze_breakout: 'Narrow Donchian channel breaks out',
+  momentum_divergence: 'Price vs %Diff divergence detected',
+  regime_mean_reversion: 'Zero-line regime + band touch signal',
+  inner_band_warning: 'Inner band early entry / profit / stop',
+};
+
+const PctDiffStrategyAlertForm: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const [strategy, setStrategy] = useState<PctDiffStrategy>('fail_first');
+  const [direction, setDirection] = useState<'long' | 'short' | 'both'>('both');
+  const symbol = useChartStore((s) => s.symbol);
+  const timeframe = useChartStore((s) => s.timeframe);
+  const indicators = useChartStore((s) => s.indicators);
+  const addAlert = useChartStore((s) => s.addPctDiffStrategyAlert);
+
+  const pctDiffIndicators = indicators.filter((i) => i.type === 'PCT_DIFF_DON');
+  const [selectedIndId, setSelectedIndId] = useState('');
+
+  const handleAdd = () => {
+    const indId = selectedIndId || pctDiffIndicators[0]?.id;
+    if (!indId) return;
+    addAlert({
+      id: crypto.randomUUID(),
+      symbol,
+      timeframe,
+      indicatorId: indId,
+      strategy,
+      direction,
+      active: true,
+      triggered: false,
+      createdAt: Date.now(),
+      telegramEnabled: true,
+      whatsappEnabled: true,
+    });
+  };
+
+  return (
+    <div className="panel-section rounded text-xs">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-2 py-1.5 text-left">
+        <span className="font-medium flex items-center gap-1.5"><Zap size={10} className="text-yellow-400" /> %Diff Strategy Alerts</span>
+        <span className="text-muted-foreground">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-2">
+          {pctDiffIndicators.length === 0 ? (
+            <div className="text-muted-foreground text-[10px]">Add a PctDiff Don indicator first.</div>
+          ) : (
+            <>
+              {pctDiffIndicators.length > 1 && (
+                <select value={selectedIndId || pctDiffIndicators[0]?.id} onChange={(e) => setSelectedIndId(e.target.value)}
+                  className="w-full bg-background border border-border rounded px-1.5 py-1 text-[10px]">
+                  {pctDiffIndicators.map((ind) => (
+                    <option key={ind.id} value={ind.id}>%Diff({ind.period},{ind.lookbackWindow ?? 10})</option>
+                  ))}
+                </select>
+              )}
+              <select value={strategy} onChange={(e) => setStrategy(e.target.value as PctDiffStrategy)}
+                className="w-full bg-background border border-border rounded px-1.5 py-1 text-[10px]">
+                {(Object.keys(STRATEGY_LABELS) as PctDiffStrategy[]).map((s) => (
+                  <option key={s} value={s}>{STRATEGY_LABELS[s]}</option>
+                ))}
+              </select>
+              <div className="text-muted-foreground text-[10px] leading-tight">{STRATEGY_DESCRIPTIONS[strategy]}</div>
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] text-muted-foreground">Direction:</label>
+                <select value={direction} onChange={(e) => setDirection(e.target.value as 'long' | 'short' | 'both')}
+                  className="flex-1 bg-background border border-border rounded px-1.5 py-1 text-[10px]">
+                  <option value="both">Both</option>
+                  <option value="long">Long Only</option>
+                  <option value="short">Short Only</option>
+                </select>
+              </div>
+              <button onClick={handleAdd} className="w-full bg-primary text-primary-foreground rounded py-1 text-[10px] hover:bg-primary/90 flex items-center justify-center gap-1">
+                <Plus size={10} /> Add {STRATEGY_LABELS[strategy]} Alert
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ============================================================
 // Sync controls
 // ============================================================
 
 const SyncControls: React.FC = () => {
-  const [status, setStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
+  const status = useChartStore(s => s.syncStatus);
+  const setStatus = useChartStore(s => s.setSyncStatus);
+  const lastResult = useChartStore(s => s.lastSyncResult);
+  const setLastResult = useChartStore(s => s.setLastSyncResult);
   const [syncing, setSyncing] = useState(false);
-  const [lastResult, setLastResult] = useState<string | null>(null);
-  const [autoSync, setAutoSync] = useState(() => localStorage.getItem('auto-sync') === 'true');
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('auto-sync', String(autoSync));
-    if (intervalRef.current) clearInterval(intervalRef.current);
-
-    if (autoSync) {
-      const doSync = async () => {
-        const ok = await checkSyncHealth();
-        if (ok) {
-          const payload = extractSyncPayload(useChartStore.getState());
-          const pushed = await pushState(payload);
-          setStatus('online');
-          setLastResult(pushed ? 'Auto-synced ✓' : 'Auto-sync failed ✗');
-        } else {
-          setStatus('offline');
-        }
-      };
-      doSync();
-      intervalRef.current = setInterval(doSync, 30_000);
-    }
-
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [autoSync]);
-
-  const handleCheckHealth = async () => {
-    setStatus('checking');
-    const ok = await checkSyncHealth();
-    setStatus(ok ? 'online' : 'offline');
-  };
+  const [autoSync, setAutoSync] = useState(() => localStorage.getItem('auto-sync') !== 'false');
 
   const handlePush = async () => {
     setSyncing(true);
     setLastResult(null);
-    const payload = extractSyncPayload(useChartStore.getState());
+    const payload = extractSyncPayload(useChartStore.getState(), useTrackerStore.getState());
     const ok = await pushState(payload);
+
     setLastResult(ok ? 'Pushed to server ✓' : 'Push failed ✗');
     setSyncing(false);
   };
@@ -354,10 +476,12 @@ const SyncControls: React.FC = () => {
         alerts: data.alerts,
         alertLogs: data.alertLogs,
         fibonacciDrawings: data.fibonacciDrawings,
+        riskRewardDrawings: data.riskRewardDrawings || [],
         indicatorCrossAlerts: data.indicatorCrossAlerts,
         indicatorThresholdAlerts: data.indicatorThresholdAlerts,
         stochRSICrossAlerts: data.stochRSICrossAlerts,
         pctDiffDonCrossAlerts: data.pctDiffDonCrossAlerts,
+        layouts: data.layouts,
       });
       setLastResult('Pulled from server ✓');
     } else {
@@ -365,6 +489,16 @@ const SyncControls: React.FC = () => {
     }
     setSyncing(false);
   };
+
+  const handleCheckHealth = async () => {
+    setStatus('checking');
+    const ok = await checkSyncHealth();
+    setStatus(ok ? 'online' : 'offline');
+  };
+
+  useEffect(() => {
+    localStorage.setItem('auto-sync', String(autoSync));
+  }, [autoSync]);
 
   return (
     <div className="space-y-2 text-xs">
@@ -383,6 +517,7 @@ const SyncControls: React.FC = () => {
           </button>
         </div>
       </div>
+
       <div className="flex gap-2">
         <button
           onClick={handlePush}
@@ -467,6 +602,235 @@ const TelegramSettings: React.FC = () => {
 };
 
 // ============================================================
+// WhatsApp settings panel
+// ============================================================
+const WhatsAppSettings: React.FC = () => {
+
+  const [provider, setProvider] = useState<WhatsAppProvider>('callmebot');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [greenId, setGreenId] = useState('');
+  const [greenToken, setGreenToken] = useState('');
+  const [ntfyTopic, setNtfyTopic] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    const creds = getWhatsAppCredentials();
+    if (creds) {
+      setProvider(creds.provider || 'callmebot');
+      setPhoneNumber(creds.phoneNumber || '');
+      setApiKey(creds.apiKey || '');
+      setGreenId(creds.greenApiIdInstance || '');
+      setGreenToken(creds.greenApiTokenInstance || '');
+      setNtfyTopic(creds.ntfyTopic || '');
+    }
+  }, []);
+
+  const handleSave = () => {
+    saveWhatsAppCredentials({
+      provider,
+      phoneNumber,
+      apiKey,
+      greenApiIdInstance: greenId,
+      greenApiTokenInstance: greenToken,
+      ntfyTopic,
+      enabled: true
+    });
+    setResult('Saved ✓');
+    setTimeout(() => setResult(null), 2000);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setResult(null);
+    saveWhatsAppCredentials({
+      provider,
+      phoneNumber,
+      apiKey,
+      greenApiIdInstance: greenId,
+      greenApiTokenInstance: greenToken,
+      ntfyTopic,
+      enabled: true
+    });
+    const ok = await testWhatsAppNotification();
+    setResult(ok ? 'Test sent ✓' : 'Failed ✗');
+    setTesting(false);
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-muted-foreground">Provider</label>
+        <select
+          value={provider}
+          onChange={(e) => setProvider(e.target.value as WhatsAppProvider)}
+          className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+        >
+          <option value="callmebot">CallMeBot (WhatsApp)</option>
+          <option value="greenapi">Green API (WhatsApp - Free Dev)</option>
+          <option value="whin">Whin (WhatsApp - RapidAPI)</option>
+          <option value="ntfy">Ntfy.sh (Fast / No-Signup / Push)</option>
+        </select>
+      </div>
+
+      {provider === 'callmebot' && (
+        <>
+          <p className="text-[9px] text-muted-foreground italic">Easiest but can be unstable. Get key from callmebot.com.</p>
+          <input
+            type="text"
+            placeholder="Phone Number (e.g. +91...)"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+          <input
+            type="text"
+            placeholder="API Key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+        </>
+      )}
+
+      {provider === 'greenapi' && (
+        <>
+          <p className="text-[9px] text-muted-foreground italic">Very stable. Scan QR on green-api.com console.</p>
+          <input
+            type="text"
+            placeholder="ID Instance (e.g. 1101...)"
+            value={greenId}
+            onChange={(e) => setGreenId(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+          <input
+            type="text"
+            placeholder="API Token"
+            value={greenToken}
+            onChange={(e) => setGreenToken(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+          <input
+            type="text"
+            placeholder="Recipient Phone (+91...)"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+        </>
+      )}
+
+      {provider === 'whin' && (
+        <>
+          <p className="text-[9px] text-muted-foreground italic">RapidAPI based. Register on whin.dev.</p>
+          <input
+            type="text"
+            placeholder="RapidAPI Key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+        </>
+      )}
+
+      {provider === 'ntfy' && (
+        <>
+          <p className="text-[9px] text-muted-foreground italic">Push notifications. Just pick a unique topic name.</p>
+          <input
+            type="text"
+            placeholder="Topic Name (e.g. my_trading_alerts_99)"
+            value={ntfyTopic}
+            onChange={(e) => setNtfyTopic(e.target.value)}
+            className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+          />
+          <p className="text-[9px] text-muted-foreground leading-tight">
+            Download Ntfy app or visit ntfy.sh/{ntfyTopic} in browser.
+          </p>
+        </>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={handleSave} className="flex-1 py-1.5 rounded bg-primary text-primary-foreground text-xs hover:opacity-90">
+          Save
+        </button>
+        <button onClick={handleTest} disabled={testing} className="flex-1 py-1.5 rounded bg-accent text-foreground text-xs hover:opacity-90 disabled:opacity-50">
+          {testing ? '...' : 'Test'}
+        </button>
+      </div>
+      {result && <p className={`text-[10px] ${result.includes('✓') ? 'text-bull' : 'text-bear'}`}>{result}</p>}
+    </div>
+  );
+};
+
+
+// ============================================================
+// AI Sidekick settings panel
+// ============================================================
+const AISidekickSettings: React.FC = () => {
+  const provider = useChartStore(s => s.aiProvider);
+  const setProvider = useChartStore(s => s.setAiProvider);
+  const apiKey = useChartStore(s => s.aiApiKey);
+  const setApiKey = useChartStore(s => s.setAiApiKey);
+  const model = useChartStore(s => s.aiModel);
+  const setModel = useChartStore(s => s.setAiModel);
+  const baseUrl = useChartStore(s => s.aiBaseUrl);
+  const setBaseUrl = useChartStore(s => s.setAiBaseUrl);
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-muted-foreground">Provider</label>
+        <select
+          value={provider}
+          onChange={(e) => setProvider(e.target.value as 'openai' | 'google' | 'anthropic')}
+          className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+        >
+          <option value="openai">OpenAI (Default)</option>
+          <option value="google">Google (Gemini)</option>
+          <option value="anthropic">Anthropic (Claude)</option>
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-muted-foreground">API Key</label>
+        <input
+          type="password"
+          placeholder="Leave empty for server default"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-muted-foreground">Custom Model Name</label>
+        <input
+          type="text"
+          placeholder="e.g. gpt-4o, gemini-1.5-pro"
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+        />
+        <p className="text-[9px] text-muted-foreground">If empty, server default will be used.</p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] text-muted-foreground">Custom Base URL (Proxy)</label>
+        <input
+          type="text"
+          placeholder="e.g. https://openrouter.ai/api/v1"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          className="w-full bg-input border border-border rounded px-2 py-1.5 text-xs text-foreground"
+        />
+      </div>
+    </div>
+  );
+};
+
+
+// ============================================================
 // Main RightSidebar
 // ============================================================
 export const RightSidebar: React.FC = () => {
@@ -496,17 +860,39 @@ export const RightSidebar: React.FC = () => {
     removeStochRSICrossAlert,
     pctDiffDonCrossAlerts,
     removePctDiffDonCrossAlert,
+    pctDiffStrategyAlerts,
+    removePctDiffStrategyAlert,
     chartFontSize,
     setChartFontSize,
     timezone,
     setTimezone,
     smartMoneyAlerts,
+    compoundAlerts,
+    rectangleAlerts,
+    removeRectangleAlert,
+    aiProvider,
+    setAiProvider,
+    aiApiKey,
+    setAiApiKey,
+    aiModel,
+    setAiModel,
+    aiBaseUrl,
+    setAiBaseUrl,
   } = useChartStore();
 
   const [showAdd, setShowAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [expandedSettingsId, setExpandedSettingsId] = useState<string | null>(null);
+
+  const handleHardReset = () => {
+    if (window.confirm('Are you sure? This will wipe ALL indicators, layouts, drawings, and settings. This cannot be undone.')) {
+      localStorage.clear();
+      sessionStorage.clear();
+      // Hard redirect to clear any in-memory state
+      window.location.href = window.location.origin;
+    }
+  };
 
   if (!rightPanelOpen) return null;
 
@@ -570,9 +956,29 @@ export const RightSidebar: React.FC = () => {
             {rightPanelTab}
           </span>
         </div>
-        <button onClick={() => setRightPanelOpen(false)} className="text-muted-foreground hover:text-foreground">
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => useChartStore.getState().setHideAllDrawings(!useChartStore.getState().hideAllDrawings)}
+            className={`p-1 flex items-center gap-1 rounded transition-colors ${useChartStore.getState().hideAllDrawings ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+            title={useChartStore.getState().hideAllDrawings ? "Show All Drawings" : "Hide All Drawings"}
+          >
+            <PenTool size={12} />
+            {useChartStore.getState().hideAllDrawings ? <EyeOff size={10} /> : <Eye size={10} />}
+          </button>
+          
+          <button
+            onClick={() => useChartStore.getState().setHideAllIndicators(!useChartStore.getState().hideAllIndicators)}
+            className={`p-1 flex items-center gap-1 rounded transition-colors ${useChartStore.getState().hideAllIndicators ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+            title={useChartStore.getState().hideAllIndicators ? "Show All Indicators" : "Hide All Indicators"}
+          >
+            <TrendingUp size={12} />
+            {useChartStore.getState().hideAllIndicators ? <EyeOff size={10} /> : <Eye size={10} />}
+          </button>
+
+          <button onClick={() => setRightPanelOpen(false)} className="text-muted-foreground hover:text-foreground ml-2">
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -707,7 +1113,7 @@ export const RightSidebar: React.FC = () => {
                         className="bg-accent text-foreground text-[10px] rounded px-1.5 py-0.5 border border-border"
                       >
                         <option value="">Chart TF</option>
-                        {(['1m','3m','5m','15m','1h','4h','1D','1W'] as Timeframe[]).map(tf => (
+                        {(['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'] as Timeframe[]).map(tf => (
                           <option key={tf} value={tf}>{tf}</option>
                         ))}
                       </select>
@@ -948,6 +1354,7 @@ export const RightSidebar: React.FC = () => {
             <StochRSICrossAlertForm />
             <IndicatorThresholdAlertForm />
             <PctDiffDonCrossAlertForm />
+            <PctDiffStrategyAlertForm />
             <CompoundAlertsList />
             <AlertTemplatesSection />
             <div className="flex items-center justify-between px-1">
@@ -957,30 +1364,57 @@ export const RightSidebar: React.FC = () => {
                     + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length
                     + (indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).length
                     + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length
-                    + (smartMoneyAlerts ?? []).filter(a => a.active).length;
+                    + (pctDiffDonCrossAlerts ?? []).filter(a => a.active && !a.triggered).length
+                    + (pctDiffStrategyAlerts ?? []).filter(a => a.active).length
+                    + (compoundAlerts ?? []).filter(a => a.active && !a.triggered).length
+                    + (smartMoneyAlerts ?? []).filter(a => a.active).length
+                    + (rectangleAlerts ?? []).filter(a => a.active && !a.triggered).length;
                   return total === 0 ? 'No alerts set.' : `${total} active alert(s)`;
                 })()}
               </p>
-              {(alerts.length > 0 || indicatorCrossAlerts.length > 0 || (indicatorThresholdAlerts ?? []).length > 0 || (stochRSICrossAlerts ?? []).length > 0 || (smartMoneyAlerts ?? []).length > 0) && (
-                <button onClick={clearAllAlerts} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">
-                  Delete All
-                </button>
-              )}
+              {((alerts.length
+                + indicatorCrossAlerts.filter(a => a.active && !a.triggered).length
+                + (indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).length
+                + (stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).length
+                + (pctDiffDonCrossAlerts ?? []).filter(a => a.active && !a.triggered).length
+                + (pctDiffStrategyAlerts ?? []).filter(a => a.active).length
+                + (compoundAlerts ?? []).filter(a => a.active && !a.triggered).length
+                + (smartMoneyAlerts ?? []).filter(a => a.active).length
+                + (rectangleAlerts ?? []).filter(a => a.active && !a.triggered).length) > 0) && (
+                  <button onClick={clearAllAlerts} className="text-[10px] text-destructive hover:text-destructive/80 transition-colors">
+                    Delete All
+                  </button>
+                )}
             </div>
             {alerts.map((alert) => (
               <div key={alert.id} className="panel-section rounded p-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeAlert(alert.id); useChartStore.getState().addAlert(updated); }}
+                    <button onClick={() => {
+                      const enabled = !(alert.telegramEnabled ?? true);
+                      if ('trendlineId' in alert) useChartStore.getState().updateAlert(alert.id, { telegramEnabled: enabled });
+                      else useChartStore.getState().updateIndicatorCrossAlert(alert.id, { telegramEnabled: enabled });
+                    }}
                       className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
                       title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
                     ><Send size={10} /></button>
+
+                    <button
+                      onClick={() => useChartStore.getState().updateAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+
                     <button onClick={() => removeAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+
                   </div>
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
               </div>
             ))}
             {indicatorCrossAlerts.filter(a => a.active && !a.triggered).map((alert) => (
@@ -991,14 +1425,59 @@ export const RightSidebar: React.FC = () => {
                     <span className="text-foreground">{alert.condition.replace('_', ' ')}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => { const updated = { ...alert, telegramEnabled: !(alert.telegramEnabled ?? true) }; removeIndicatorCrossAlert(alert.id); useChartStore.getState().addIndicatorCrossAlert(updated); }}
+                    <button onClick={() => {
+                      const enabled = !(alert.telegramEnabled ?? true);
+                      if ('trendlineId' in alert) useChartStore.getState().updateAlert(alert.id, { telegramEnabled: enabled });
+                      else useChartStore.getState().updateIndicatorCrossAlert(alert.id, { telegramEnabled: enabled });
+                    }}
                       className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
                       title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
                     ><Send size={10} /></button>
+
+                    <button onClick={() => useChartStore.getState().updateIndicatorCrossAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+
                     <button onClick={() => removeIndicatorCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+
                   </div>
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
+              </div>
+            ))}
+            {(rectangleAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
+              <div 
+                key={alert.id} 
+                className="panel-section rounded p-2 text-xs cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => useChartStore.getState().setSelectedRectangleId(alert.rectangleId)}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Price {alert.condition.replace('_', ' ')}</span>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => useChartStore.getState().updateRectangleAlert(alert.id, { telegramEnabled: !(alert.telegramEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+
+                    <button
+                      onClick={() => useChartStore.getState().updateRectangleAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+
+                    <button onClick={() => removeRectangleAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+
+                  </div>
+                </div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
               </div>
             ))}
             {(stochRSICrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
@@ -1008,9 +1487,24 @@ export const RightSidebar: React.FC = () => {
                     <ArrowRightLeft size={10} className="text-accent-foreground" />
                     <span className="text-foreground">StochRSI {alert.condition.replace('_', ' ')}</span>
                   </div>
-                  <button onClick={() => removeStochRSICrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => useChartStore.getState().updateStochRSICrossAlert(alert.id, { telegramEnabled: !(alert.telegramEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+                    <button onClick={() => useChartStore.getState().updateStochRSICrossAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+                    <button onClick={() => removeStochRSICrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  </div>
+
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
               </div>
             ))}
             {(indicatorThresholdAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
@@ -1020,9 +1514,24 @@ export const RightSidebar: React.FC = () => {
                     <Bell size={10} className="text-accent-foreground" />
                     <span className="text-foreground">{alert.condition} {alert.threshold}</span>
                   </div>
-                  <button onClick={() => removeIndicatorThresholdAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => useChartStore.getState().updateIndicatorThresholdAlert(alert.id, { telegramEnabled: !(alert.telegramEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+                    <button onClick={() => useChartStore.getState().updateIndicatorThresholdAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+                    <button onClick={() => removeIndicatorThresholdAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  </div>
+
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
               </div>
             ))}
             {(pctDiffDonCrossAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
@@ -1032,9 +1541,56 @@ export const RightSidebar: React.FC = () => {
                     <ArrowRightLeft size={10} className="text-accent-foreground" />
                     <span className="text-foreground">%Diff {alert.condition.replace('_', ' ')}</span>
                   </div>
-                  <button onClick={() => removePctDiffDonCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => useChartStore.getState().updatePctDiffDonCrossAlert(alert.id, { telegramEnabled: !(alert.telegramEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+                    <button onClick={() => useChartStore.getState().updatePctDiffDonCrossAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`flex items-center gap-0.5 transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+                    <button onClick={() => removePctDiffDonCrossAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  </div>
+
                 </div>
-                <div className="text-muted-foreground mt-1">{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe} · {alert.message ?? ''}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
+              </div>
+            ))}
+            {(pctDiffStrategyAlerts ?? []).filter(a => a.active).map((alert) => (
+              <div key={alert.id} className="panel-section rounded p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Zap size={10} className="text-yellow-400" />
+                    <span className="text-foreground">{STRATEGY_LABELS[alert.strategy]}</span>
+                    <span className={`text-[9px] px-1 rounded ${alert.direction === 'long' ? 'bg-green-900/40 text-green-400' : alert.direction === 'short' ? 'bg-red-900/40 text-red-400' : 'bg-blue-900/40 text-blue-400'}`}>
+                      {alert.direction}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => useChartStore.getState().updatePctDiffStrategyAlert(alert.id, { active: !alert.active })}
+                      className="text-muted-foreground hover:text-foreground" title="Toggle">
+                      {alert.active ? <Eye size={10} /> : <EyeOff size={10} />}
+                    </button>
+                    <button onClick={() => useChartStore.getState().updatePctDiffStrategyAlert(alert.id, { telegramEnabled: !(alert.telegramEnabled ?? true) })}
+                      className={`transition-colors ${(alert.telegramEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`Telegram ${(alert.telegramEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><Send size={10} /></button>
+                    <button onClick={() => useChartStore.getState().updatePctDiffStrategyAlert(alert.id, { whatsappEnabled: !(alert.whatsappEnabled ?? true) })}
+                      className={`transition-colors ${(alert.whatsappEnabled ?? true) ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={`WhatsApp ${(alert.whatsappEnabled ?? true) ? 'ON' : 'OFF'}`}
+                    ><MessageSquare size={10} /></button>
+                    <button onClick={() => removePctDiffStrategyAlert(alert.id)} className="text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+                  </div>
+                </div>
+                <div className="text-muted-foreground mt-1 flex justify-between">
+                  <span>{alert.symbol} · {alert.timeframe}</span>
+                  <span className="opacity-60">{new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
               </div>
             ))}
             {alertLogs.length > 0 && (
@@ -1110,10 +1666,38 @@ export const RightSidebar: React.FC = () => {
               <TelegramSettings />
             </div>
 
+            {/* WhatsApp */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">WhatsApp Alerts</p>
+              <WhatsAppSettings />
+            </div>
+
+            {/* AI Sidekick */}
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">AI Sidekick Settings</p>
+              <AISidekickSettings />
+            </div>
+
+
             {/* Sync */}
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Server Sync</p>
               <SyncControls />
+            </div>
+
+            {/* Danger Zone */}
+            <div className="pt-2 border-t border-border">
+              <p className="text-[10px] font-semibold text-destructive uppercase tracking-wider mb-2">Danger Zone</p>
+              <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+                If the chart is stuck or indicators won't go away, use this to completely wipe all local data.
+              </p>
+              <button
+                onClick={handleHardReset}
+                className="w-full flex items-center justify-center gap-1.5 py-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 rounded-md transition-colors text-[11px] font-medium"
+              >
+                <Trash2 size={12} />
+                Factory Reset (Wipe All Data)
+              </button>
             </div>
           </div>
         )}

@@ -15,6 +15,7 @@ interface TrackerState {
   updateEntry: (id: string, patch: Partial<TrackedEntry>) => void;
   stopTracking: (id: string) => void;
   removeEntry: (id: string) => void;
+  clearAllEntries: () => void;
 }
 
 export const useTrackerStore = create<TrackerState>()(
@@ -25,13 +26,16 @@ export const useTrackerStore = create<TrackerState>()(
 
       addSymbol: (symbol, timeframe, strategy) =>
         set((s) => {
-          if (s.watchlist.some((w) => w.symbol === symbol && w.timeframe === timeframe)) return s;
-          return { watchlist: [...s.watchlist, { symbol, timeframe, strategy }] };
+          const exists = s.watchlist.some(w => w.symbol === symbol && w.timeframe === timeframe);
+          if (exists) return s;
+          return {
+            watchlist: [{ symbol, timeframe, strategy }, ...s.watchlist],
+          };
         }),
 
-      removeSymbol: (symbol) =>
+      removeSymbol: (symbol, timeframe) =>
         set((s) => ({
-          watchlist: s.watchlist.filter((w) => w.symbol !== symbol),
+          watchlist: s.watchlist.filter((w) => !(w.symbol === symbol && w.timeframe === timeframe)),
         })),
 
       addEntry: (entry) =>
@@ -49,6 +53,7 @@ export const useTrackerStore = create<TrackerState>()(
 
       removeEntry: (id) =>
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) })),
+      clearAllEntries: () => set({ entries: [] }),
     }),
     { name: 'tracker-store' }
   )

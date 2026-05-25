@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChartStore } from '@/stores/chartStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch, Sparkles } from 'lucide-react';
+import { useTrackerStore } from '@/stores/trackerStore';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch, Sparkles, Zap } from 'lucide-react';
+
 import { ChartLayoutMenu } from './ChartLayoutMenu';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
 import { MarketType } from '@/types/trading';
@@ -18,6 +20,15 @@ const CRYPTO_SYMBOLS = [
   { name: 'AVAX/USD', label: 'Avalanche' },
 ];
 
+const FOREX_SYMBOLS = [
+  { name: 'XAU/USD', label: 'Gold' },
+  { name: 'XAG/USD', label: 'Silver' },
+  { name: 'EUR/USD', label: 'Euro / US Dollar' },
+  { name: 'GBP/USD', label: 'British Pound / US Dollar' },
+  { name: 'USD/JPY', label: 'US Dollar / Japanese Yen' },
+  { name: 'USD/CHF', label: 'US Dollar / Swiss Franc' },
+];
+
 function loadCustomPairs(): { name: string; label: string }[] {
   try {
     return JSON.parse(localStorage.getItem('custom-pairs') || '[]');
@@ -31,6 +42,7 @@ function saveCustomPairs(pairs: { name: string; label: string }[]) {
 const MARKET_OPTIONS: { value: MarketType; label: string; icon: string }[] = [
   { value: 'crypto', label: 'Crypto', icon: '₿' },
   { value: 'indian', label: 'Indian Stocks', icon: '🇮🇳' },
+  { value: 'forex', label: 'Forex / Metals', icon: '💱' },
 ];
 
 const UpstoxCredentialsForm: React.FC = () => {
@@ -80,7 +92,7 @@ const UpstoxCredentialsForm: React.FC = () => {
 const SyncStatusIndicator: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
   const [lastSync, setLastSync] = useState<string | null>(null);
-  const autoSync = localStorage.getItem('auto-sync') === 'true';
+  const autoSync = localStorage.getItem('auto-sync') !== 'false';
 
   useEffect(() => {
     const check = async () => {
@@ -102,8 +114,9 @@ const SyncStatusIndicator: React.FC = () => {
   }, []);
 
   const handleManualSync = async () => {
-    const payload = extractSyncPayload(useChartStore.getState());
+    const payload = extractSyncPayload(useChartStore.getState(), useTrackerStore.getState());
     const ok = await pushState(payload);
+
     if (ok) {
       const now = new Date().toLocaleTimeString();
       setLastSync(now);
@@ -154,6 +167,8 @@ export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
 
   const symbolList = marketType === 'crypto'
     ? [...CRYPTO_SYMBOLS, ...customPairs]
+    : marketType === 'forex'
+    ? FOREX_SYMBOLS
     : INDIAN_STOCKS.map((s) => ({ name: s.name, label: s.label }));
 
   const filtered = symbolList.filter(
@@ -334,6 +349,7 @@ export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
 
       <div className="flex-1" />
 
+      <SyncStatusIndicator />
       <ChartLayoutMenu />
 
       <div className="w-px h-5 bg-border" />
@@ -360,6 +376,15 @@ export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
         >
           <ScanSearch size={14} />
           <span className="hidden sm:inline">Screener</span>
+        </button>
+
+        <button
+          onClick={() => navigate('/pct_screener')}
+          className={`trading-btn flex items-center gap-1 ${location.pathname === '/pct_screener' ? 'text-primary' : ''}`}
+          title="%Diff Strategy Screener"
+        >
+          <Zap size={14} />
+          <span className="hidden sm:inline">%Diff</span>
         </button>
 
         <button

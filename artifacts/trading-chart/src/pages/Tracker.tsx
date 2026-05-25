@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { useTrackerStore } from '@/stores/trackerStore';
 import { TrackerSymbol, TrackedEntry, StrategyConfig, PctDiffDonSource } from '@/types/tracker';
-import { Timeframe } from '@/types/trading';
+import { Timeframe, MarketType } from '@/types/trading';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
 import { detectPctDiffDonCrossover } from '@/lib/trackerCrossover';
 import { CRYPTO_SYMBOLS } from '@/lib/cryptoSymbols';
+import { FOREX_SYMBOLS } from '@/lib/forexSymbols';
+import { INDIAN_STOCKS } from '@/lib/upstoxData';
 import { NavLink } from '@/components/NavLink';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -17,8 +19,17 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, Square, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { Plus, Trash2, Square, ArrowUpRight, ArrowDownRight, Activity, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1D', '1W'];
 const SOURCE_OPTIONS: { value: PctDiffDonSource; label: string }[] = [
@@ -42,6 +53,27 @@ const DEFAULT_STRATEGY: StrategyConfig = {
   donLineDiff: 0.2,
 };
 
+const COLUMN_CONFIG = [
+  { id: 'direction', label: 'Direction' },
+  { id: 'entryTime', label: 'Entry Time' },
+  { id: 'strategy', label: 'Strategy' },
+  { id: 'entryPrice', label: 'Entry' },
+  { id: 'currentPrice', label: 'Current' },
+  { id: 'pnl', label: 'P&L %' },
+  { id: 'perf5m', label: '5m' },
+  { id: 'perf15m', label: '15m' },
+  { id: 'perf30m', label: '30m' },
+  { id: 'perf1h', label: '1h' },
+  { id: 'perf4h', label: '4h' },
+  { id: 'perf12h', label: '12h' },
+  { id: 'perf1D', label: '1D' },
+  { id: 'perf3D', label: '3D' },
+  { id: 'perf7D', label: '7D' },
+  { id: 'perf1M', label: '1M' },
+  { id: 'status', label: 'Status' },
+];
+
+
 function pctChange(entry: number, current: number): string {
   if (!entry) return '—';
   const pct = ((current - entry) / entry) * 100;
@@ -59,9 +91,28 @@ function PctBadge({ entry, current }: { entry: number; current?: number }) {
 }
 
 export function Tracker() {
-  const { watchlist, entries, addSymbol, removeSymbol, addEntry, updateEntry, stopTracking, removeEntry } = useTrackerStore();
+  const { watchlist, entries, addSymbol, removeSymbol, addEntry, updateEntry, stopTracking, removeEntry, clearAllEntries } = useTrackerStore();
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    () => JSON.parse(localStorage.getItem('tracker-visible-cols') || '[]')
+    .filter(Boolean).length > 0 
+    ? JSON.parse(localStorage.getItem('tracker-visible-cols')!)
+    : COLUMN_CONFIG.map(c => c.id)
+  );
+
+  useEffect(() => {
+    localStorage.setItem('tracker-visible-cols', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  const toggleColumn = (id: string) => {
+    setVisibleColumns(prev => 
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
 
   // Add symbol form state
+  const [marketType, setMarketType] = useState<MarketType>('crypto');
   const [newSymbol, setNewSymbol] = useState('');
   const [newTimeframe, setNewTimeframe] = useState<Timeframe>('1h');
   const [strategy, setStrategy] = useState<StrategyConfig>({ ...DEFAULT_STRATEGY });
@@ -100,55 +151,50 @@ export function Tracker() {
 
   // Use refs for crossover check to avoid re-creating callback on every entries change
   const entriesRef = useRef(entries);
-  entriesRef.current = entries;
   const pricesRef = useRef(prices);
-  pricesRef.current = prices;
+  useEffect(() => { entriesRef.current = entries; }, [entries]);
+  useEffect(() => { pricesRef.current = prices; }, [prices]);
 
-  // Determine minimum timeframe polling interval
-  const minCheckInterval = React.useMemo(() => {
-    const TF_INTERVALS: Record<string, number> = {
-      '1m': 60_000, '3m': 60_000, '5m': 60_000, '15m': 60_000,
-      '1h': 60_000, '4h': 120_000, '1D': 300_000, '1W': 600_000,
-    };
-    if (watchlist.length === 0) return 60_000;
-    let minInterval = Infinity;
-    for (const w of watchlist) {
-      const interval = TF_INTERVALS[w.timeframe] ?? 60_000;
-      if (interval < minInterval) minInterval = interval;
-    }
-    return minInterval;
-  }, [watchlist]);
-
-  // Periodically check crossovers for watchlist symbols
+  // Background check for crossovers
   useEffect(() => {
-    if (watchlist.length === 0) return;
-
+    const minCheckInterval = 1000 * 60; // Check every minute
+    
     const checkCrossovers = async () => {
+      const currentEntries = entriesRef.current;
       for (const item of watchlist) {
+        // Skip if already tracked
+        if (currentEntries.some(e => e.symbol === item.symbol && e.timeframe === item.timeframe && e.active)) {
+          continue;
+        }
+
         try {
           const candles = await fetchCandles(item.symbol, item.timeframe, 500);
-          if (item.strategy.type === 'pct_diff_don') {
-            const cross = detectPctDiffDonCrossover(candles, item.strategy);
-            if (cross) {
-              const currentEntries = entriesRef.current;
-              const exists = currentEntries.some(
-                (e) => e.symbol === item.symbol && e.entryTime === cross.time
-              );
-              if (!exists) {
-                const id = `${item.symbol}-${cross.time}-${Date.now()}`;
-                addEntry({
-                  id,
-                  symbol: item.symbol,
-                  timeframe: item.timeframe,
-                  strategy: item.strategy,
-                  entryPrice: cross.price,
-                  entryTime: cross.time,
-                  direction: cross.direction,
-                  active: true,
-                });
-                toast.success(`Crossover detected: ${item.symbol} ${cross.direction}`, {
-                  description: `Entry @ ${cross.price.toFixed(2)}`,
-                });
+          if (candles && candles.length > 50) {
+            if (item.strategy.type === 'pct_diff_don') {
+              const signal = detectPctDiffDonCrossover(candles, item.strategy);
+              if (signal) {
+                // Check if this signal is new (we don't want to fire again if we already have it in inactive entries)
+                const alreadyExists = currentEntries.some(
+                  e => e.symbol === item.symbol && e.timeframe === item.timeframe && e.strategy.type === 'pct_diff_don' && e.direction === signal
+                );
+                
+                if (!alreadyExists) {
+                  const currentPrice = candles[candles.length - 1].close;
+                  const id = `entry-${item.symbol}-${candles[candles.length - 1].time}-${Math.random().toString(36).slice(2, 9)}`;
+                  addEntry({
+                    id,
+                    symbol: item.symbol,
+                    timeframe: item.timeframe,
+                    strategy: item.strategy,
+                    entryPrice: currentPrice,
+                    entryTime: candles[candles.length - 1].time,
+                    direction: signal,
+                    active: true,
+                  });
+                  toast.success(`Crossover detected for ${item.symbol}! Added to tracking.`, {
+                    description: `${signal === 'long' ? 'Bullish' : 'Bearish'} signal on ${item.timeframe}`
+                  });
+                }
               }
             }
           }
@@ -161,7 +207,7 @@ export function Tracker() {
     checkCrossovers();
     const interval = setInterval(checkCrossovers, minCheckInterval);
     return () => clearInterval(interval);
-  }, [watchlist, minCheckInterval, addEntry]);
+  }, [watchlist, addEntry]);
 
   // Timeframe to seconds mapping
   const TF_SECONDS: Record<string, number> = {
@@ -241,14 +287,22 @@ export function Tracker() {
   const handleAddSymbol = () => {
     const sym = newSymbol.trim().toUpperCase();
     if (!sym) return;
-    // Auto-format: if user types "BTC" → "BTC/USD"
-    const formatted = sym.includes('/') ? sym : `${sym}/USD`;
+    
+    // Auto-format: if user types "BTC" -> "BTC/USD" for crypto. Indian stocks don't need '/USD'.
+    let formatted = sym;
+    if (marketType === 'crypto' && !sym.includes('/')) {
+      formatted = `${sym}/USD`;
+    }
+    
     addSymbol(formatted, newTimeframe, strategy);
     setNewSymbol('');
     toast.success(`Added ${formatted} to tracker`);
   };
 
-  const filteredSymbols = CRYPTO_SYMBOLS.filter((s) =>
+  const symbolList = marketType === 'crypto' ? CRYPTO_SYMBOLS 
+                   : marketType === 'indian' ? INDIAN_STOCKS.map(s => s.name)
+                   : FOREX_SYMBOLS;
+  const filteredSymbols = symbolList.filter((s) =>
     s.toLowerCase().includes(newSymbol.toLowerCase())
   ).slice(0, 8);
 
@@ -256,7 +310,18 @@ export function Tracker() {
     setStrategy((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleDeleteAll = () => {
+    if (entries.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete all ${entries.length} tracked entries? This cannot be undone.`)) {
+      clearAllEntries();
+      toast.success('All entries deleted');
+    }
+  };
+
+  const isColVisible = (id: string) => visibleColumns.includes(id);
+
   return (
+
     <div className="min-h-screen bg-background text-foreground">
       {/* Top nav */}
       <div className="border-b border-border px-4 py-2 flex items-center gap-4">
@@ -276,18 +341,31 @@ export function Tracker() {
           <CardContent className="space-y-4">
             {/* Row 1: Symbol + Timeframe + Add */}
             <div className="flex gap-2 items-end flex-wrap">
-              <div className="flex-1 min-w-[200px]">
+              <div className="w-[140px]">
+                <label className="text-xs text-muted-foreground mb-1 block">Market</label>
+                <Select value={marketType} onValueChange={(val) => setMarketType(val as MarketType)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="crypto">Crypto</SelectItem>
+                    <SelectItem value="indian">Indian Stocks</SelectItem>
+                    <SelectItem value="forex">Forex</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 min-w-[200px] relative">
                 <label className="text-xs text-muted-foreground mb-1 block">Symbol</label>
                 <Input
                   value={newSymbol}
                   onChange={(e) => { setNewSymbol(e.target.value); setShowDropdown(true); }}
                   onFocus={() => setShowDropdown(true)}
-                  placeholder="BTC/USD or BTC"
+                  placeholder={marketType === 'crypto' ? "BTC/USD or BTC" : marketType === 'indian' ? "RELIANCE" : "XAU/USD"}
                   className="bg-secondary border-border h-9"
                   onKeyDown={(e) => { if (e.key === 'Enter') { setShowDropdown(false); handleAddSymbol(); } }}
                 />
                 {showDropdown && newSymbol && filteredSymbols.length > 0 && (
-                  <div className="absolute z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                  <div className="absolute z-50 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
                     {filteredSymbols.map((s) => (
                       <button
                         key={s}
@@ -412,8 +490,9 @@ export function Tracker() {
               <div className="flex flex-wrap gap-2">
                 {watchlist.map((w) => (
                   <Badge
-                    key={w.symbol}
+                    key={`${w.symbol}-${w.timeframe}`}
                     variant="secondary"
+
                     className="flex items-center gap-2 py-1.5 px-3"
                   >
                     <span>{w.symbol}</span>
@@ -425,11 +504,12 @@ export function Tracker() {
                       <span className="text-xs font-mono">${prices[w.symbol]?.toFixed(2)}</span>
                     )}
                     <button
-                      onClick={() => removeSymbol(w.symbol)}
+                      onClick={() => removeSymbol(w.symbol, w.timeframe)}
                       className="text-muted-foreground hover:text-destructive ml-1"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
+
                   </Badge>
                 ))}
               </div>
@@ -439,34 +519,68 @@ export function Tracker() {
 
         {/* Tracked Entries Table */}
         <Card className="border-border bg-card">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Tracked Entries ({entries.length})</CardTitle>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 border-border">
+                    <Settings2 className="h-4 w-4 mr-2" /> Columns
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 max-h-80 overflow-y-auto">
+                  <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {COLUMN_CONFIG.map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      checked={isColVisible(col.id)}
+                      onCheckedChange={() => toggleColumn(col.id)}
+                    >
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleDeleteAll}
+                className="h-8 text-destructive border-border hover:bg-destructive/10"
+                disabled={entries.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Delete All
+              </Button>
+            </div>
           </CardHeader>
+
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow className="border-border">
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>TF</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Entry Time</TableHead>
-                  <TableHead>Strategy</TableHead>
-                  <TableHead className="text-right">Entry</TableHead>
-                  <TableHead className="text-right">Current</TableHead>
-                  <TableHead className="text-right">P&L %</TableHead>
-                  <TableHead className="text-right">5m</TableHead>
-                  <TableHead className="text-right">15m</TableHead>
-                  <TableHead className="text-right">30m</TableHead>
-                  <TableHead className="text-right">1h</TableHead>
-                  <TableHead className="text-right">4h</TableHead>
-                  <TableHead className="text-right">12h</TableHead>
-                  <TableHead className="text-right">1D</TableHead>
-                  <TableHead className="text-right">3D</TableHead>
-                  <TableHead className="text-right">7D</TableHead>
-                  <TableHead className="text-right">1M</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="w-[120px]">Symbol</TableHead>
+                  <TableHead className="w-[60px]">TF</TableHead>
+                  {isColVisible('direction') && <TableHead>Direction</TableHead>}
+                  {isColVisible('entryTime') && <TableHead>Entry Time</TableHead>}
+                  {isColVisible('strategy') && <TableHead>Strategy</TableHead>}
+                  {isColVisible('entryPrice') && <TableHead className="text-right">Entry</TableHead>}
+                  {isColVisible('currentPrice') && <TableHead className="text-right">Current</TableHead>}
+                  {isColVisible('pnl') && <TableHead className="text-right">P&L %</TableHead>}
+                  {isColVisible('perf5m') && <TableHead className="text-right">5m</TableHead>}
+                  {isColVisible('perf15m') && <TableHead className="text-right">15m</TableHead>}
+                  {isColVisible('perf30m') && <TableHead className="text-right">30m</TableHead>}
+                  {isColVisible('perf1h') && <TableHead className="text-right">1h</TableHead>}
+                  {isColVisible('perf4h') && <TableHead className="text-right">4h</TableHead>}
+                  {isColVisible('perf12h') && <TableHead className="text-right">12h</TableHead>}
+                  {isColVisible('perf1D') && <TableHead className="text-right">1D</TableHead>}
+                  {isColVisible('perf3D') && <TableHead className="text-right">3D</TableHead>}
+                  {isColVisible('perf7D') && <TableHead className="text-right">7D</TableHead>}
+                  {isColVisible('perf1M') && <TableHead className="text-right">1M</TableHead>}
+                  {isColVisible('status') && <TableHead>Status</TableHead>}
+                  <TableHead className="w-[100px]"></TableHead>
                 </TableRow>
+
               </TableHeader>
               <TableBody>
                 {entries.length === 0 ? (
@@ -482,67 +596,100 @@ export function Tracker() {
                       <TableRow key={entry.id} className="border-border">
                         <TableCell className="font-mono font-medium">{entry.symbol}</TableCell>
                         <TableCell>{entry.timeframe}</TableCell>
-                        <TableCell>
-                          {entry.direction === 'above' ? (
-                            <span className="flex items-center gap-1 text-[hsl(var(--bull))]">
-                              <ArrowUpRight className="h-3 w-3" /> Above
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-[hsl(var(--bear))]">
-                              <ArrowDownRight className="h-3 w-3" /> Below
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(entry.entryTime * 1000), 'MMM dd, HH:mm')}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {entry.strategy.type === 'pct_diff_don' && 
-                            `%Diff ${(entry.strategy as any).source1}×${(entry.strategy as any).source2}`
-                          }
-                        </TableCell>
-                        <TableCell className="text-right font-mono">${entry.entryPrice.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {current ? `$${current.toFixed(2)}` : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          <PctBadge entry={entry.entryPrice} current={current} />
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf5m ? <PctBadge entry={entry.entryPrice} current={entry.perf5m} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf15m ? <PctBadge entry={entry.entryPrice} current={entry.perf15m} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf30m ? <PctBadge entry={entry.entryPrice} current={entry.perf30m} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf1h ? <PctBadge entry={entry.entryPrice} current={entry.perf1h} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf4h ? <PctBadge entry={entry.entryPrice} current={entry.perf4h} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf12h ? <PctBadge entry={entry.entryPrice} current={entry.perf12h} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf1D ? <PctBadge entry={entry.entryPrice} current={entry.perf1D} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf3D ? <PctBadge entry={entry.entryPrice} current={entry.perf3D} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf7D ? <PctBadge entry={entry.entryPrice} current={entry.perf7D} /> : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">
-                          {entry.perf1M ? <PctBadge entry={entry.entryPrice} current={entry.perf1M} /> : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={entry.active ? 'default' : 'secondary'}>
-                            {entry.active ? 'Active' : 'Stopped'}
-                          </Badge>
-                        </TableCell>
+                        {isColVisible('direction') && (
+                          <TableCell>
+                            {entry.direction === 'above' ? (
+                              <span className="flex items-center gap-1 text-[hsl(var(--bull))]">
+                                <ArrowUpRight className="h-3 w-3" /> Above
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[hsl(var(--bear))]">
+                                <ArrowDownRight className="h-3 w-3" /> Below
+                              </span>
+                            )}
+                          </TableCell>
+                        )}
+                        {isColVisible('entryTime') && (
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {format(new Date(entry.entryTime * 1000), 'MMM dd, HH:mm')}
+                          </TableCell>
+                        )}
+                        {isColVisible('strategy') && (
+                          <TableCell className="text-xs text-muted-foreground">
+                            {entry.strategy.type === 'pct_diff_don' && 
+                              `%Diff ${(entry.strategy as any).source1}×${(entry.strategy as any).source2}`
+                            }
+                          </TableCell>
+                        )}
+                        {isColVisible('entryPrice') && <TableCell className="text-right font-mono">${entry.entryPrice.toFixed(2)}</TableCell>}
+                        {isColVisible('currentPrice') && (
+                          <TableCell className="text-right font-mono">
+                            {current ? `$${current.toFixed(2)}` : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('pnl') && (
+                          <TableCell className="text-right font-mono">
+                            <PctBadge entry={entry.entryPrice} current={current} />
+                          </TableCell>
+                        )}
+                        {isColVisible('perf5m') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf5m ? <PctBadge entry={entry.entryPrice} current={entry.perf5m} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf15m') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf15m ? <PctBadge entry={entry.entryPrice} current={entry.perf15m} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf30m') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf30m ? <PctBadge entry={entry.entryPrice} current={entry.perf30m} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf1h') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf1h ? <PctBadge entry={entry.entryPrice} current={entry.perf1h} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf4h') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf4h ? <PctBadge entry={entry.entryPrice} current={entry.perf4h} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf12h') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf12h ? <PctBadge entry={entry.entryPrice} current={entry.perf12h} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf1D') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf1D ? <PctBadge entry={entry.entryPrice} current={entry.perf1D} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf3D') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf3D ? <PctBadge entry={entry.entryPrice} current={entry.perf3D} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf7D') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf7D ? <PctBadge entry={entry.entryPrice} current={entry.perf7D} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('perf1M') && (
+                          <TableCell className="text-right font-mono text-xs">
+                            {entry.perf1M ? <PctBadge entry={entry.entryPrice} current={entry.perf1M} /> : '—'}
+                          </TableCell>
+                        )}
+                        {isColVisible('status') && (
+                          <TableCell>
+                            <Badge variant={entry.active ? 'default' : 'secondary'}>
+                              {entry.active ? 'Active' : 'Stopped'}
+                            </Badge>
+                          </TableCell>
+                        )}
+
                         <TableCell>
                           <div className="flex gap-1">
                             {entry.active && (

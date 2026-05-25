@@ -18,6 +18,7 @@ import { computeEMA } from '@/lib/marketData';
 import { useChartStore } from '@/stores/chartStore';
 import { DrawingOverlay } from './DrawingOverlay';
 import { TrendlineToolbar } from './TrendlineToolbar';
+import { RectangleToolbar } from './RectangleToolbar';
 import { RiskRewardToolbar } from './RiskRewardToolbar';
 
 const ALL_TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
@@ -209,6 +210,7 @@ export const MiniChart: React.FC<MiniChartProps> = ({ symbol, timeframe, onCross
           interactive={!!isActive}
         />
         {isActive && <TrendlineToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />}
+        {isActive && <RectangleToolbar chartRef={chartRef} seriesRef={candleSeriesRef} />}
       </div>
     </div>
   );

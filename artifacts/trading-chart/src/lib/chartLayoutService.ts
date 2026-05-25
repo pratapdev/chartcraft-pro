@@ -35,20 +35,16 @@ export interface ChartSnapshot {
   alertTemplates: any[];
 }
 
-const STORAGE_KEY = 'saved-chart-layouts';
+import { useChartStore } from '@/stores/chartStore';
 
-// ─── Storage adapter (swap for server-based sync later) ─────────
+// ─── Storage adapter (uses synced chartStore) ───────────────────
 
 function readAll(): SavedChartLayout[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
+  return useChartStore.getState().layouts || [];
 }
 
 function writeAll(layouts: SavedChartLayout[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(layouts));
+  useChartStore.getState().setLayouts(layouts);
 }
 
 // ─── Public API ─────────────────────────────────────────────────
@@ -58,14 +54,20 @@ export function listLayouts(): SavedChartLayout[] {
 }
 
 export function saveLayout(name: string, snapshot: ChartSnapshot): SavedChartLayout {
-  const layouts = readAll();
-  const existing = layouts.find((l) => l.name === name);
-  if (existing) {
-    existing.snapshot = snapshot;
-    existing.updatedAt = Date.now();
+  const layouts = [...readAll()];
+  const existingIndex = layouts.findIndex((l) => l.name === name);
+  
+  if (existingIndex >= 0) {
+    const updated = {
+      ...layouts[existingIndex],
+      snapshot,
+      updatedAt: Date.now(),
+    };
+    layouts[existingIndex] = updated;
     writeAll(layouts);
-    return existing;
+    return updated;
   }
+  
   const layout: SavedChartLayout = {
     id: crypto.randomUUID(),
     name,
@@ -83,11 +85,14 @@ export function deleteLayout(id: string) {
 }
 
 export function renameLayout(id: string, newName: string) {
-  const layouts = readAll();
-  const layout = layouts.find((l) => l.id === id);
-  if (layout) {
-    layout.name = newName;
-    layout.updatedAt = Date.now();
+  const layouts = [...readAll()];
+  const layoutIndex = layouts.findIndex((l) => l.id === id);
+  if (layoutIndex >= 0) {
+    layouts[layoutIndex] = {
+      ...layouts[layoutIndex],
+      name: newName,
+      updatedAt: Date.now(),
+    };
     writeAll(layouts);
   }
 }

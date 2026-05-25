@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useChartStore } from '@/stores/chartStore';
-import { Trendline, FibonacciDrawing, AlertCondition, RiskRewardDrawing } from '@/types/trading';
+import { Trendline, FibonacciDrawing, AlertCondition, RiskRewardDrawing, RectangleDrawing } from '@/types/trading';
 
 interface Props {
   chartRef: React.RefObject<IChartApi | null>;
@@ -43,6 +43,15 @@ interface RRDrawState {
 }
 const EMPTY_RR: RRDrawState = { phase: 'idle', entryPrice: 0, entryTime: 0, currentPrice: 0, startX: 0, startY: 0, currentX: 0, currentY: 0 };
 
+interface RectDrawState {
+  phase: 'idle' | 'drawing';
+  startX: number; startY: number;
+  currentX: number; currentY: number;
+  startPrice: number; currentPrice: number;
+  startTime: number; currentTime: number;
+}
+const EMPTY_RECT: RectDrawState = { phase: 'idle', startX: 0, startY: 0, currentX: 0, currentY: 0, startPrice: 0, currentPrice: 0, startTime: 0, currentTime: 0 };
+
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const FIB_COLORS: Record<number, string> = {
   0: '#787b86',
@@ -65,6 +74,14 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
     startMY: number;
     origLine: Trendline;
   } | null>(null);
+  const rectDragRef = useRef<{
+    rectId: string;
+    dragTime: 'start' | 'end' | null;
+    dragPrice: 'start' | 'end' | null;
+    startMX: number;
+    startMY: number;
+    origRect: RectangleDrawing;
+  } | null>(null);
 
   const [isInteracting, setIsInteracting] = useState(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
@@ -81,6 +98,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
   const measureRef = useRef<MeasureState>(EMPTY_MEASURE);
   const fibRef = useRef<FibDrawState>(EMPTY_FIB);
   const rrRef = useRef<RRDrawState>(EMPTY_RR);
+  const rectRef = useRef<RectDrawState>(EMPTY_RECT);
 
   const store = useChartStore();
   const {
@@ -100,6 +118,12 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
     addRiskReward,
     removeRiskReward,
     setSelectedRiskRewardId,
+    rectangleDrawings,
+    addRectangle,
+    removeRectangle,
+    selectedRectangleId,
+    setSelectedRectangleId,
+    updateRectangle,
   } = store;
   const symbol = paneSymbol ?? store.symbol;
   const timeframe = (paneTimeframe ?? store.timeframe) as typeof store.timeframe;
@@ -431,6 +455,36 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
       renderFibPreview(ctx, tempFib, w, series);
     }
 
+    // Render persisted Rectangle drawings
+    if (series) {
+      for (const rect of rectangleDrawings) {
+        const isSelected = selectedRectangleId === rect.id;
+        renderRectangle(ctx, rect, series, timeToPixel, isSelected);
+      }
+    }
+
+    // Render in-progress Rectangle drawing
+    const rsState = rectRef.current;
+    if (rsState.phase === 'drawing' && series) {
+      const left = Math.min(rsState.startX, rsState.currentX);
+      const right = Math.max(rsState.startX, rsState.currentX);
+      const top = Math.min(rsState.startY, rsState.currentY);
+      const bottom = Math.max(rsState.startY, rsState.currentY);
+      
+      const rectDefaults = useChartStore.getState().drawingDefaults.rectangle || { color: '#2563eb', fillColor: 'rgba(37, 99, 235, 0.2)', thickness: 1, lineStyle: 'solid' };
+      ctx.fillStyle = rectDefaults.fillColor;
+      ctx.fillRect(left, top, right - left, bottom - top);
+      
+      ctx.strokeStyle = rectDefaults.color;
+      ctx.lineWidth = rectDefaults.thickness;
+      const style = rectDefaults.lineStyle ?? 'solid';
+      if (style === 'dashed') ctx.setLineDash([8, 5]);
+      else if (style === 'dotted') ctx.setLineDash([2, 3]);
+      
+      ctx.strokeRect(left, top, right - left, bottom - top);
+      ctx.setLineDash([]);
+    }
+
     // Render persisted Risk/Reward drawings
     if (series) {
       for (const rr of riskRewardDrawings) {
@@ -488,7 +542,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
         }
       }
     }
-  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting, riskRewardDrawings]);
+  }, [trendlines, selectedTrendlineId, lineToPixels, activeTool, hoverY, fibonacciDrawings, selectedFibId, hoveredAlertBtn, isInteracting, riskRewardDrawings, rectangleDrawings, selectedRectangleId]);
 
   useEffect(() => {
     let raf: number;
@@ -650,6 +704,22 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
         return;
       }
 
+      if (activeTool === 'rectangle') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          rectRef.current = {
+            phase: 'drawing', startX: mx, startY: my, currentX: mx, currentY: my,
+            startPrice: coords.price, currentPrice: coords.price,
+            startTime: coords.time, currentTime: coords.time,
+          };
+          setIsInteracting(true);
+          bump((n) => n + 1);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       if (activeTool === 'measure') {
         const mCoords = pixelToCoords(mx, my);
         if (mCoords) {
@@ -730,12 +800,56 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
         }
       }
 
+      // Check rectangle hit
+      if (series && rectangleDrawings.length > 0) {
+        // Reverse iterate to pick top-most first
+        for (let i = rectangleDrawings.length - 1; i >= 0; i--) {
+          const rect = rectangleDrawings[i];
+          const x1 = timeToPixel(rect.startTime);
+          const x2 = timeToPixel(rect.endTime);
+          const y1 = series.priceToCoordinate(rect.startPrice);
+          const y2 = series.priceToCoordinate(rect.endPrice);
+          if (x1 !== null && x2 !== null && y1 !== null && y2 !== null) {
+            const left = Math.min(x1, x2);
+            const right = Math.max(x1, x2);
+            const top = Math.min(y1 as number, y2 as number);
+            const bottom = Math.max(y1 as number, y2 as number);
+            
+            let dragTime: 'start' | 'end' | null = null;
+            let dragPrice: 'start' | 'end' | null = null;
+            if (Math.abs(mx - x1) <= 6) dragTime = 'start';
+            else if (Math.abs(mx - x2) <= 6) dragTime = 'end';
+            if (Math.abs(my - y1) <= 6) dragPrice = 'start';
+            else if (Math.abs(my - y2) <= 6) dragPrice = 'end';
+            const isCorner = dragTime !== null && dragPrice !== null;
+            
+            if (isCorner || (mx >= left && mx <= right && my >= top && my <= bottom)) {
+              setSelectedRectangleId(rect.id);
+              setSelectedTrendlineId(null);
+              setSelectedFibId(null);
+              setSelectedRiskRewardId(null);
+              setFibDeletePos(null);
+              rectDragRef.current = { rectId: rect.id, dragTime, dragPrice, startMX: mx, startMY: my, origRect: { ...rect } };
+              setIsInteracting(true);
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+          }
+        }
+      }
+
       setSelectedTrendlineId(null);
       setSelectedFibId(null);
       setFibDeletePos(null);
       setSelectedRiskRewardId(null);
+      setSelectedRectangleId(null);
     },
-    [activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, addTrendline, addAlert, symbol, timeframe, setActiveTool]
+    [
+      activeTool, hitTest, hitAlertButton, trendlines, lineToPixels, setSelectedTrendlineId, pixelToCoords, 
+      addTrendline, addAlert, symbol, timeframe, setActiveTool, rectangleDrawings, fibonacciDrawings, 
+      riskRewardDrawings, setSelectedRectangleId, setSelectedFibId, setSelectedRiskRewardId, setFibDeletePos, timeToPixel
+    ]
   );
 
   const handleMouseMove = useCallback(
@@ -798,6 +912,46 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
         return;
       }
 
+      if (rectRef.current.phase === 'drawing') {
+        const coords = pixelToCoords(mx, my);
+        if (coords) {
+          rectRef.current = { ...rectRef.current, currentX: mx, currentY: my, currentPrice: coords.price, currentTime: coords.time };
+          bump((n) => n + 1);
+        }
+        return;
+      }
+
+      if (rectDragRef.current) {
+        const coords = pixelToCoords(mx, my);
+        if (!coords) return;
+        const drag = rectDragRef.current;
+        const startCoords = pixelToCoords(drag.startMX, drag.startMY);
+        if (!startCoords) return;
+
+        if (drag.dragTime === null && drag.dragPrice === null) {
+          // Body drag
+          updateRectangle(drag.rectId, {
+            startTime: drag.origRect.startTime + (coords.time - startCoords.time),
+            startPrice: drag.origRect.startPrice + (coords.price - startCoords.price),
+            endTime: drag.origRect.endTime + (coords.time - startCoords.time),
+            endPrice: drag.origRect.endPrice + (coords.price - startCoords.price),
+          });
+        } else {
+          // Corner drag
+          const updates: Partial<RectangleDrawing> = {};
+          if (drag.dragTime === 'start') updates.startTime = coords.time;
+          else if (drag.dragTime === 'end') updates.endTime = coords.time;
+          
+          if (drag.dragPrice === 'start') updates.startPrice = coords.price;
+          else if (drag.dragPrice === 'end') updates.endPrice = coords.price;
+          
+          updateRectangle(drag.rectId, updates);
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       // Update crosshair position for "+" button
       crosshairMouseY.current = my;
       const coords = pixelToCoords(mx, my);
@@ -813,7 +967,7 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
       const alertHover = hitAlertButton(mx, my);
       setHoveredAlertBtn(alertHover);
 
-      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward') {
+      if (activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || activeTool === 'rectangle') {
         if (activeTool === 'horizontal') setHoverY(my);
         if (eventLayerRef.current) eventLayerRef.current.style.cursor = 'crosshair';
       } else if (eventLayerRef.current) {
@@ -822,12 +976,43 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
           eventLayerRef.current.style.cursor = 'crosshair';
         } else {
           const isHit = !!hitTest(mx, my);
-          setHoveringLine(isHit);
-          eventLayerRef.current.style.cursor = alertHover ? 'pointer' : isHit ? 'pointer' : '';
+          let isRectHit = false;
+          let rectCursor = '';
+          const series = seriesRef.current;
+          if (series) {
+            for (const rect of rectangleDrawings) {
+              const x1 = timeToPixel(rect.startTime);
+              const x2 = timeToPixel(rect.endTime);
+              const y1 = series.priceToCoordinate(rect.startPrice);
+              const y2 = series.priceToCoordinate(rect.endPrice);
+              if (x1 !== null && x2 !== null && y1 !== null && y2 !== null) {
+                const left = Math.min(x1, x2);
+                const right = Math.max(x1, x2);
+                const top = Math.min(y1 as number, y2 as number);
+                const bottom = Math.max(y1 as number, y2 as number);
+                
+                if (Math.abs(mx - left) <= 6 && Math.abs(my - top) <= 6) { isRectHit = true; rectCursor = 'nwse-resize'; break; }
+                else if (Math.abs(mx - right) <= 6 && Math.abs(my - bottom) <= 6) { isRectHit = true; rectCursor = 'nwse-resize'; break; }
+                else if (Math.abs(mx - right) <= 6 && Math.abs(my - top) <= 6) { isRectHit = true; rectCursor = 'nesw-resize'; break; }
+                else if (Math.abs(mx - left) <= 6 && Math.abs(my - bottom) <= 6) { isRectHit = true; rectCursor = 'nesw-resize'; break; }
+                else if (mx >= left && mx <= right && my >= top && my <= bottom) {
+                  isRectHit = true;
+                  rectCursor = 'pointer';
+                  break;
+                }
+              }
+            }
+          }
+          setHoveringLine(isHit || isRectHit);
+          if (rectCursor) {
+            eventLayerRef.current.style.cursor = rectCursor;
+          } else {
+            eventLayerRef.current.style.cursor = alertHover ? 'pointer' : (isHit ? 'pointer' : '');
+          }
         }
       }
     },
-    [activeTool, hitTest, pixelToCoords, updateTrendline, hitAlertButton]
+    [activeTool, hitTest, pixelToCoords, updateTrendline, updateRectangle, hitAlertButton, rectangleDrawings, timeToPixel]
   );
 
   const handleMouseUp = useCallback(
@@ -929,8 +1114,40 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
         bump((n) => n + 1);
         return;
       }
+
+      if (rectRef.current.phase === 'drawing') {
+        const rs = rectRef.current;
+        const dist = Math.hypot(mx - rs.startX, my - rs.startY);
+        if (dist > 10) {
+          const rectDefaults = useChartStore.getState().drawingDefaults.rectangle || { color: '#2563eb', fillColor: 'rgba(37, 99, 235, 0.2)', thickness: 1, lineStyle: 'solid' };
+          addRectangle({
+            id: crypto.randomUUID(),
+            symbol,
+            timeframe,
+            startTime: rs.startTime,
+            startPrice: rs.startPrice,
+            endTime: rs.currentTime,
+            endPrice: rs.currentPrice,
+            color: rectDefaults.color,
+            fillColor: rectDefaults.fillColor,
+            thickness: rectDefaults.thickness,
+            lineStyle: rectDefaults.lineStyle,
+            createdAt: Date.now(),
+          });
+        }
+        rectRef.current = EMPTY_RECT;
+        setActiveTool('cursor');
+        setIsInteracting(false);
+        bump((n) => n + 1);
+        return;
+      }
+
+      if (rectDragRef.current) {
+        rectDragRef.current = null;
+        setIsInteracting(false);
+      }
     },
-    [pixelToCoords, addTrendline, addRiskReward, symbol, timeframe, setActiveTool]
+    [pixelToCoords, addTrendline, addRiskReward, addFibonacci, addRectangle, symbol, timeframe, setActiveTool]
   );
 
   // Keyboard
@@ -971,6 +1188,10 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedTrendlineId) removeTrendline(selectedTrendlineId);
+        if (selectedRectangleId) {
+          removeRectangle(selectedRectangleId);
+          setSelectedRectangleId(null);
+        }
         if (selectedFibId) {
           removeFibonacci(selectedFibId);
           setSelectedFibId(null);
@@ -980,11 +1201,13 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
       if (e.key === 'Escape') {
         setSelectedTrendlineId(null);
         setSelectedFibId(null);
+        setSelectedRectangleId(null);
         setFibDeletePos(null);
         drawRef.current = EMPTY_DRAW;
         measureRef.current = EMPTY_MEASURE;
         fibRef.current = EMPTY_FIB;
         rrRef.current = EMPTY_RR;
+        rectRef.current = EMPTY_RECT;
         setActiveTool('cursor');
         setIsInteracting(false);
         bump((n) => n + 1);
@@ -996,10 +1219,10 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [selectedTrendlineId, selectedFibId, removeTrendline, removeFibonacci, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
+  }, [selectedTrendlineId, selectedFibId, selectedRectangleId, removeTrendline, removeFibonacci, removeRectangle, setSelectedRectangleId, setSelectedTrendlineId, setActiveTool, activeTool, addTrendline, addAlert, symbol, timeframe]);
 
   // Event layer should capture when: drawing tool active, or actively dragging, or cursor mode (for crosshair alert btn + trendline interaction)
-  const shouldCapture = interactive && (activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || isInteracting || activeTool === 'cursor');
+  const shouldCapture = interactive && (activeTool === 'trendline' || activeTool === 'horizontal' || activeTool === 'vertical' || activeTool === 'measure' || activeTool === 'fibonacci' || activeTool === 'riskreward' || activeTool === 'rectangle' || isInteracting || activeTool === 'cursor');
 
   return (
     <>
@@ -1015,9 +1238,9 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
           const { mx, my } = getPos(e.nativeEvent);
           // In cursor mode, check crosshair btn, trendline and fib hits
           if (activeTool === 'cursor' && !hitTest(mx, my)) {
-            // Check if clicking on a fib level
+            // Check if clicking on a fib level, riskReward, or rectangle
             const series = seriesRef.current;
-            let fibHit = false;
+            let hitAny = false;
             if (series) {
               for (const fib of fibonacciDrawings) {
                 const diff = fib.endPrice - fib.startPrice;
@@ -1025,15 +1248,49 @@ export const DrawingOverlay: React.FC<Props> = ({ chartRef, seriesRef, paneSymbo
                   const price = fib.endPrice - diff * level;
                   const y = series.priceToCoordinate(price);
                   if (y !== null && Math.abs(my - (y as number)) < 8) {
-                    fibHit = true;
-                    handleMouseDown(e);
+                    hitAny = true;
                     break;
                   }
                 }
-                if (fibHit) break;
+                if (hitAny) break;
+              }
+              if (!hitAny) {
+                for (const rr of riskRewardDrawings) {
+                  const entryY = series.priceToCoordinate(rr.entryPrice);
+                  const slY = series.priceToCoordinate(rr.stopLoss);
+                  const tpY = series.priceToCoordinate(rr.takeProfit);
+                  if (entryY !== null && slY !== null && tpY !== null) {
+                    const minY = Math.min(tpY as number, slY as number);
+                    const maxY = Math.max(tpY as number, slY as number);
+                    if (my >= minY - 5 && my <= maxY + 5) {
+                      hitAny = true;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (!hitAny) {
+                for (const rect of rectangleDrawings) {
+                  const x1 = timeToPixel(rect.startTime);
+                  const x2 = timeToPixel(rect.endTime);
+                  const y1 = series.priceToCoordinate(rect.startPrice);
+                  const y2 = series.priceToCoordinate(rect.endPrice);
+                  if (x1 !== null && x2 !== null && y1 !== null && y2 !== null) {
+                    const left = Math.min(x1, x2);
+                    const right = Math.max(x1, x2);
+                    const top = Math.min(y1 as number, y2 as number);
+                    const bottom = Math.max(y1 as number, y2 as number);
+                    if (mx >= left && mx <= right && my >= top && my <= bottom) {
+                      hitAny = true;
+                      break;
+                    }
+                  }
+                }
               }
             }
-            if (!fibHit) {
+            if (hitAny) {
+              handleMouseDown(e);
+            } else {
               // Temporarily disable pointer events so the chart gets this click
               if (eventLayerRef.current) {
                 eventLayerRef.current.style.pointerEvents = 'none';
@@ -1364,4 +1621,57 @@ function renderRiskReward(
   ctx.fillStyle = '#e5e7eb';
   ctx.font = 'bold 12px "JetBrains Mono", monospace';
   ctx.fillText(`R:R 1:${ratio}`, x1 + boxW - 80, (entryY as number) - 5);
+}
+
+function renderRectangle(
+  ctx: CanvasRenderingContext2D,
+  rect: RectangleDrawing,
+  series: ISeriesApi<'Candlestick'>,
+  timeToPixelFn: (t: number) => number | null,
+  selected?: boolean,
+) {
+  const x1 = timeToPixelFn(rect.startTime);
+  const x2 = timeToPixelFn(rect.endTime);
+  const y1 = series.priceToCoordinate(rect.startPrice);
+  const y2 = series.priceToCoordinate(rect.endPrice);
+  if (x1 === null || x2 === null || y1 === null || y2 === null) return;
+
+  const left = Math.min(x1, x2);
+  const right = Math.max(x1, x2);
+  const top = Math.min(y1 as number, y2 as number);
+  const bottom = Math.max(y1 as number, y2 as number);
+  const width = right - left;
+  const height = bottom - top;
+
+  ctx.save();
+  ctx.fillStyle = rect.fillColor;
+  ctx.fillRect(left, top, width, height);
+
+  ctx.strokeStyle = rect.color;
+  ctx.lineWidth = selected ? rect.thickness + 1 : rect.thickness;
+  const style = rect.lineStyle ?? 'solid';
+  if (style === 'dashed') ctx.setLineDash([8, 5]);
+  else if (style === 'dotted') ctx.setLineDash([2, 3]);
+  else ctx.setLineDash([]);
+  
+  if (selected) {
+    ctx.shadowColor = rect.color;
+    ctx.shadowBlur = 8;
+  }
+  
+  ctx.strokeRect(left, top, width, height);
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  if (selected) {
+    for (const [ex, ey] of [[left, top], [right, top], [left, bottom], [right, bottom]]) {
+      ctx.beginPath();
+      ctx.arc(ex, ey as number, 5, 0, Math.PI * 2);
+      ctx.fillStyle = rect.color;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
 }
