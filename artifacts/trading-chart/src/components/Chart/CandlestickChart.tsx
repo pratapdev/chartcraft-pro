@@ -42,12 +42,14 @@ export const CandlestickChart: React.FC = () => {
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const { candles, indicators, chartFontSize, timezone, loadCandles, startLiveUpdates, stopLiveUpdates, hideAllDrawings, hideAllIndicators, clearAllDrawings, clearAllIndicators } = useChartStore();
+  const { candles, indicators, chartFontSize, timezone, loadCandles, startLiveUpdates, stopLiveUpdates, hideAllDrawings, hideAllIndicators, clearAllDrawings, clearAllIndicators, dataSource } = useChartStore();
 
   const { clearLineSeries } = useIndicatorRenderer(chartRef, candleSeriesRef, candles, hideAllIndicators ? [] : indicators);
 
   useEffect(() => {
-    loadCandles().then(() => startLiveUpdates());
+    if (dataSource !== 'csv') {
+      loadCandles().then(() => startLiveUpdates());
+    }
     return () => stopLiveUpdates();
   }, []);
 

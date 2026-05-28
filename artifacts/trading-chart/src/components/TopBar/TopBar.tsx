@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChartStore } from '@/stores/chartStore';
 import { useTrackerStore } from '@/stores/trackerStore';
-import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch, Sparkles, Zap } from 'lucide-react';
+import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch, Sparkles, Zap, BookOpen } from 'lucide-react';
 
 import { ChartLayoutMenu } from './ChartLayoutMenu';
 import { INDIAN_STOCKS, getUpstoxCredentials, saveUpstoxCredentials } from '@/lib/upstoxData';
@@ -403,6 +403,15 @@ export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
         >
           <List size={14} />
           <span className="hidden sm:inline">Watch</span>
+        </button>
+
+        <button
+          onClick={() => setRightPanelTab('trades')}
+          className="trading-btn flex items-center gap-1"
+          title="Trade Book"
+        >
+          <BookOpen size={14} />
+          <span className="hidden sm:inline">Trades</span>
         </button>
 
         <button

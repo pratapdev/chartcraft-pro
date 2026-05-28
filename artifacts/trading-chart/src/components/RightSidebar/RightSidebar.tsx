@@ -19,7 +19,8 @@ import { CompoundAlertForm, CompoundAlertsList, AlertTemplatesSection } from '@/
 import { WatchlistPanel } from '@/components/Watchlist/WatchlistPanel';
 import { HeatmapView } from '@/components/Heatmap/HeatmapView';
 import { FeatureGuide } from '@/components/Guide/FeatureGuide';
-import { HelpCircle } from 'lucide-react';
+import { TradeBook } from '@/components/TradeBook/TradeBook';
+import { HelpCircle, BookOpen } from 'lucide-react';
 
 const INDICATOR_PRESETS: {
   type: IndicatorType;
@@ -61,7 +62,7 @@ const INDICATOR_PRESETS: {
     { type: 'ATR', label: 'ATR', description: 'Average True Range', group: 'Volatility', defaults: { period: 14, color: '#6b7280' } },
     { type: 'OBV', label: 'OBV', description: 'On-Balance Volume', group: 'Volatility', defaults: { period: 1, color: '#06b6d4' } },
     { type: 'PIVOT_HL', label: 'Pivot H/L', description: 'Pivot highs and lows', group: 'Volatility', defaults: { period: 5, color: '#22c55e', color2: '#ef4444' } },
-    { type: 'PCT_DIFF_DON', label: 'PctDiff Don', description: 'Pct diff with Donchian', group: 'Volatility', defaults: { period: 20, color: '#06b6d4', lookbackWindow: 50, emaSmoothing: 9, donchianLength: 20, donLineDiff: 0.1 } },
+    { type: 'PCT_DIFF_DON', label: 'PctDiff Don', description: 'Pct diff with Donchian', group: 'Volatility', defaults: { period: 20, color: '#06b6d4', lookbackWindow: 10, emaSmoothing: 5, donchianLength: 20, donLineDiff: 0.1 } },
     { type: 'VPVR', label: 'VPVR', description: 'Volume Profile Visible Range', group: 'Volatility', defaults: { period: 1, color: '#6b7280' } },
     { type: 'SESSION_VPVR', label: 'Session Volume Profile', description: 'Per-day volume profile drawn at the right edge of each session (POC highlighted)', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
     { type: 'COMPOSITE_VPVR', label: 'Composite VPVR', description: 'Aggregated profile across ALL loaded candles with VAH/VAL/POC labels', group: 'Volatility', defaults: { period: 1, color: '#facc15' } },
@@ -329,15 +330,15 @@ const PCT_CROSS_PRESETS: {
   condition: AlertCondition;
   color: string;
 }[] = [
-  { label: 'Diff ✕ EMA — Bullish', description: '%Diff crosses above EMA (bullish momentum shift)', line1: 'main', line2: 'ema', condition: 'cross_above', color: 'text-green-400' },
-  { label: 'Diff ✕ EMA — Bearish', description: '%Diff crosses below EMA (bearish momentum shift)', line1: 'main', line2: 'ema', condition: 'cross_below', color: 'text-red-400' },
-  { label: 'Diff ✕ EMA — Any', description: '%Diff crosses EMA in either direction', line1: 'main', line2: 'ema', condition: 'cross_any', color: 'text-blue-400' },
-  { label: 'Diff ↑ from Lower Don', description: '%Diff crosses above lower Donchian band (bottom reversal)', line1: 'main', line2: 'lower', condition: 'cross_above', color: 'text-green-400' },
-  { label: 'Diff ↓ from Upper Don', description: '%Diff crosses below upper Donchian band (top reversal)', line1: 'main', line2: 'upper', condition: 'cross_below', color: 'text-red-400' },
-  { label: 'Diff ✕ Basis — Any', description: '%Diff crosses the Donchian basis (midline)', line1: 'main', line2: 'basis', condition: 'cross_any', color: 'text-blue-400' },
-  { label: 'EMA ↑ Lower Don', description: 'EMA crosses above lower Donchian (trend recovery)', line1: 'ema', line2: 'lower', condition: 'cross_above', color: 'text-green-400' },
-  { label: 'EMA ↓ Upper Don', description: 'EMA crosses below upper Donchian (trend weakening)', line1: 'ema', line2: 'upper', condition: 'cross_below', color: 'text-red-400' },
-];
+    { label: 'Diff ✕ EMA — Bullish', description: '%Diff crosses above EMA (bullish momentum shift)', line1: 'main', line2: 'ema', condition: 'cross_above', color: 'text-green-400' },
+    { label: 'Diff ✕ EMA — Bearish', description: '%Diff crosses below EMA (bearish momentum shift)', line1: 'main', line2: 'ema', condition: 'cross_below', color: 'text-red-400' },
+    { label: 'Diff ✕ EMA — Any', description: '%Diff crosses EMA in either direction', line1: 'main', line2: 'ema', condition: 'cross_any', color: 'text-blue-400' },
+    { label: 'Diff ↑ from Lower Don', description: '%Diff crosses above lower Donchian band (bottom reversal)', line1: 'main', line2: 'lower', condition: 'cross_above', color: 'text-green-400' },
+    { label: 'Diff ↓ from Upper Don', description: '%Diff crosses below upper Donchian band (top reversal)', line1: 'main', line2: 'upper', condition: 'cross_below', color: 'text-red-400' },
+    { label: 'Diff ✕ Basis — Any', description: '%Diff crosses the Donchian basis (midline)', line1: 'main', line2: 'basis', condition: 'cross_any', color: 'text-blue-400' },
+    { label: 'EMA ↑ Lower Don', description: 'EMA crosses above lower Donchian (trend recovery)', line1: 'ema', line2: 'lower', condition: 'cross_above', color: 'text-green-400' },
+    { label: 'EMA ↓ Upper Don', description: 'EMA crosses below upper Donchian (trend weakening)', line1: 'ema', line2: 'upper', condition: 'cross_below', color: 'text-red-400' },
+  ];
 
 const PctDiffDonCrossAlertForm: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -1088,6 +1089,7 @@ export const RightSidebar: React.FC = () => {
   const tabs = [
     { id: 'indicators', icon: <TrendingUp size={12} />, title: 'Indicators' },
     { id: 'alerts', icon: <Bell size={12} />, title: 'Alerts' },
+    { id: 'trades', icon: <BookOpen size={12} />, title: 'Trades' },
     { id: 'settings', icon: <Settings size={12} />, title: 'Settings' },
     { id: 'guide', icon: <HelpCircle size={12} />, title: 'Guide' },
   ];
@@ -1120,7 +1122,7 @@ export const RightSidebar: React.FC = () => {
             <PenTool size={12} />
             {useChartStore.getState().hideAllDrawings ? <EyeOff size={10} /> : <Eye size={10} />}
           </button>
-          
+
           <button
             onClick={() => useChartStore.getState().setHideAllIndicators(!useChartStore.getState().hideAllIndicators)}
             className={`p-1 flex items-center gap-1 rounded transition-colors ${useChartStore.getState().hideAllIndicators ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
@@ -1606,8 +1608,8 @@ export const RightSidebar: React.FC = () => {
               </div>
             ))}
             {(rectangleAlerts ?? []).filter(a => a.active && !a.triggered).map((alert) => (
-              <div 
-                key={alert.id} 
+              <div
+                key={alert.id}
                 className="panel-section rounded p-2 text-xs cursor-pointer hover:bg-accent/50 transition-colors"
                 onClick={() => useChartStore.getState().setSelectedRectangleId(alert.rectangleId)}
               >
@@ -1865,6 +1867,9 @@ export const RightSidebar: React.FC = () => {
 
         {/* ---- GUIDE TAB ---- */}
         {rightPanelTab === 'guide' && <FeatureGuide />}
+
+        {/* ---- TRADES TAB ---- */}
+        {rightPanelTab === 'trades' && <TradeBook />}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { Candle, Timeframe, Trendline, DrawingTool, Alert, AlertLog, IndicatorCo
 import { CompoundAlert, AlertTemplate } from '@/types/compoundAlerts';
 import { HTFOverlayState, HTFLayerConfig, DEFAULT_LAYERS } from '@/types/htfOverlay';
 import { fetchCandles, subscribeToCandles } from '@/lib/marketData';
+import { loadCsvFile, CsvMeta } from '@/lib/csvDataLoader';
 import { fetchUpstoxCandles, getInstrumentKey } from '@/lib/upstoxData';
 import { toast } from 'sonner';
 import type { SavedChartLayout } from '@/lib/chartLayoutService';
@@ -29,8 +30,28 @@ interface CrosshairData {
 }
 
 export type ChartMode = 'candles' | 'footprint';
+export type DataSource = 'live' | 'csv';
+
+export interface BacktestMeta {
+  fileName: string;
+  rowCount: number;
+  from: number;
+  to: number;
+  detectedTimeframe: string;
+}
 
 interface ChartStore {
+  // ── Backtest / CSV mode ──────────────────────────────────────────────
+  dataSource: DataSource;
+  backtestCandles: Candle[];
+  backtestMeta: BacktestMeta | null;
+  backtestIndex: number;          // current playback cursor (1-based: slice(0, backtestIndex))
+  csvLoading: boolean;
+  csvLoadProgress: number;        // 0-100
+  setBacktestIndex: (i: number) => void;
+  loadCsvData: (file: File) => Promise<void>;
+  clearCsvData: () => void;
+  // ─────────────────────────────────────────────────────────────────────
   chartMode: ChartMode;
   setChartMode: (mode: ChartMode) => void;
   marketType: MarketType;
@@ -126,9 +147,9 @@ interface ChartStore {
   crosshairData: CrosshairData | null;
   setCrosshairData: (data: CrosshairData | null) => void;
   rightPanelOpen: boolean;
-  rightPanelTab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap' | 'guide';
+  rightPanelTab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap' | 'guide' | 'trades';
   setRightPanelOpen: (open: boolean) => void;
-  setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap' | 'guide') => void;
+  setRightPanelTab: (tab: 'alerts' | 'indicators' | 'settings' | 'watchlist' | 'heatmap' | 'guide' | 'trades') => void;
   undoLastDeletion: () => void;
   redoLastDeletion: () => void;
   multiTfMode: boolean;
@@ -184,6 +205,66 @@ interface ChartStore {
 }
 
 export const useChartStore = create<ChartStore>()(persist((set, get) => ({
+  // ── Backtest state (NOT persisted — resets on page reload) ───────────
+  dataSource: 'live',
+  backtestCandles: [],
+  backtestMeta: null,
+  backtestIndex: 0,
+  csvLoading: false,
+  csvLoadProgress: 0,
+
+  setBacktestIndex: (backtestIndex: number) => {
+    set({ backtestIndex });
+    // Push the sliced candles into the store so the chart re-renders
+    const { backtestCandles } = get();
+    set({ candles: backtestCandles.slice(0, backtestIndex) });
+  },
+
+  loadCsvData: async (file: File) => {
+    set({ csvLoading: true, csvLoadProgress: 0 });
+    try {
+      const { candles, meta } = await loadCsvFile(file, (parsed, total) => {
+        set({ csvLoadProgress: Math.min(99, Math.round((parsed / total) * 100)) });
+      });
+
+      // Stop live WebSocket before switching
+      get().stopLiveUpdates();
+
+      const startIndex = Math.min(100, candles.length);
+      set({
+        dataSource: 'csv',
+        backtestCandles: candles,
+        backtestMeta: meta,
+        backtestIndex: startIndex,
+        candles: candles.slice(0, startIndex),
+        csvLoading: false,
+        csvLoadProgress: 100,
+        connected: false,
+      });
+
+      toast.success(`Loaded ${meta.rowCount.toLocaleString()} candles (${meta.detectedTimeframe})`);
+    } catch (err: any) {
+      set({ csvLoading: false, csvLoadProgress: 0 });
+      toast.error(`CSV Error: ${err?.message ?? 'Unknown error'}`);
+    }
+  },
+
+  clearCsvData: () => {
+    set({
+      dataSource: 'live',
+      backtestCandles: [],
+      backtestMeta: null,
+      backtestIndex: 0,
+      csvLoadProgress: 0,
+    });
+    // Reload live data
+    get().loadCandles().then(() => {
+      const mt = get().marketType;
+      if (mt === 'crypto' || mt === 'forex') get().startLiveUpdates();
+    });
+  },
+  // ─────────────────────────────────────────────────────────────────────
+
   chartMode: 'candles',
   setChartMode: (chartMode) => set({ chartMode }),
   marketType: 'crypto',
@@ -217,6 +298,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   loading: false,
   connected: false,
   loadCandles: async () => {
+    // Skip live fetch when CSV is active
+    if (get().dataSource === 'csv') return;
+
     const { symbol, timeframe, marketType } = get();
     set({ loading: true });
     try {
@@ -248,6 +332,8 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   }),
   unsubscribe: null,
   startLiveUpdates: () => {
+    // Never start WebSocket when CSV data is active
+    if (get().dataSource === 'csv') return;
     const { symbol, timeframe, marketType } = get();
     if (marketType !== 'crypto') return;
     const existing = get().unsubscribe;

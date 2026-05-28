@@ -3,7 +3,8 @@ import { useChartStore } from '@/stores/chartStore';
 import { Timeframe } from '@/types/trading';
 import { ChartMode } from '@/stores/chartStore';
 import { ReplayBar } from './ReplayBar';
-import { Globe, ChevronDown, BarChart3, CandlestickChart as CandlestickIcon } from 'lucide-react';
+import { BacktestPanel } from './BacktestPanel';
+import { Globe, ChevronDown, BarChart3, CandlestickChart as CandlestickIcon, Upload, Wifi } from 'lucide-react';
 
 const TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1D', '1W'];
 
@@ -24,7 +25,7 @@ const TIMEZONES = [
 ];
 
 export const ChartHeader: React.FC = () => {
-  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone, chartMode, setChartMode } = useChartStore();
+  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone, chartMode, setChartMode, dataSource } = useChartStore();
   const [showTzDropdown, setShowTzDropdown] = useState(false);
   const tzRef = useRef<HTMLDivElement>(null);
   const last = candles[candles.length - 1];
@@ -58,6 +59,7 @@ export const ChartHeader: React.FC = () => {
   }, []);
 
   return (
+    <div>
     <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border bg-card min-h-[40px]">
       {/* Symbol + live dot */}
       <div className="flex items-center gap-2">
@@ -120,7 +122,26 @@ export const ChartHeader: React.FC = () => {
       </div>
 
       <div className="w-px h-5 bg-border" />
-      <ReplayBar />
+
+      {/* Live / CSV mode toggle */}
+      {dataSource === 'csv' ? (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded px-1.5 py-0.5 font-semibold tracking-wide animate-pulse">
+            📂 CSV MODE
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <Wifi size={10} className="text-bull" />
+            LIVE
+          </span>
+        </div>
+      )}
+
+      <div className="w-px h-5 bg-border" />
+      {/* Only show ReplayBar in live mode */}
+      {dataSource === 'live' && <ReplayBar />}
 
       <div className="w-px h-5 bg-border" />
 
@@ -181,6 +202,8 @@ export const ChartHeader: React.FC = () => {
           </div>
         </>
       )}
+    </div>
+    <BacktestPanel />
     </div>
   );
 };
