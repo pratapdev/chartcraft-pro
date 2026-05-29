@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChartStore } from '@/stores/chartStore';
 import { useTrackerStore } from '@/stores/trackerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Search, Bell, BarChart3, ChevronDown, Wifi, WifiOff, Plus, TrendingUp, Settings, LayoutGrid, Cloud, CloudOff, RefreshCw, List, Grid3X3, ScanSearch, Sparkles, Zap, BookOpen } from 'lucide-react';
 
 import { ChartLayoutMenu } from './ChartLayoutMenu';
@@ -154,7 +155,19 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({ aiOpen, onToggleAI }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore();
+  const { symbol, setSymbol, setRightPanelTab, alertLogs, connected, marketType, setMarketType, multiTfMode, setMultiTfMode } = useChartStore(
+    useShallow((s) => ({
+      symbol: s.symbol,
+      setSymbol: s.setSymbol,
+      setRightPanelTab: s.setRightPanelTab,
+      alertLogs: s.alertLogs,
+      connected: s.connected,
+      marketType: s.marketType,
+      setMarketType: s.setMarketType,
+      multiTfMode: s.multiTfMode,
+      setMultiTfMode: s.setMultiTfMode,
+    }))
+  );
   const [showSymbols, setShowSymbols] = useState(false);
   const [showMarketDropdown, setShowMarketDropdown] = useState(false);
   const [search, setSearch] = useState('');

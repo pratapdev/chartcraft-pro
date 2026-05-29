@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChartStore } from '@/stores/chartStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Timeframe } from '@/types/trading';
 import { ChartMode } from '@/stores/chartStore';
 import { ReplayBar } from './ReplayBar';
@@ -25,7 +26,21 @@ const TIMEZONES = [
 ];
 
 export const ChartHeader: React.FC = () => {
-  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone, chartMode, setChartMode, dataSource } = useChartStore();
+  const { symbol, timeframe, setTimeframe, candles, connected, loading, timezone, setTimezone, chartMode, setChartMode, dataSource } = useChartStore(
+    useShallow((s) => ({
+      symbol: s.symbol,
+      timeframe: s.timeframe,
+      setTimeframe: s.setTimeframe,
+      candles: s.candles,
+      connected: s.connected,
+      loading: s.loading,
+      timezone: s.timezone,
+      setTimezone: s.setTimezone,
+      chartMode: s.chartMode,
+      setChartMode: s.setChartMode,
+      dataSource: s.dataSource,
+    }))
+  );
   const [showTzDropdown, setShowTzDropdown] = useState(false);
   const tzRef = useRef<HTMLDivElement>(null);
   const last = candles[candles.length - 1];

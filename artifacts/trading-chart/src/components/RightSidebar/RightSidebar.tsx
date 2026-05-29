@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChartStore } from '@/stores/chartStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore } from '@/stores/trackerStore';
 import {
   X, Trash2, Eye, EyeOff, Plus, Bell, Send, ArrowRightLeft, PenTool,
@@ -1034,7 +1035,53 @@ export const RightSidebar: React.FC = () => {
     setAiModel,
     aiBaseUrl,
     setAiBaseUrl,
-  } = useChartStore();
+  // useShallow: only re-render when these specific fields change
+  // (prevents re-renders from candle ticks, crosshair moves, playback, etc.)
+  } = useChartStore(useShallow((s) => ({
+    rightPanelOpen: s.rightPanelOpen,
+    rightPanelTab: s.rightPanelTab,
+    setRightPanelOpen: s.setRightPanelOpen,
+    setRightPanelTab: s.setRightPanelTab,
+    alerts: s.alerts,
+    alertLogs: s.alertLogs,
+    removeAlert: s.removeAlert,
+    clearAllAlerts: s.clearAllAlerts,
+    indicators: s.indicators,
+    addIndicator: s.addIndicator,
+    removeIndicator: s.removeIndicator,
+    toggleIndicator: s.toggleIndicator,
+    updateIndicator: s.updateIndicator,
+    clearAllIndicators: s.clearAllIndicators,
+    trendlines: s.trendlines,
+    fibonacciDrawings: s.fibonacciDrawings,
+    clearAllDrawings: s.clearAllDrawings,
+    indicatorCrossAlerts: s.indicatorCrossAlerts,
+    removeIndicatorCrossAlert: s.removeIndicatorCrossAlert,
+    indicatorThresholdAlerts: s.indicatorThresholdAlerts,
+    removeIndicatorThresholdAlert: s.removeIndicatorThresholdAlert,
+    stochRSICrossAlerts: s.stochRSICrossAlerts,
+    removeStochRSICrossAlert: s.removeStochRSICrossAlert,
+    pctDiffDonCrossAlerts: s.pctDiffDonCrossAlerts,
+    removePctDiffDonCrossAlert: s.removePctDiffDonCrossAlert,
+    pctDiffStrategyAlerts: s.pctDiffStrategyAlerts,
+    removePctDiffStrategyAlert: s.removePctDiffStrategyAlert,
+    chartFontSize: s.chartFontSize,
+    setChartFontSize: s.setChartFontSize,
+    timezone: s.timezone,
+    setTimezone: s.setTimezone,
+    smartMoneyAlerts: s.smartMoneyAlerts,
+    compoundAlerts: s.compoundAlerts,
+    rectangleAlerts: s.rectangleAlerts,
+    removeRectangleAlert: s.removeRectangleAlert,
+    aiProvider: s.aiProvider,
+    setAiProvider: s.setAiProvider,
+    aiApiKey: s.aiApiKey,
+    setAiApiKey: s.setAiApiKey,
+    aiModel: s.aiModel,
+    setAiModel: s.setAiModel,
+    aiBaseUrl: s.aiBaseUrl,
+    setAiBaseUrl: s.setAiBaseUrl,
+  })));
 
   const [showAdd, setShowAdd] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

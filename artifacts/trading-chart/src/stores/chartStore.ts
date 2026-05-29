@@ -214,10 +214,9 @@ export const useChartStore = create<ChartStore>()(persist((set, get) => ({
   csvLoadProgress: 0,
 
   setBacktestIndex: (backtestIndex: number) => {
-    set({ backtestIndex });
-    // Push the sliced candles into the store so the chart re-renders
+    // Single atomic update — avoids two render cycles per tick
     const { backtestCandles } = get();
-    set({ candles: backtestCandles.slice(0, backtestIndex) });
+    set({ backtestIndex, candles: backtestCandles.slice(0, backtestIndex) });
   },
 
   loadCsvData: async (file: File) => {

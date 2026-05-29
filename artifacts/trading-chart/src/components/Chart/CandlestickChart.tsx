@@ -40,6 +40,8 @@ export const CandlestickChart: React.FC = () => {
 
   const hasDragged = useRef(false);
   const initialRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const prevCandleLengthRef = useRef<number>(0); // for incremental update detection
+  const prevLastTimeRef = useRef<number>(0);       // to detect full reset vs append
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const { candles, indicators, chartFontSize, timezone, loadCandles, startLiveUpdates, stopLiveUpdates, hideAllDrawings, hideAllIndicators, clearAllDrawings, clearAllIndicators, dataSource } = useChartStore();
@@ -294,14 +296,74 @@ export const CandlestickChart: React.FC = () => {
     volumeSeriesRef.current.setData(volumeData as HistogramData[]);
   }, [timezone]);
 
-  // Update candle data
+  // Update candle data — uses incremental update() during playback to avoid O(n) setData
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current || !chartRef.current || candles.length === 0) return;
 
+    const currentSource = useChartStore.getState().dataSource;
+    const prevLen = prevCandleLengthRef.current;
+    const prevLastTime = prevLastTimeRef.current;
+    const lastCandle = candles[candles.length - 1];
+
+    // Detect if this is a single-bar append during backtest playback
+    const isSingleAppend =
+      currentSource === 'csv' &&
+      candles.length === prevLen + 1 &&
+      lastCandle.time > prevLastTime;
+
+    // Detect if last candle time matches (live update / same bar)
+    const isSameBarUpdate =
+      currentSource !== 'csv' &&
+      candles.length === prevLen &&
+      lastCandle.time === prevLastTime;
+
+    prevCandleLengthRef.current = candles.length;
+    prevLastTimeRef.current = lastCandle.time;
+
+    // ── Fast path: append ONE candle (backtest step-forward) ────────────
+    if (isSingleAppend) {
+      try {
+        candleSeriesRef.current.update({
+          time: lastCandle.time as Time,
+          open: lastCandle.open,
+          high: lastCandle.high,
+          low: lastCandle.low,
+          close: lastCandle.close,
+        });
+        volumeSeriesRef.current.update({
+          time: lastCandle.time as Time,
+          value: lastCandle.volume,
+          color: lastCandle.close >= lastCandle.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+        });
+      } catch { /* ignore out-of-order errors */ }
+      return; // skip setData and range-preservation
+    }
+
+    // ── Fast path: live tick update (same bar, update last candle only) ─
+    if (isSameBarUpdate) {
+      try {
+        candleSeriesRef.current.update({
+          time: lastCandle.time as Time,
+          open: lastCandle.open,
+          high: lastCandle.high,
+          low: lastCandle.low,
+          close: lastCandle.close,
+        });
+        volumeSeriesRef.current.update({
+          time: lastCandle.time as Time,
+          value: lastCandle.volume,
+          color: lastCandle.close >= lastCandle.open ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+        });
+      } catch { /* ignore */ }
+      return;
+    }
+
+    // ── Full reload: symbol/timeframe change, CSV load, jump-to-date ────
     const timeScale = chartRef.current.timeScale();
     const prevRange = timeScale.getVisibleLogicalRange();
 
-    const sorted = dedupeAndSort(candles);
+    // CSV data is already sorted+deduped by csvDataLoader — skip O(n log n) work
+    const sorted = currentSource === 'csv' ? candles : dedupeAndSort(candles);
 
     const candleData: CandlestickData[] = sorted.map((c) => ({
       time: c.time as Time,

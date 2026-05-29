@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   useTradeStore,
   Trade,
@@ -15,28 +15,26 @@ type Tab = 'open' | 'closed';
 
 export const TradeBook: React.FC = () => {
   const { trades, closeTrade, deleteTrade, clearAllTrades } = useTradeStore();
-  const { candles, dataSource, backtestCandles, backtestIndex } = useChartStore();
+
+  // Granular selectors — only re-render when price or time changes, not the whole candles array
+  const currentPrice = useChartStore((s) => {
+    const c = s.candles;
+    return c.length > 0 ? c[c.length - 1].close : 0;
+  });
+  const currentTime = useChartStore((s) => {
+    if (s.dataSource === 'csv' && s.backtestCandles.length > 0) {
+      const idx = Math.max(0, s.backtestIndex - 1);
+      return s.backtestCandles[idx]?.time ?? Math.floor(Date.now() / 1000);
+    }
+    return Math.floor(Date.now() / 1000);
+  });
+  const dataSource = useChartStore((s) => s.dataSource);
 
   const [activeTab, setActiveTab] = useState<Tab>('open');
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [closeTarget, setCloseTarget] = useState<Trade | null>(null);
   const [closePrice, setClosePrice] = useState('');
-
-  // Get current market price for P&L calc
-  const currentPrice = (() => {
-    const last = candles[candles.length - 1];
-    return last?.close ?? 0;
-  })();
-
-  // Current time for closing trades
-  const currentTime = (() => {
-    if (dataSource === 'csv' && backtestCandles.length > 0) {
-      const idx = Math.max(0, backtestIndex - 1);
-      return backtestCandles[idx]?.time ?? Math.floor(Date.now() / 1000);
-    }
-    return Math.floor(Date.now() / 1000);
-  })();
 
   const openTrades = trades.filter((t) => t.status === 'open');
   const closedTrades = trades.filter((t) => t.status === 'closed')
